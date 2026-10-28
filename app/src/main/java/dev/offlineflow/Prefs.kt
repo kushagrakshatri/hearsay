@@ -38,6 +38,14 @@ object Prefs {
             .putBoolean("cloud_cleanup", cleanup)
             .apply()
 
+    // Sign in with ChatGPT: cleanup and commands on the user's ChatGPT plan (tokens live in ChatGptPlan's file).
+    fun chatGptCleanup(c: Context): Boolean = p(c).getBoolean("chatgpt_cleanup", true)
+    fun setChatGptCleanup(c: Context, on: Boolean) = p(c).edit().putBoolean("chatgpt_cleanup", on).apply()
+    fun chatGptModel(c: Context): String = p(c).getString("chatgpt_model", null) ?: "gpt-6-luna"
+    fun setChatGptModel(c: Context, m: String) = p(c).edit().putString("chatgpt_model", m.trim().ifEmpty { "gpt-6-luna" }).apply()
+    fun chatGptWelcomed(c: Context): Boolean = p(c).getBoolean("chatgpt_welcomed", false)
+    fun setChatGptWelcomed(c: Context) = p(c).edit().putBoolean("chatgpt_welcomed", true).apply()
+
     /** Apps where the user picked a style with the keyboard chip. */
     fun styleOverrides(c: Context): Int = p(c).all.keys.count { it.startsWith(STYLE_PREFIX) }
 

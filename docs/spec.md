@@ -43,6 +43,7 @@ Mic (AudioRecord, 16 kHz mono)
   - Guardrail: if the LLM output drifts too far from the transcript (length/similarity check), insert the rules version instead.
 - **Context:** app package + input type from `EditorInfo`; a little text before the cursor via `getTextBeforeCursor` for tone and continuity. Never stored.
 - **Optional cloud mode (opt-in):** bring-your-own key for an OpenAI-compatible ASR/LLM endpoint. Off by default, clearly labeled.
+- **Sign in with ChatGPT (opt-in):** OpenAI's open-source ChatGPT plan usage flow (OAuth + PKCE, loopback redirect, no API key). Cleanup and commands run on the user's plan via the Responses API (default model `gpt-6-luna`, reasoning effort none). Speech always stays on-device (the flow takes no audio). Falls back to the on-device LLM when offline or over the plan limit. Compiled out with `-PnoCloud`.
 
 ## 4. Models and devices
 - Models download on first launch (not bundled), with checksums, resumable downloads, and a storage screen to delete them.

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
@@ -27,6 +28,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.Snippets
+import dev.offlineflow.cloud.ChatGptPlan
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,6 +51,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var stylesInfo: TextView
     private lateinit var stylesReset: Button
     private lateinit var storageBox: LinearLayout
+    private var planBox: LinearLayout? = null
+    private var signingIn = false
     private val downloading = mutableSetOf<ModelManager.Model>()
     private var dp = 1f
 
@@ -173,6 +177,14 @@ class SettingsActivity : AppCompatActivity() {
             addView(card("Storage", hint("Downloaded models. Remove ones you don't use to free space."), storageBox))
 
             if (BuildConfig.CLOUD) {
+                planBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+                addView(card("Use your ChatGPT plan (optional)",
+                    hint("Run cleanup and commands on GPT-6 Luna with your ChatGPT plan instead of the on-device model. " +
+                        "No API key needed. Speech is still transcribed on this phone; only the transcribed text is sent to OpenAI. " +
+                        "If ChatGPT can't be reached, Hearsay falls back to the on-device model."),
+                    planBox!!,
+                ))
+
                 fun field(value: String, hintText: String, secret: Boolean = false) = EditText(context).apply {
                     setText(value); hint = hintText; isSingleLine = true
                     inputType = if (secret) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
@@ -184,7 +196,7 @@ class SettingsActivity : AppCompatActivity() {
                 val llmModel = field(Prefs.cloudCleanupModel(context), "Cleanup model, e.g. gpt-4o-mini")
                 val speech = CheckBox(context).apply { text = "Use the cloud for speech"; isChecked = Prefs.cloudSpeech(context) }
                 val cleanup = CheckBox(context).apply { text = "Use the cloud for cleanup and commands"; isChecked = Prefs.cloudCleanup(context) }
-                addView(card("Cloud mode (optional, off by default)",
+                addView(card("Cloud mode with your own API key (optional)",
                     hint("Use your own key for an OpenAI-compatible service instead of the on-device models. " +
                         "When on, your audio or text is sent to that service. Leave both boxes unticked to stay fully offline. " +
                         "Needs an https address."),
@@ -204,7 +216,7 @@ class SettingsActivity : AppCompatActivity() {
                 ))
             }
 
-            addView(hint("\nAudio and text stay on this phone unless you turn on cloud mode. Otherwise the only network use is downloading models.").apply {
+            addView(hint("\nAudio stays on this phone unless you turn on cloud speech. Text stays here too unless you use your ChatGPT plan or cloud mode. Otherwise the only network use is downloading models.").apply {
                 gravity = Gravity.CENTER
             })
         }
@@ -250,6 +262,72 @@ class SettingsActivity : AppCompatActivity() {
         stylesReset.visibility = if (n == 0) View.GONE else View.VISIBLE
 
         refreshStorage()
+        refreshPlan()
+    }
+
+    /** The ChatGPT plan card: Continue with ChatGPT, or the signed-in account and its controls. */
+    private fun refreshPlan() {
+        val box = planBox ?: return
+        box.removeAllViews()
+        val account = ChatGptPlan.account(this)
+        if (account == null) {
+            box.addView(Button(this).apply {
+                text = if (signingIn) "Waiting for ChatGPT sign-in…" else "Continue with ChatGPT"
+                isAllCaps = false; isEnabled = !signingIn
+                setTextColor(Color.WHITE)
+                background = GradientDrawable().apply { cornerRadius = 24 * dp; setColor(Color.BLACK) }
+                setOnClickListener { signInWithChatGpt() }
+            })
+            return
+        }
+        val on = Prefs.chatGptCleanup(this)
+        box.addView(TextView(this).apply {
+            textSize = 14f
+            text = "Signed in as ${account.email.ifEmpty { "your ChatGPT account" }}" + if (on) "\nUsing ChatGPT plan · ${Prefs.chatGptModel(this@SettingsActivity)}" else ""
+        })
+        box.addView(CheckBox(this).apply {
+            text = "Use my ChatGPT plan for cleanup and commands"; isChecked = on
+            setOnCheckedChangeListener { _, checked -> Prefs.setChatGptCleanup(this@SettingsActivity, checked); refreshPlan() }
+        })
+        val model = EditText(this).apply {
+            setText(Prefs.chatGptModel(this@SettingsActivity)); hint = ChatGptPlan.DEFAULT_MODEL; isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        box.addView(model)
+        box.addView(button("Save model") { Prefs.setChatGptModel(this, model.text.toString()); toast("Model saved"); refreshPlan() })
+        box.addView(button("Manage usage") { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ChatGptPlan.USAGE_URL))) })
+        box.addView(button("Sign out") {
+            lifecycleScope.launch {
+                val revoked = withContext(Dispatchers.IO) { ChatGptPlan.signOut(this@SettingsActivity) }
+                toast(if (revoked) "Signed out" else "Signed out here. You can also disconnect Hearsay in ChatGPT settings.")
+                refreshPlan()
+            }
+        })
+    }
+
+    private fun signInWithChatGpt() {
+        if (signingIn) return
+        signingIn = true; refreshPlan()
+        // App-wide scope: the activity sits in the background while the browser is open.
+        @Suppress("OPT_IN_USAGE")
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            val result = runCatching { ChatGptPlan.signIn(this@SettingsActivity) }
+            runOnUiThread {
+                signingIn = false
+                result.onFailure { toast(it.message ?: "Sign-in failed") }
+                result.onSuccess {
+                    if (!Prefs.chatGptWelcomed(this@SettingsActivity)) {
+                        Prefs.setChatGptWelcomed(this@SettingsActivity)
+                        if (!isFinishing) AlertDialog.Builder(this@SettingsActivity)
+                            .setTitle("You're using your ChatGPT plan")
+                            .setMessage("Cleanup and commands in Hearsay now use your ChatGPT plan. You can manage usage in ChatGPT settings.")
+                            .setPositiveButton("Got it", null)
+                            .show()
+                    }
+                }
+                refreshPlan()
+            }
+        }
     }
 
     private fun refreshStorage() {

@@ -52,12 +52,20 @@ class LlmCleaner private constructor(
          * Shared by the local model and opt-in cloud cleanup: rules pre-pass, skip very short
          * input, run [generate], and fall back to the rules text when the output looks off.
          */
-        fun cleanWith(raw: String, style: Style, generate: (input: String, words: Int) -> String): String {
+        fun cleanWith(raw: String, style: Style, generate: (input: String, words: Int) -> String): String =
+            clean(raw, style, rethrow = false, generate)
+
+        /** Like [cleanWith], but a failing [generate] throws so the caller can fall back (cloud → on-device). */
+        fun cleanWithOrThrow(raw: String, style: Style, generate: (input: String, words: Int) -> String): String =
+            clean(raw, style, rethrow = true, generate)
+
+        private fun clean(raw: String, style: Style, rethrow: Boolean, generate: (input: String, words: Int) -> String): String {
             val input = RulesCleaner.clean(raw) // cheap pre-pass: strips [BLANK_AUDIO], ums
             if (input.isBlank() || style == Style.VERBATIM) return input
             val words = input.split(Regex("\\s+")).size
             if (words < 3) return if (style == Style.CASUAL) casualEnding(input) else input
-            val out = runCatching { generate(input, words) }.getOrDefault("").let(::stripWrapping)
+            val out = (if (rethrow) generate(input, words) else runCatching { generate(input, words) }.getOrDefault(""))
+                .let(::stripWrapping)
             return if (looksSane(input, out)) out else input
         }
 

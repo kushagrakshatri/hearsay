@@ -27,6 +27,7 @@ import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.Commands
 import dev.offlineflow.cleanup.Continuity
 import dev.offlineflow.cloud.CloudClient
+import dev.offlineflow.cloud.CloudText
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
@@ -61,6 +62,8 @@ class OfflineFlowIME : InputMethodService() {
     private var style = Style.POLISHED
     private var editorPkg: String? = null
     private var lastRaw: String? = null
+    /** Why the last cloud call fell back to on-device, shown once in the status line. */
+    private var cloudNote: String? = null
     private var lastInserted: String? = null
     private var hasSelection = false
     private var idleJob: Job? = null
@@ -131,7 +134,8 @@ class OfflineFlowIME : InputMethodService() {
         status.text = when {
             !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
             !speechAvailable() -> "Open the Hearsay app to download the speech model"
-            CloudClient.speechOn(this) || CloudClient.cleanupOn(this) -> "Ready · cloud mode on"
+            CloudText.usingPlan(this) -> "Ready · using ChatGPT plan · ${models.selected.shortName} on-device"
+            CloudClient.speechOn(this) || CloudText.on(this) -> "Ready · cloud mode on"
             else -> "Ready · on-device · ${models.selected.shortName}"
         }
         warmUp()
@@ -178,7 +182,7 @@ class OfflineFlowIME : InputMethodService() {
 
     /** Local cleanup model downloaded, or cloud cleanup configured. */
     private fun cleanupAvailable() =
-        models.selectedCleanup?.let { models.isReady(it) } == true || CloudClient.cleanupOn(this)
+        models.selectedCleanup?.let { models.isReady(it) } == true || CloudText.on(this)
 
     override fun onDestroy() {
         scope.cancel()
@@ -220,7 +224,7 @@ class OfflineFlowIME : InputMethodService() {
     /** Loads the cleanup model and evaluates the current style's prompt ahead of use. */
     private fun warmStyle() {
         val s = style
-        if (CloudClient.cleanupOn(this)) return // cloud cleanup: keep the local LLM unloaded
+        if (CloudText.on(this)) return // cloud cleanup: keep the local LLM unloaded
         scope.launch(llmDispatcher) {
             runCatching { (cleanerForSelected() as? LlmCleaner)?.warm(s) }
                 .onFailure { Log.e(TAG, "cleanup model load failed", it) }
@@ -322,19 +326,26 @@ class OfflineFlowIME : InputMethodService() {
             val t1 = SystemClock.elapsedRealtime()
             val dictionary = Dictionary.load(this@OfflineFlowIME)
             val heard = dictionary.apply(raw)
-            val cloudClean = CloudClient.from(this@OfflineFlowIME)?.takeIf { CloudClient.cleanupOn(this@OfflineFlowIME) }
-            val cloudModel = Prefs.cloudCleanupModel(this@OfflineFlowIME)
-            val cleaned = if (s == Style.VERBATIM) RulesCleaner.verbatim(heard) else try {
-                if (cloudClean != null) withContext(Dispatchers.IO) {
-                    dictionary.apply(LlmCleaner.cleanWith(heard, s) { input, words ->
-                        cloudClean.chat(cloudModel, LlmCleaner.cleanupMessages(s, dictionary.spellings, input), words * 2 + 32)
-                    })
-                } else withContext(llmDispatcher) {
-                    when (val c = cleanerForSelected(dictionary)) {
-                        is LlmCleaner -> dictionary.apply(c.clean(heard, s))
-                        else -> dictionary.apply(rulesFor(heard, s))
-                    }
+            val ctx = this@OfflineFlowIME
+            suspend fun local() = withContext(llmDispatcher) {
+                when (val c = cleanerForSelected(dictionary)) {
+                    is LlmCleaner -> dictionary.apply(c.clean(heard, s))
+                    else -> dictionary.apply(rulesFor(heard, s))
                 }
+            }
+            val cleaned = if (s == Style.VERBATIM) RulesCleaner.verbatim(heard) else try {
+                if (CloudText.on(ctx)) try {
+                    withContext(Dispatchers.IO) {
+                        dictionary.apply(LlmCleaner.cleanWithOrThrow(heard, s) { input, words ->
+                            CloudText.chat(ctx, LlmCleaner.cleanupMessages(s, dictionary.spellings, input), words * 2 + 32)
+                        })
+                    }
+                } catch (t: Throwable) {
+                    // Offline, plan limit, signed out: fall back to the on-device model (or rules).
+                    Log.w(TAG, "cloud cleanup failed, using on-device", t)
+                    cloudNote = t.message
+                    local()
+                } else local()
             } catch (t: Throwable) {
                 Log.e(TAG, "cleanup failed, using rules", t)
                 dictionary.apply(rulesFor(heard, s))
@@ -350,6 +361,7 @@ class OfflineFlowIME : InputMethodService() {
             status.text = if (cleaned.isEmpty()) "Heard nothing · ${ms} ms"
                 else if (useLlm) "Done in ${ms} ms · speech ${asrMs} + cleanup ${cleanMs} · ${audio.size / Recorder.SAMPLE_RATE}s audio"
                 else "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
+            cloudNote?.let { status.text = "${status.text} · cloud skipped: ${it.take(60)}"; cloudNote = null }
             Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
         }
     }
@@ -362,12 +374,17 @@ class OfflineFlowIME : InputMethodService() {
             status.text = "Commands need a cleanup model · open Hearsay settings"; return
         }
         status.text = "Editing: $instruction…"
-        val cloudClean = CloudClient.from(this)?.takeIf { CloudClient.cleanupOn(this) }
-        val cloudModel = Prefs.cloudCleanupModel(this)
+        suspend fun local() = withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
         val edited = try {
-            if (cloudClean != null) withContext(Dispatchers.IO) {
-                LlmCleaner.editWith(target.trim()) { max -> cloudClean.chat(cloudModel, LlmCleaner.editMessages(target.trim(), instruction), max) }
-            } else withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
+            if (CloudText.on(this)) try {
+                withContext(Dispatchers.IO) {
+                    LlmCleaner.editWith(target.trim()) { max -> CloudText.chat(this@OfflineFlowIME, LlmCleaner.editMessages(target.trim(), instruction), max) }
+                        ?: error("cloud edit returned nothing usable")
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "cloud command failed, using on-device", t)
+                local()
+            } else local()
         } catch (t: Throwable) {
             Log.e(TAG, "command failed", t); null
         }
@@ -407,7 +424,7 @@ class OfflineFlowIME : InputMethodService() {
         if (sel == hasSelection) return
         hasSelection = sel
         if (::mic.isInitialized && recorder == null) mic.text = idleLabel()
-        if (sel && !CloudClient.cleanupOn(this)) scope.launch(llmDispatcher) {
+        if (sel && !CloudText.on(this)) scope.launch(llmDispatcher) {
             runCatching { (cleanerForSelected() as? LlmCleaner)?.warmEdit() }.onFailure { Log.e(TAG, "edit warm-up failed", it) }
         }
     }
