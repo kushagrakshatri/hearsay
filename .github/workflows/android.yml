@@ -16,9 +16,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
-      - name: Install NDK and CMake
-        run: sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Install NDK and CMake (SDK is preinstalled on ubuntu-latest)
+        run: |
+          SDKM=$(ls -d $ANDROID_HOME/cmdline-tools/*/bin | sort -V | tail -1)/sdkmanager
+          yes | $SDKM --licenses > /dev/null || true
+          $SDKM "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
