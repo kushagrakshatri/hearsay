@@ -58,7 +58,8 @@ class SetupActivity : AppCompatActivity() {
             addView(ScrollView(context).apply {
                 isFillViewport = true
                 addView(FrameLayout(context).apply {
-                    addView(body, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL))
+                    setPadding(0, ui.dp(56), 0, ui.dp(16))
+                    addView(body, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
                 })
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
             addView(primary, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -186,7 +187,7 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun modelRow(m: ModelManager.Model) {
-        val label = ui.body("").apply { textSize = 15f }
+        val label = ui.body("").apply { textSize = 16f }
         val bar = LinearProgressIndicator(this).apply { max = 100; trackCornerRadius = ui.dp(4) }
         labels[m] = label; bars[m] = bar
         body.addView(ui.card(
@@ -199,7 +200,8 @@ class SetupActivity : AppCompatActivity() {
         for ((m, label) in labels) {
             val ready = models.isReady(m)
             label.text = "${m.shortName} · ${if (ready) "ready" else "~${m.approxMb} MB"}"
-            if (!downloading) bars[m]?.setProgressCompat(if (ready) 100 else 0, false)
+            // Bars appear only while downloading; an empty track reads as a full bar.
+            bars[m]?.visibility = if (downloading && !ready) View.VISIBLE else View.GONE
         }
         if (step == Step.MODELS) {
             primary.isEnabled = !downloading

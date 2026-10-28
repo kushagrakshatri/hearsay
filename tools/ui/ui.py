@@ -16,10 +16,17 @@ def nodes():
     return list(root.iter("node"))
 
 def find(label):
-    for n in nodes():
+    """Exact text match first (so "Later" is the button, not a sentence containing it), then substring."""
+    ns = nodes()
+    def center(n):
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds")))
+        return (x1 + x2) // 2, (y1 + y2) // 2
+    for n in ns:
+        if label.lower() in (n.get("text", "").strip().lower(), n.get("content-desc", "").strip().lower()):
+            return center(n)
+    for n in ns:
         if label.lower() in (n.get("text", "") + " " + n.get("content-desc", "")).lower():
-            x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds")))
-            return (x1 + x2) // 2, (y1 + y2) // 2
+            return center(n)
     return None
 
 def size():
