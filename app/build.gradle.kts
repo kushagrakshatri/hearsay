@@ -39,6 +39,8 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.0-build.$buildNumber"
+        // Opt-in cloud mode (bring your own key). Build with -PnoCloud to compile it out (F-Droid).
+        buildConfigField("boolean", "CLOUD", if (project.hasProperty("noCloud")) "false" else "true")
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
             cmake { arguments += listOf("-DANDROID_STL=c++_shared") }
@@ -75,6 +77,8 @@ android {
         // Both native modules bundle the same NDK C++ runtime.
         jniLibs { pickFirsts += "**/libc++_shared.so" }
     }
+
+    buildFeatures { buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

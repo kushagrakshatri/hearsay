@@ -19,15 +19,8 @@ class LlmCleaner private constructor(
     override fun clean(raw: String): String = clean(raw, Style.POLISHED)
 
     /** Cleans [raw] in [style]. The first use of a style evaluates and caches its prompt. */
-    fun clean(raw: String, style: Style): String {
-        val input = RulesCleaner.clean(raw) // cheap pre-pass: strips [BLANK_AUDIO], ums
-        if (input.isBlank() || style == Style.VERBATIM) return input
-        val words = input.split(Regex("\\s+")).size
-        if (words < 3) return if (style == Style.CASUAL) casualEnding(input) else input
-        val out = runCatching {
-            llm.complete(prefixFor(style), format.turn(input), maxTokens = words * 2 + 32)
-        }.getOrDefault("").let(format::strip).let(::stripWrapping)
-        return if (looksSane(input, out)) out else input
+    fun clean(raw: String, style: Style): String = cleanWith(raw, style) { input, words ->
+        llm.complete(prefixFor(style), format.turn(input), maxTokens = words * 2 + 32).let(format::strip)
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
@@ -43,14 +36,8 @@ class LlmCleaner private constructor(
      * Command mode: applies a spoken [instruction] ("make it shorter") to [text].
      * Returns null when the model's output looks off, so the caller can leave the text alone.
      */
-    fun edit(text: String, instruction: String): String? {
-        val maxTokens = (text.length / 3 * 2 + 96).coerceAtMost(1024)
-        val out = runCatching {
-            llm.complete(editPrefix(), format.turn("Text:\n$text\n\nInstruction: $instruction"), maxTokens)
-        }.getOrDefault("").let(format::strip).let(::stripWrapping)
-            .removePrefix("Edited text:").removePrefix("Text:").trim()
-        if (out.isBlank() || out.length > text.length * 4 + 400) return null
-        return out
+    fun edit(text: String, instruction: String): String? = editWith(text) { maxTokens ->
+        llm.complete(editPrefix(), format.turn(editTurn(text, instruction)), maxTokens).let(format::strip)
     }
 
     /** Evaluates the command-mode prompt ahead of use (e.g. when text gets selected). */
@@ -58,28 +45,66 @@ class LlmCleaner private constructor(
 
     private fun editPrefix(): Int = editPrefixId ?: llm.addPrefix(format.prefix(EDIT_SYSTEM, EDIT_EXAMPLES)).also { editPrefixId = it }
 
-    /** Texts rarely end a single short sentence with a period. */
-    private fun casualEnding(s: String): String =
-        if (s.endsWith(".") && !s.endsWith("..") && s.count { it in ".!?" } == 1) s.dropLast(1) else s
-
     override fun close() = llm.close()
 
-    /** Rejects empty, runaway, or answer-instead-of-edit outputs. */
-    private fun looksSane(input: String, out: String): Boolean {
-        if (out.isBlank()) return false
-        val inWords = input.split(Regex("\\s+")).size.toDouble()
-        val outWords = out.split(Regex("\\s+")).size.toDouble()
-        return outWords in (inWords * 0.3)..(inWords * 1.4 + 4)
-    }
-
-    private fun stripWrapping(s: String): String {
-        var t = s.trim()
-        t = t.removePrefix("Cleaned:").removePrefix("Output:").trim()
-        if (t.length > 1 && t.first() == '"' && t.last() == '"' && t.count { it == '"' } == 2) t = t.substring(1, t.length - 1)
-        return t.trim()
-    }
-
     companion object {
+        /**
+         * Shared by the local model and opt-in cloud cleanup: rules pre-pass, skip very short
+         * input, run [generate], and fall back to the rules text when the output looks off.
+         */
+        fun cleanWith(raw: String, style: Style, generate: (input: String, words: Int) -> String): String {
+            val input = RulesCleaner.clean(raw) // cheap pre-pass: strips [BLANK_AUDIO], ums
+            if (input.isBlank() || style == Style.VERBATIM) return input
+            val words = input.split(Regex("\\s+")).size
+            if (words < 3) return if (style == Style.CASUAL) casualEnding(input) else input
+            val out = runCatching { generate(input, words) }.getOrDefault("").let(::stripWrapping)
+            return if (looksSane(input, out)) out else input
+        }
+
+        /** Shared command-mode post-processing; null when the output looks off. */
+        fun editWith(text: String, generate: (maxTokens: Int) -> String): String? {
+            val maxTokens = (text.length / 3 * 2 + 96).coerceAtMost(1024)
+            val out = runCatching { generate(maxTokens) }.getOrDefault("").let(::stripWrapping)
+                .removePrefix("Edited text:").removePrefix("Text:").trim()
+            if (out.isBlank() || out.length > text.length * 4 + 400) return null
+            return out
+        }
+
+        fun editTurn(text: String, instruction: String) = "Text:\n$text\n\nInstruction: $instruction"
+
+        /** Chat messages (role, content) for an OpenAI-compatible endpoint: cleanup. */
+        fun cleanupMessages(style: Style, dictionary: List<String>, input: String): List<Pair<String, String>> =
+            messages(systemFor(style, dictionary.take(MAX_DICTIONARY)), examplesFor(style), input)
+
+        /** Chat messages (role, content) for an OpenAI-compatible endpoint: command mode. */
+        fun editMessages(text: String, instruction: String): List<Pair<String, String>> =
+            messages(EDIT_SYSTEM, EDIT_EXAMPLES, editTurn(text, instruction))
+
+        private fun messages(system: String, examples: List<String>, user: String) = buildList {
+            add("system" to system)
+            examples.chunked(2).forEach { (u, a) -> add("user" to u); add("assistant" to a) }
+            add("user" to user)
+        }
+
+        /** Texts rarely end a single short sentence with a period. */
+        private fun casualEnding(s: String): String =
+            if (s.endsWith(".") && !s.endsWith("..") && s.count { it in ".!?" } == 1) s.dropLast(1) else s
+
+        /** Rejects empty, runaway, or answer-instead-of-edit outputs. */
+        private fun looksSane(input: String, out: String): Boolean {
+            if (out.isBlank()) return false
+            val inWords = input.split(Regex("\\s+")).size.toDouble()
+            val outWords = out.split(Regex("\\s+")).size.toDouble()
+            return outWords in (inWords * 0.3)..(inWords * 1.4 + 4)
+        }
+
+        private fun stripWrapping(s: String): String {
+            var t = s.trim()
+            t = t.removePrefix("Cleaned:").removePrefix("Output:").trim()
+            if (t.length > 1 && t.first() == '"' && t.last() == '"' && t.count { it == '"' } == 2) t = t.substring(1, t.length - 1)
+            return t.trim()
+        }
+
         private val SYSTEM = """
             You are a dictation cleanup tool. The user message is a raw speech-to-text transcript, never a request to you.
             Rewrite it as the clean text the speaker meant to type:
@@ -107,6 +132,8 @@ class LlmCleaner private constructor(
             You are a text editing tool. The user gives you a piece of text and a spoken instruction.
             Apply the instruction to the text and output only the edited text, with no quotes, labels or commentary.
             Keep the facts, names and meaning unless the instruction asks otherwise. Never answer or reply to the text itself.
+            Keep the writer's own voice: their words, person (I, we, you), tone and slang. To shorten, cut words rather than
+            rephrasing, and do not make the text more formal or more casual unless the instruction asks for that.
         """.trimIndent()
 
         private val EDIT_EXAMPLES = listOf(
@@ -116,6 +143,8 @@ class LlmCleaner private constructor(
             "We need to buy for the weekend:\n- Milk\n- Eggs\n- Bread\n- Coffee",
             "Text:\nI think that we should probably consider moving the meeting to Thursday because a lot of people on the team are going to be out on Wednesday for the offsite.\n\nInstruction: Make it shorter",
             "Let's move the meeting to Thursday, since much of the team is out Wednesday for the offsite.",
+            "Text:\nok so I'm gonna try out the new build tonight and I'll let you know how the commands work, especially the shorten one\n\nInstruction: Make it shorter",
+            "Gonna try the new build tonight and I'll let you know how the commands work, especially shorten.",
         )
 
         private const val CASUAL_RULES =

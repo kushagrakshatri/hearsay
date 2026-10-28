@@ -2,6 +2,7 @@ package dev.offlineflow.ime
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ComponentCallbacks2
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -24,6 +25,8 @@ import dev.offlineflow.audio.Recorder
 import dev.offlineflow.audio.SpeechGate
 import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.Commands
+import dev.offlineflow.cleanup.Continuity
+import dev.offlineflow.cloud.CloudClient
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
@@ -60,6 +63,8 @@ class OfflineFlowIME : InputMethodService() {
     private var lastRaw: String? = null
     private var lastInserted: String? = null
     private var hasSelection = false
+    private var idleJob: Job? = null
+    private lateinit var wave: LevelView
 
     override fun onCreate() {
         super.onCreate()
@@ -96,6 +101,7 @@ class OfflineFlowIME : InputMethodService() {
         val back = Button(this).apply {
             text = "⌫"; setOnClickListener { currentInputConnection?.deleteSurroundingText(1, 0) }
         }
+        wave = LevelView(this).apply { visibility = View.GONE }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             addView(next); addView(mic, LinearLayout.LayoutParams(0, (72 * dp).toInt(), 1f)); addView(raw); addView(back)
@@ -108,12 +114,14 @@ class OfflineFlowIME : InputMethodService() {
                 addView(status, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(styleChip)
             })
+            addView(wave, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (28 * dp).toInt()))
             addView(row)
         }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        idleJob?.cancel(); idleJob = null
         lastRaw = null; lastInserted = null
         hasSelection = info != null && info.initialSelStart >= 0 && info.initialSelStart != info.initialSelEnd
         mic.text = idleLabel()
@@ -122,7 +130,8 @@ class OfflineFlowIME : InputMethodService() {
         styleChip.text = style.label
         status.text = when {
             !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
-            !models.isReady(models.selected) -> "Open the Hearsay app to download the speech model"
+            !speechAvailable() -> "Open the Hearsay app to download the speech model"
+            CloudClient.speechOn(this) || CloudClient.cleanupOn(this) -> "Ready · cloud mode on"
             else -> "Ready · on-device · ${models.selected.shortName}"
         }
         warmUp()
@@ -133,7 +142,43 @@ class OfflineFlowIME : InputMethodService() {
         recorder?.stop(); recorder = null
         handsFree = false
         if (::mic.isInitialized) mic.text = idleLabel()
+        if (::wave.isInitialized) { wave.visibility = View.GONE; wave.clear() }
+        // Keyboard hidden: free the cleanup LLM after a minute and the speech model after five,
+        // so a hidden keyboard doesn't hold gigabytes of RAM. Reopening cancels this.
+        idleJob?.cancel()
+        idleJob = scope.launch {
+            delay(LLM_IDLE_MS)
+            releaseLlm()
+            delay(ASR_IDLE_MS - LLM_IDLE_MS)
+            releaseAsr()
+        }
     }
+
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (recorder != null) return
+        val hidden = !isInputViewShown
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL || (hidden && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)) {
+            Log.i(TAG, "trim memory level=$level, releasing models")
+            scope.launch { releaseLlm(); releaseAsr() }
+        }
+    }
+
+    private suspend fun releaseLlm() = withContext(llmDispatcher) {
+        cleaner?.close(); cleaner = null; cleanerModel = null; cleanerDictKey = null
+    }
+
+    private suspend fun releaseAsr() = withContext(asrDispatcher) {
+        engine?.close(); engine = null; engineModel = null
+    }
+
+    /** Local model downloaded, or cloud speech configured. */
+    private fun speechAvailable() = models.isReady(models.selected) || CloudClient.speechOn(this)
+
+    /** Local cleanup model downloaded, or cloud cleanup configured. */
+    private fun cleanupAvailable() =
+        models.selectedCleanup?.let { models.isReady(it) } == true || CloudClient.cleanupOn(this)
 
     override fun onDestroy() {
         scope.cancel()
@@ -166,7 +211,7 @@ class OfflineFlowIME : InputMethodService() {
     }
 
     private fun warmUp() {
-        if (models.isReady(models.selected)) scope.launch(asrDispatcher) {
+        if (models.isReady(models.selected) && !CloudClient.speechOn(this)) scope.launch(asrDispatcher) {
             runCatching { engineForSelected() }.onFailure { Log.e(TAG, "speech model load failed", it) }
         }
         warmStyle()
@@ -175,6 +220,7 @@ class OfflineFlowIME : InputMethodService() {
     /** Loads the cleanup model and evaluates the current style's prompt ahead of use. */
     private fun warmStyle() {
         val s = style
+        if (CloudClient.cleanupOn(this)) return // cloud cleanup: keep the local LLM unloaded
         scope.launch(llmDispatcher) {
             runCatching { (cleanerForSelected() as? LlmCleaner)?.warm(s) }
                 .onFailure { Log.e(TAG, "cleanup model load failed", it) }
@@ -203,14 +249,15 @@ class OfflineFlowIME : InputMethodService() {
     }
 
     private fun startDictation() {
-        if (!hasMicPermission() || !models.isReady(models.selected)) return
+        if (!hasMicPermission() || !speechAvailable()) return
         status.text = "Listening…"
         val gate = SpeechGate.create(assets)
         buzz()
+        wave.clear(); wave.visibility = View.VISIBLE
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
             mic.post { if (handsFree) finishDictation() }
-        }).also { it.start() }
+        }, onLevel = { level -> wave.post { wave.push(level) } }).also { it.start() }
     }
 
     private fun finishDictation() {
@@ -219,16 +266,32 @@ class OfflineFlowIME : InputMethodService() {
         handsFree = false
         mic.text = idleLabel()
         buzz()
+        wave.visibility = View.GONE
         val audio = rec.stop()
         // Captured now: the selection decides whether this is a command or a replacement.
         val selected = currentInputConnection?.getSelectedText(0)?.toString()?.takeIf { it.isNotEmpty() }
         if (!rec.heardSpeech) { status.text = "Didn't hear any speech"; return }
         if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
-        status.text = if (engine == null || engineModel != models.selected) "Loading model, then transcribing…" else "Transcribing…"
+        val cloud = CloudClient.from(this)?.takeIf { CloudClient.speechOn(this) }
+        status.text = when {
+            cloud != null -> "Transcribing (cloud)…"
+            engine == null || engineModel != models.selected -> "Loading model, then transcribing…"
+            else -> "Transcribing…"
+        }
         val t0 = SystemClock.elapsedRealtime()
+        val cloudAsrModel = Prefs.cloudSpeechModel(this)
         scope.launch {
             val raw = try {
-                withContext(asrDispatcher) {
+                if (cloud != null) {
+                    try {
+                        withContext(Dispatchers.IO) { cloud.transcribe(audio, cloudAsrModel) }
+                    } catch (t: Throwable) {
+                        // Cloud failed: fall back to the on-device model when there is one.
+                        if (!models.isReady(models.selected)) throw t
+                        Log.w(TAG, "cloud transcription failed, using on-device", t)
+                        withContext(asrDispatcher) { engineForSelected().transcribe(audio) }
+                    }
+                } else withContext(asrDispatcher) {
                     engineForSelected().transcribe(audio)
                 }
             } catch (t: Throwable) {
@@ -254,13 +317,19 @@ class OfflineFlowIME : InputMethodService() {
                 return@launch
             }
             val s = style
-            val useLlm = s != Style.VERBATIM && models.selectedCleanup?.let { models.isReady(it) } == true && raw.isNotBlank()
+            val useLlm = s != Style.VERBATIM && cleanupAvailable() && raw.isNotBlank()
             if (useLlm) status.text = "Cleaning up…"
             val t1 = SystemClock.elapsedRealtime()
             val dictionary = Dictionary.load(this@OfflineFlowIME)
             val heard = dictionary.apply(raw)
+            val cloudClean = CloudClient.from(this@OfflineFlowIME)?.takeIf { CloudClient.cleanupOn(this@OfflineFlowIME) }
+            val cloudModel = Prefs.cloudCleanupModel(this@OfflineFlowIME)
             val cleaned = if (s == Style.VERBATIM) RulesCleaner.verbatim(heard) else try {
-                withContext(llmDispatcher) {
+                if (cloudClean != null) withContext(Dispatchers.IO) {
+                    dictionary.apply(LlmCleaner.cleanWith(heard, s) { input, words ->
+                        cloudClean.chat(cloudModel, LlmCleaner.cleanupMessages(s, dictionary.spellings, input), words * 2 + 32)
+                    })
+                } else withContext(llmDispatcher) {
                     when (val c = cleanerForSelected(dictionary)) {
                         is LlmCleaner -> dictionary.apply(c.clean(heard, s))
                         else -> dictionary.apply(rulesFor(heard, s))
@@ -273,7 +342,8 @@ class OfflineFlowIME : InputMethodService() {
             val cleanMs = SystemClock.elapsedRealtime() - t1
             val ms = SystemClock.elapsedRealtime() - t0
             if (cleaned.isNotEmpty()) {
-                val text = withLeadingSpace(cleaned)
+                val before = currentInputConnection?.getTextBeforeCursor(2, 0)
+                val text = withLeadingSpace(if (s == Style.VERBATIM) cleaned else Continuity.apply(cleaned, before))
                 currentInputConnection?.commitText(text, 1)
                 lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
             }
@@ -288,12 +358,16 @@ class OfflineFlowIME : InputMethodService() {
     private suspend fun runCommand(target: String, utterance: String, onSelection: Boolean, t0: Long) {
         val instruction = Commands.instruction(utterance)
         if (target.length > MAX_EDIT_CHARS) { status.text = "Too much text for a command (about 400 words max)"; return }
-        if (models.selectedCleanup?.let { models.isReady(it) } != true) {
+        if (!cleanupAvailable()) {
             status.text = "Commands need a cleanup model · open Hearsay settings"; return
         }
         status.text = "Editing: $instruction…"
+        val cloudClean = CloudClient.from(this)?.takeIf { CloudClient.cleanupOn(this) }
+        val cloudModel = Prefs.cloudCleanupModel(this)
         val edited = try {
-            withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
+            if (cloudClean != null) withContext(Dispatchers.IO) {
+                LlmCleaner.editWith(target.trim()) { max -> cloudClean.chat(cloudModel, LlmCleaner.editMessages(target.trim(), instruction), max) }
+            } else withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
         } catch (t: Throwable) {
             Log.e(TAG, "command failed", t); null
         }
@@ -333,7 +407,7 @@ class OfflineFlowIME : InputMethodService() {
         if (sel == hasSelection) return
         hasSelection = sel
         if (::mic.isInitialized && recorder == null) mic.text = idleLabel()
-        if (sel) scope.launch(llmDispatcher) {
+        if (sel && !CloudClient.cleanupOn(this)) scope.launch(llmDispatcher) {
             runCatching { (cleanerForSelected() as? LlmCleaner)?.warmEdit() }.onFailure { Log.e(TAG, "edit warm-up failed", it) }
         }
     }
@@ -372,5 +446,7 @@ class OfflineFlowIME : InputMethodService() {
         private const val TAG = "OfflineFlowIME"
         private const val TAP_MS = 350L
         private const val MAX_EDIT_CHARS = 2400
+        private const val LLM_IDLE_MS = 60_000L
+        private const val ASR_IDLE_MS = 300_000L
     }
 }

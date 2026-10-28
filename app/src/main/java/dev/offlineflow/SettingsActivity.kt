@@ -172,7 +172,39 @@ class SettingsActivity : AppCompatActivity() {
             storageBox = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
             addView(card("Storage", hint("Downloaded models. Remove ones you don't use to free space."), storageBox))
 
-            addView(hint("\nAudio and text stay on this phone. The only network use is downloading models.").apply {
+            if (BuildConfig.CLOUD) {
+                fun field(value: String, hintText: String, secret: Boolean = false) = EditText(context).apply {
+                    setText(value); hint = hintText; isSingleLine = true
+                    inputType = if (secret) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                        else InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+                }
+                val url = field(Prefs.cloudUrl(context), "https://api.openai.com/v1")
+                val key = field(Prefs.cloudKey(context), "API key", secret = true)
+                val asrModel = field(Prefs.cloudSpeechModel(context), "Speech model, e.g. whisper-1")
+                val llmModel = field(Prefs.cloudCleanupModel(context), "Cleanup model, e.g. gpt-4o-mini")
+                val speech = CheckBox(context).apply { text = "Use the cloud for speech"; isChecked = Prefs.cloudSpeech(context) }
+                val cleanup = CheckBox(context).apply { text = "Use the cloud for cleanup and commands"; isChecked = Prefs.cloudCleanup(context) }
+                addView(card("Cloud mode (optional, off by default)",
+                    hint("Use your own key for an OpenAI-compatible service instead of the on-device models. " +
+                        "When on, your audio or text is sent to that service. Leave both boxes unticked to stay fully offline. " +
+                        "Needs an https address."),
+                    url, key, asrModel, llmModel, speech, cleanup,
+                    button("Save cloud settings") {
+                        val u = url.text.toString().trim()
+                        if ((speech.isChecked || cleanup.isChecked) && !u.startsWith("https://")) {
+                            toast("The address must start with https://"); return@button
+                        }
+                        if ((speech.isChecked || cleanup.isChecked) && key.text.isBlank()) {
+                            toast("Add your API key first"); return@button
+                        }
+                        Prefs.saveCloud(this@SettingsActivity, u, key.text.toString(), asrModel.text.toString(),
+                            llmModel.text.toString(), speech.isChecked, cleanup.isChecked)
+                        toast(if (speech.isChecked || cleanup.isChecked) "Cloud mode on" else "Saved · fully offline")
+                    },
+                ))
+            }
+
+            addView(hint("\nAudio and text stay on this phone unless you turn on cloud mode. Otherwise the only network use is downloading models.").apply {
                 gravity = Gravity.CENTER
             })
         }
