@@ -29,6 +29,22 @@ def find(label):
             return center(n)
     return None
 
+def unstick():
+    for _ in range(3):
+        if not find_raw("isn't responding"): return
+        w = find_raw("Wait")
+        if w: adb("shell", "input", "tap", str(w[0]), str(w[1]))
+        else: adb("shell", "input", "keyevent", "BACK")
+
+
+def find_raw(label):
+    for n in nodes():
+        if label.lower() in (n.get("text", "") + " " + n.get("content-desc", "")).lower():
+            x1, y1, x2, y2 = map(int, re.findall(r"\d+", n.get("bounds")))
+            return (x1 + x2) // 2, (y1 + y2) // 2
+    return None
+
+
 def size():
     m = re.search(r"(\d+)x(\d+)", adb("shell", "wm", "size"))
     return int(m.group(1)), int(m.group(2))
@@ -39,6 +55,7 @@ def swipe_up():
     time.sleep(0.8)
 
 def tap(label, scroll=True):
+    unstick()
     for _ in range(12 if scroll else 1):
         p = find(label)
         if p:

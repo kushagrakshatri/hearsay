@@ -5,7 +5,9 @@ P=dev.offlineflow
 UI="python3 tools/ui/ui.py"
 OUT=shots; mkdir -p $OUT
 n=0
-shot() { sleep ${2:-1.5}; n=$((n+1)); adb exec-out screencap -p > "$OUT/$(printf %02d $n)-$1.png"; echo "shot $1"; }
+# Emulator system apps (Pixel Launcher) sometimes ANR on CI; dismiss the dialog before any shot.
+unstick() { python3 -c 'import sys; sys.path.insert(0, "tools/ui"); import ui; ui.unstick()'; }
+shot() { sleep ${2:-1.5}; unstick; n=$((n+1)); adb exec-out screencap -p > "$OUT/$(printf %02d $n)-$1.png"; echo "shot $1"; }
 start() { adb shell am force-stop $P; adb shell am start -n $P/.SettingsActivity >/dev/null; sleep 3; }
 scroll_shots() { for i in 1 2 3 4 5 6 7; do $UI up; shot "$1-scroll$i" 0.5; done; }
 
@@ -13,6 +15,7 @@ adb install -r "$1" || exit 1
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
+adb shell settings put global hide_error_dialogs 1
 
 for mode in light dark; do
   adb shell cmd uimode night $([ $mode = dark ] && echo yes || echo no); sleep 2
