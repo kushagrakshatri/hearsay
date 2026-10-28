@@ -46,9 +46,12 @@ PY
 done
 $UI tap "Basic rules only"
 start; shot settings-ready
+# force-stop resets the system IME to the default, so pick Hearsay again before opening the keyboard.
+adb shell ime set $P/.ime.OfflineFlowIME; sleep 1
 $UI tapnoscroll "Try it"; shot keyboard-idle 2.5
 $UI hold "Microphone" 4000; shot keyboard-listening 1.5; sleep 4; shot keyboard-after 2
 $UI tapnoscroll "Writing style"; shot keyboard-style-casual 1
-adb shell cmd uimode night yes; sleep 2; start
+adb shell cmd uimode night yes; sleep 2; start; adb shell ime set $P/.ime.OfflineFlowIME; sleep 1
 $UI tapnoscroll "Try it"; shot dark-keyboard-idle 2.5
+adb logcat -d -b crash > "$OUT/crash-log.txt" 2>&1 || true
 echo "done: $n shots"
