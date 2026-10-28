@@ -35,14 +35,14 @@ class SettingsActivity : AppCompatActivity() {
 
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(pad, pad, pad, pad)
-            addView(TextView(context).apply { text = "offline-flow"; textSize = 28f })
+            addView(TextView(context).apply { text = "Hearsay"; textSize = 28f })
             addView(TextView(context).apply { text = "Voice dictation that never leaves your phone."; textSize = 15f })
             addView(info)
             addView(button("1. Allow microphone") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1) })
             addView(button("2. Download speech model (~${OfflineFlowIME.MODEL.approxMb} MB)") { download() })
             addView(progress)
             addView(button("3. Enable keyboard") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
-            addView(button("4. Switch to offline-flow") { getSystemService(InputMethodManager::class.java).showInputMethodPicker() })
+            addView(button("4. Switch to Hearsay") { getSystemService(InputMethodManager::class.java).showInputMethodPicker() })
         })
     }
 

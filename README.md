@@ -1,4 +1,4 @@
-# offline-flow
+# Hearsay
 
 **An open-source, offline-first voice dictation keyboard for Android.** Think Wispr Flow, but your audio never leaves your phone: no account, no subscription, no cloud.
 
@@ -20,12 +20,12 @@ Mic (16 kHz, in memory only) → silence trim → whisper.cpp (on-device) → cl
 
 1. Grab the debug APK from the latest [Actions run](../../actions), or build it:
    ```bash
-   git clone --recursive https://github.com/kushagrakshatri/offline-flow.git
-   cd offline-flow
+   git clone --recursive https://github.com/kushagrakshatri/hearsay.git
+   cd hearsay
    ./gradlew :app:assembleDebug
    ```
    Needs Android SDK 35, NDK 27.2.12479018 and CMake 3.22.1.
-2. Open **offline-flow**, allow the mic, download the model, enable the keyboard and switch to it.
+2. Open **Hearsay**, allow the mic, download the model, enable the keyboard and switch to it.
 3. In any text field: hold **Hold to talk**, speak, release. Tap **Raw** to see the untouched transcript.
 
 The status line shows latency for each dictation. Please share numbers and your phone model in an issue.

@@ -80,8 +80,8 @@ class OfflineFlowIME : InputMethodService() {
         super.onStartInputView(info, restarting)
         lastRaw = null; lastInserted = null
         status.text = when {
-            !hasMicPermission() -> "Open offline-flow app to grant microphone access"
-            !models.isReady(MODEL) -> "Open offline-flow app to download the speech model"
+            !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
+            !models.isReady(MODEL) -> "Open the Hearsay app to download the speech model"
             else -> "Ready · on-device"
         }
         warmUp()

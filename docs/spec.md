@@ -1,4 +1,4 @@
-# offline-flow — Spec v0.2 (Oct 27, 2026)
+# Hearsay (formerly offline-flow) — Spec v0.2 (Oct 27, 2026)
 
 ## 1. What it is
 An open-source Android keyboard that turns speech into clean, ready-to-send text, fully on the phone. Hold the mic, talk naturally, release; polished text lands in whatever app you're in. No account, no subscription, audio never leaves the device.
@@ -79,4 +79,4 @@ Mic (AudioRecord, 16 kHz mono)
 - ~~English-only v1 or multilingual?~~ Decided: English-only v1 (*.en models).
 - Which cleanup model ships as default (benchmark 2–3 candidates in M1).
 - ~~Minimum Android version~~ Decided: Android 10+ (minSdk 29).
-- ~~Name and license~~ Decided: offline-flow, Apache-2.0.
+- ~~Name and license~~ Decided: Hearsay (renamed from offline-flow Oct 27), Apache-2.0. Kotlin package stays dev.offlineflow for now.
