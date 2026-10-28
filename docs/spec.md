@@ -103,3 +103,8 @@ Mic (AudioRecord, 16 kHz mono)
 - Applied in three places: (1) to the ASR text (fixes, exact-case, split-word joins like "hear say" → "Hearsay", one-letter-off for terms ≥6 letters); (2) in the LLM system prompt ("spell these exactly", up to 150 entries; a dictionary change reloads the cached prefix); (3) again on the cleaned text. "Raw" still restores the exact ASR transcript.
 - ASR-level biasing (Whisper initial prompt / sherpa hotwords) deferred: Parakeet TDT hotword support in sherpa-onnx is unverified.
 - CI now runs `:app:testDebugUnitTest` (DictionaryTest) before assembling.
+
+## Update Oct 28, 2026: per-app styles (M2, part 2)
+- Styles: Casual (texting: conversational, light punctuation, no period on a single short sentence), Polished (email/docs/work chat: complete sentences), Verbatim (code, URLs, numbers, passwords, search: transcript as heard + dictionary, no LLM).
+- Default from the app (known messaging / work / code packages) and field type (URI, email address, password, number, filter → Verbatim; short message → Casual; else Polished). A chip on the keyboard cycles the style; the choice is saved per app.
+- Each style has its own system rules and few-shot examples; llama.cpp prefixes are cached per style (lazily, warmed when the keyboard opens), so switching styles costs one prefix evaluation once.

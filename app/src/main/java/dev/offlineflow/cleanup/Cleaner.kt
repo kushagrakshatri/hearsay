@@ -23,4 +23,11 @@ object RulesCleaner : Cleaner {
         if (t.last() !in ".!?") t += "."
         return t
     }
+
+    /** For code, URLs and search: the transcript as heard, minus noise tags and one trailing period. */
+    fun verbatim(raw: String): String {
+        var t = raw.replace(bracketed, " ").replace(spaces, " ").trim()
+        if (t.endsWith(".") && !t.endsWith("..") && t.count { it == '.' } == 1) t = t.dropLast(1)
+        return t
+    }
 }

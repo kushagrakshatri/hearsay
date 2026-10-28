@@ -1,8 +1,8 @@
 // JNI bridge between Kotlin (dev.offlineflow.llm.LlamaEngine) and llama.cpp.
 //
 // The caller formats prompts itself (each model family has its own chat format).
-// The fixed prefix (system prompt + few-shot examples) is decoded once at load and its
-// sequence state is snapshotted. Each request restores that snapshot and decodes only
+// Each fixed prefix (system prompt + few-shot examples; one per style) is decoded once and
+// its sequence state is snapshotted. Each request restores a snapshot and decodes only
 // the new turn. A snapshot (rather than trimming the KV cache) also works for models
 // whose memory can't be partially rewound: hybrid/recurrent (Qwen3.5) and sliding-window
 // attention (Gemma 4).
@@ -24,8 +24,8 @@ struct Llm {
     llama_context *ctx = nullptr;
     const llama_vocab *vocab = nullptr;
     llama_sampler *sampler = nullptr;
-    std::vector<uint8_t> snapshot;  // sequence 0 state right after the prefix
-    int n_prefix = 0;
+    struct Prefix { std::vector<uint8_t> state; int n_tokens; };
+    std::vector<Prefix> prefixes;  // sequence 0 state right after each prefix
     int n_ctx = 0;
     int n_batch = 0;
 };
@@ -48,9 +48,9 @@ bool decode_all(Llm &l, std::vector<llama_token> &toks) {
     return true;
 }
 
-bool restore_prefix(Llm &l) {
+bool restore_prefix(Llm &l, const Llm::Prefix &p) {
     llama_memory_seq_rm(llama_get_memory(l.ctx), 0, -1, -1);
-    return llama_state_seq_set_data(l.ctx, l.snapshot.data(), l.snapshot.size(), 0) > 0;
+    return llama_state_seq_set_data(l.ctx, p.state.data(), p.state.size(), 0) > 0;
 }
 
 std::string jstr(JNIEnv *env, jstring s) {
@@ -85,8 +85,7 @@ void free_llm(Llm *l) {
 } // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpath, jint threads,
-                                                 jstring jprefix) {
+Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpath, jint threads) {
     static bool backend = false;
     if (!backend) { llama_backend_init(); backend = true; }
 
@@ -114,26 +113,41 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpa
     l->sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(l->sampler, llama_sampler_init_greedy());
 
-    auto toks = tokenize(l->vocab, jstr(env, jprefix), true);
-    if (toks.empty() || !decode_all(*l, toks)) { LOGE("prefix decode failed"); free_llm(l); return 0; }
-    l->n_prefix = (int) toks.size();
-    l->snapshot.resize(llama_state_seq_get_size(l->ctx, 0));
-    size_t n = llama_state_seq_get_data(l->ctx, l->snapshot.data(), l->snapshot.size(), 0);
-    if (n == 0) { LOGE("snapshot failed"); free_llm(l); return 0; }
-    l->snapshot.resize(n);
-    LOGI("llm ready: prefix=%d tokens, snapshot=%zu bytes, threads=%d", l->n_prefix, n, threads);
+    LOGI("llm loaded: threads=%d", threads);
     return reinterpret_cast<jlong>(l);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_dev_offlineflow_llm_LlamaEngine_nativeAddPrefix(JNIEnv *env, jobject, jlong handle, jstring jprefix) {
+    auto *l = reinterpret_cast<Llm *>(handle);
+    if (!l) return -1;
+    llama_memory_seq_rm(llama_get_memory(l->ctx), 0, -1, -1);
+    auto toks = tokenize(l->vocab, jstr(env, jprefix), true);
+    if (toks.empty() || (int) toks.size() >= l->n_ctx - 256 || !decode_all(*l, toks)) {
+        LOGE("prefix decode failed (%zu tokens)", toks.size());
+        return -1;
+    }
+    Llm::Prefix p;
+    p.n_tokens = (int) toks.size();
+    p.state.resize(llama_state_seq_get_size(l->ctx, 0));
+    size_t n = llama_state_seq_get_data(l->ctx, p.state.data(), p.state.size(), 0);
+    if (n == 0) { LOGE("snapshot failed"); return -1; }
+    p.state.resize(n);
+    l->prefixes.push_back(std::move(p));
+    LOGI("prefix %zu: %d tokens, %zu bytes", l->prefixes.size() - 1, l->prefixes.back().n_tokens, n);
+    return (jint) (l->prefixes.size() - 1);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_offlineflow_llm_LlamaEngine_nativeComplete(JNIEnv *env, jobject, jlong handle,
-                                                     jstring jsuffix, jint max_tokens) {
+                                                     jint prefix, jstring jsuffix, jint max_tokens) {
     auto *l = reinterpret_cast<Llm *>(handle);
-    if (!l) return env->NewStringUTF("");
-    if (!restore_prefix(*l)) { LOGE("restore failed"); return env->NewStringUTF(""); }
+    if (!l || prefix < 0 || prefix >= (jint) l->prefixes.size()) return env->NewStringUTF("");
+    const auto &pre = l->prefixes[prefix];
+    if (!restore_prefix(*l, pre)) { LOGE("restore failed"); return env->NewStringUTF(""); }
 
     auto toks = tokenize(l->vocab, jstr(env, jsuffix), false);
-    int pos = l->n_prefix + (int) toks.size();
+    int pos = pre.n_tokens + (int) toks.size();
     if (toks.empty() || pos >= l->n_ctx - 8 || !decode_all(*l, toks)) {
         LOGE("prompt decode failed (pos=%d)", pos);
         return env->NewStringUTF("");

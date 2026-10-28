@@ -24,6 +24,7 @@ import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
+import dev.offlineflow.cleanup.Style
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.*
 
@@ -49,6 +50,9 @@ class OfflineFlowIME : InputMethodService() {
 
     private lateinit var status: TextView
     private lateinit var mic: Button
+    private lateinit var styleChip: Button
+    private var style = Style.POLISHED
+    private var editorPkg: String? = null
     private var lastRaw: String? = null
     private var lastInserted: String? = null
 
@@ -69,6 +73,16 @@ class OfflineFlowIME : InputMethodService() {
             setOnTouchListener(::onMicTouch)
         }
         val raw = Button(this).apply { text = "Raw"; isAllCaps = false; setOnClickListener { swapToRaw() } }
+        styleChip = Button(this).apply {
+            isAllCaps = false; textSize = 13f
+            setOnClickListener {
+                style = style.next()
+                editorPkg?.let { Style.save(this@OfflineFlowIME, it, style) }
+                text = style.label
+                status.text = "${style.label} in this app" + if (style == Style.VERBATIM) " · no AI rewrite" else ""
+                warmStyle()
+            }
+        }
         val next = Button(this).apply {
             text = "⌨"; setOnClickListener {
                 if (Build.VERSION.SDK_INT >= 28) switchToPreviousInputMethod()
@@ -84,13 +98,21 @@ class OfflineFlowIME : InputMethodService() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt())
-            addView(status); addView(row)
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                addView(status, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(styleChip)
+            })
+            addView(row)
         }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         lastRaw = null; lastInserted = null
+        editorPkg = info?.packageName
+        style = Style.forEditor(this, info)
+        styleChip.text = style.label
         status.text = when {
             !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
             !models.isReady(models.selected) -> "Open the Hearsay app to download the speech model"
@@ -140,8 +162,15 @@ class OfflineFlowIME : InputMethodService() {
         if (models.isReady(models.selected)) scope.launch(asrDispatcher) {
             runCatching { engineForSelected() }.onFailure { Log.e(TAG, "speech model load failed", it) }
         }
+        warmStyle()
+    }
+
+    /** Loads the cleanup model and evaluates the current style's prompt ahead of use. */
+    private fun warmStyle() {
+        val s = style
         scope.launch(llmDispatcher) {
-            runCatching { cleanerForSelected() }.onFailure { Log.e(TAG, "cleanup model load failed", it) }
+            runCatching { (cleanerForSelected() as? LlmCleaner)?.warm(s) }
+                .onFailure { Log.e(TAG, "cleanup model load failed", it) }
         }
     }
 
@@ -197,16 +226,22 @@ class OfflineFlowIME : InputMethodService() {
                 return@launch
             }
             val asrMs = SystemClock.elapsedRealtime() - t0
-            val useLlm = models.selectedCleanup?.let { models.isReady(it) } == true && raw.isNotBlank()
+            val s = style
+            val useLlm = s != Style.VERBATIM && models.selectedCleanup?.let { models.isReady(it) } == true && raw.isNotBlank()
             if (useLlm) status.text = "Cleaning up…"
             val t1 = SystemClock.elapsedRealtime()
             val dictionary = Dictionary.load(this@OfflineFlowIME)
             val heard = dictionary.apply(raw)
-            val cleaned = try {
-                withContext(llmDispatcher) { dictionary.apply(cleanerForSelected(dictionary).clean(heard)) }
+            val cleaned = if (s == Style.VERBATIM) RulesCleaner.verbatim(heard) else try {
+                withContext(llmDispatcher) {
+                    when (val c = cleanerForSelected(dictionary)) {
+                        is LlmCleaner -> dictionary.apply(c.clean(heard, s))
+                        else -> dictionary.apply(rulesFor(heard, s))
+                    }
+                }
             } catch (t: Throwable) {
                 Log.e(TAG, "cleanup failed, using rules", t)
-                dictionary.apply(RulesCleaner.clean(heard))
+                dictionary.apply(rulesFor(heard, s))
             }
             val cleanMs = SystemClock.elapsedRealtime() - t1
             val ms = SystemClock.elapsedRealtime() - t0
@@ -220,6 +255,11 @@ class OfflineFlowIME : InputMethodService() {
                 else "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
             Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
         }
+    }
+
+    private fun rulesFor(text: String, s: Style): String {
+        val t = RulesCleaner.clean(text)
+        return if (s == Style.CASUAL && t.endsWith(".") && t.count { it in ".!?" } == 1) t.dropLast(1) else t
     }
 
     private fun swapToRaw() {
