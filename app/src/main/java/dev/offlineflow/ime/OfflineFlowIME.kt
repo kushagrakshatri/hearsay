@@ -10,12 +10,14 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.offlineflow.Prefs
 import dev.offlineflow.asr.Engines
 import dev.offlineflow.asr.SpeechEngine
 import dev.offlineflow.audio.Recorder
@@ -200,7 +202,8 @@ class OfflineFlowIME : InputMethodService() {
         if (!hasMicPermission() || !models.isReady(models.selected)) return
         status.text = "Listening…"
         val gate = SpeechGate.create(assets)
-        recorder = Recorder(gate, onSpeechEnd = {
+        buzz()
+        recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
             mic.post { if (handsFree) finishDictation() }
         }).also { it.start() }
@@ -211,6 +214,7 @@ class OfflineFlowIME : InputMethodService() {
         recorder = null
         handsFree = false
         mic.text = "Hold to talk"
+        buzz()
         val audio = rec.stop()
         if (!rec.heardSpeech) { status.text = "Didn't hear any speech"; return }
         if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
@@ -285,6 +289,10 @@ class OfflineFlowIME : InputMethodService() {
     private fun withLeadingSpace(s: String): String {
         val before = currentInputConnection?.getTextBeforeCursor(1, 0)
         return if (!before.isNullOrEmpty() && !before.last().isWhitespace()) " $s" else s
+    }
+
+    private fun buzz() {
+        if (Prefs.haptics(this)) mic.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
     }
 
     private fun hasMicPermission() =

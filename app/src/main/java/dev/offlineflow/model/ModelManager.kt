@@ -111,6 +111,16 @@ class ModelManager(context: Context) {
     fun file(m: Model, asset: Asset = m.assets.first()) = File(dir(m), asset.name)
     fun isReady(m: Model) = m.assets.all { file(m, it).let { f -> f.exists() && f.length() == it.bytes } }
 
+    /** Bytes this model takes on disk, including partial downloads. */
+    fun bytesOnDisk(m: Model): Long = m.assets.sumOf { a ->
+        file(m, a).length() + File(file(m, a).path + ".part").length()
+    }
+
+    /** Deletes this model's files (and partial downloads) to free space. */
+    fun delete(m: Model) {
+        for (a in m.assets) { file(m, a).delete(); File(file(m, a).path + ".part").delete() }
+    }
+
     /** Blocking; call off the main thread. Resumes partial downloads; verifies each file. */
     fun download(m: Model, onProgress: (Int) -> Unit) {
         dir(m).mkdirs()
