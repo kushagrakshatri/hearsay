@@ -139,6 +139,13 @@ class SettingsActivity : AppCompatActivity() {
                 stylesInfo, stylesReset,
             ))
 
+            addView(card("Commands",
+                hint("Select text and say what to change: \"make this shorter\", \"more formal\", \"turn it into bullets\", " +
+                    "\"fix the grammar\". Say anything else to replace the selection. With nothing selected, " +
+                    "\"make that more formal\" edits what you just dictated, and \"scratch that\" deletes it. " +
+                    "Raw undoes an edit. Needs a cleanup model."),
+            ))
+
             val dict = editor(Dictionary.text(context), "Hearsay\nGitHub\nhear say -> Hearsay", 4)
             addView(card("Personal dictionary",
                 hint("One per line. Names and jargon get spelled exactly as you write them. To fix something it keeps " +

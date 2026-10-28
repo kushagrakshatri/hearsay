@@ -23,6 +23,7 @@ import dev.offlineflow.asr.SpeechEngine
 import dev.offlineflow.audio.Recorder
 import dev.offlineflow.audio.SpeechGate
 import dev.offlineflow.cleanup.Cleaner
+import dev.offlineflow.cleanup.Commands
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
@@ -58,6 +59,7 @@ class OfflineFlowIME : InputMethodService() {
     private var editorPkg: String? = null
     private var lastRaw: String? = null
     private var lastInserted: String? = null
+    private var hasSelection = false
 
     override fun onCreate() {
         super.onCreate()
@@ -113,6 +115,8 @@ class OfflineFlowIME : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         lastRaw = null; lastInserted = null
+        hasSelection = info != null && info.initialSelStart >= 0 && info.initialSelStart != info.initialSelEnd
+        mic.text = idleLabel()
         editorPkg = info?.packageName
         style = Style.forEditor(this, info)
         styleChip.text = style.label
@@ -128,7 +132,7 @@ class OfflineFlowIME : InputMethodService() {
         super.onFinishInputView(finishingInput)
         recorder?.stop(); recorder = null
         handsFree = false
-        if (::mic.isInitialized) mic.text = "Hold to talk"
+        if (::mic.isInitialized) mic.text = idleLabel()
     }
 
     override fun onDestroy() {
@@ -213,9 +217,11 @@ class OfflineFlowIME : InputMethodService() {
         val rec = recorder ?: return
         recorder = null
         handsFree = false
-        mic.text = "Hold to talk"
+        mic.text = idleLabel()
         buzz()
         val audio = rec.stop()
+        // Captured now: the selection decides whether this is a command or a replacement.
+        val selected = currentInputConnection?.getSelectedText(0)?.toString()?.takeIf { it.isNotEmpty() }
         if (!rec.heardSpeech) { status.text = "Didn't hear any speech"; return }
         if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
         status.text = if (engine == null || engineModel != models.selected) "Loading model, then transcribing…" else "Transcribing…"
@@ -231,6 +237,14 @@ class OfflineFlowIME : InputMethodService() {
                 return@launch
             }
             val asrMs = SystemClock.elapsedRealtime() - t0
+            // Command mode: "scratch that", or an edit instruction for the selection / last insert.
+            if (selected == null && Commands.isScratch(raw)) { scratchLast(); return@launch }
+            val target = when {
+                selected != null && Commands.forSelection(raw) -> selected
+                selected == null && Commands.forLastInsert(raw) && lastInsertAtCursor() -> lastInserted
+                else -> null
+            }
+            if (target != null) { runCommand(target, raw, onSelection = selected != null, t0); return@launch }
             // A snippet trigger on its own inserts the saved text exactly, skipping cleanup.
             Snippets.load(this@OfflineFlowIME).match(raw)?.let { snippet ->
                 val text = withLeadingSpace(snippet)
@@ -270,6 +284,62 @@ class OfflineFlowIME : InputMethodService() {
         }
     }
 
+    /** Applies a spoken edit [utterance] to [target] (the selection, or the last insert) with the local LLM. */
+    private suspend fun runCommand(target: String, utterance: String, onSelection: Boolean, t0: Long) {
+        val instruction = Commands.instruction(utterance)
+        if (target.length > MAX_EDIT_CHARS) { status.text = "Too much text for a command (about 400 words max)"; return }
+        if (models.selectedCleanup?.let { models.isReady(it) } != true) {
+            status.text = "Commands need a cleanup model · open Hearsay settings"; return
+        }
+        status.text = "Editing: $instruction…"
+        val edited = try {
+            withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
+        } catch (t: Throwable) {
+            Log.e(TAG, "command failed", t); null
+        }
+        if (edited == null) { status.text = "Couldn't apply \"$instruction\""; return }
+        val ic = currentInputConnection ?: return
+        if (onSelection) {
+            ic.commitText(edited, 1) // replaces the selection
+            lastRaw = target; lastInserted = edited
+        } else {
+            val ins = lastInserted ?: return
+            if (ic.getTextBeforeCursor(ins.length, 0)?.toString() != ins) { status.text = "Text changed, command skipped"; return }
+            val text = (if (ins.startsWith(" ")) " " else "") + edited
+            ic.deleteSurroundingText(ins.length, 0)
+            ic.commitText(text, 1)
+            lastRaw = ins; lastInserted = text
+        }
+        status.text = "$instruction · ${SystemClock.elapsedRealtime() - t0} ms · Raw undoes it"
+    }
+
+    private fun lastInsertAtCursor(): Boolean {
+        val ins = lastInserted ?: return false
+        return currentInputConnection?.getTextBeforeCursor(ins.length, 0)?.toString() == ins
+    }
+
+    private fun scratchLast() {
+        val ins = lastInserted
+        if (ins != null && lastInsertAtCursor()) {
+            currentInputConnection?.deleteSurroundingText(ins.length, 0)
+            lastInserted = null; lastRaw = null
+            status.text = "Removed the last dictation"
+        } else status.text = "Nothing to scratch"
+    }
+
+    override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val sel = newSelStart != newSelEnd
+        if (sel == hasSelection) return
+        hasSelection = sel
+        if (::mic.isInitialized && recorder == null) mic.text = idleLabel()
+        if (sel) scope.launch(llmDispatcher) {
+            runCatching { (cleanerForSelected() as? LlmCleaner)?.warmEdit() }.onFailure { Log.e(TAG, "edit warm-up failed", it) }
+        }
+    }
+
+    private fun idleLabel() = if (hasSelection) "Talk to edit selection" else "Hold to talk"
+
     private fun rulesFor(text: String, s: Style): String {
         val t = RulesCleaner.clean(text)
         return if (s == Style.CASUAL && t.endsWith(".") && t.count { it in ".!?" } == 1) t.dropLast(1) else t
@@ -301,5 +371,6 @@ class OfflineFlowIME : InputMethodService() {
     companion object {
         private const val TAG = "OfflineFlowIME"
         private const val TAP_MS = 350L
+        private const val MAX_EDIT_CHARS = 2400
     }
 }

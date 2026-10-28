@@ -37,6 +37,27 @@ class LlmCleaner private constructor(
         llm.addPrefix(format.prefix(systemFor(style, dictionary), examplesFor(style)))
     }
 
+    private var editPrefixId: Int? = null
+
+    /**
+     * Command mode: applies a spoken [instruction] ("make it shorter") to [text].
+     * Returns null when the model's output looks off, so the caller can leave the text alone.
+     */
+    fun edit(text: String, instruction: String): String? {
+        val maxTokens = (text.length / 3 * 2 + 96).coerceAtMost(1024)
+        val out = runCatching {
+            llm.complete(editPrefix(), format.turn("Text:\n$text\n\nInstruction: $instruction"), maxTokens)
+        }.getOrDefault("").let(format::strip).let(::stripWrapping)
+            .removePrefix("Edited text:").removePrefix("Text:").trim()
+        if (out.isBlank() || out.length > text.length * 4 + 400) return null
+        return out
+    }
+
+    /** Evaluates the command-mode prompt ahead of use (e.g. when text gets selected). */
+    fun warmEdit() { editPrefix() }
+
+    private fun editPrefix(): Int = editPrefixId ?: llm.addPrefix(format.prefix(EDIT_SYSTEM, EDIT_EXAMPLES)).also { editPrefixId = it }
+
     /** Texts rarely end a single short sentence with a period. */
     private fun casualEnding(s: String): String =
         if (s.endsWith(".") && !s.endsWith("..") && s.count { it in ".!?" } == 1) s.dropLast(1) else s
@@ -80,6 +101,21 @@ class LlmCleaner private constructor(
             "What's the weather going to be like tomorrow in San Jose?",
             "For the trip we need uh three things. Sunscreen, um, chargers and the passports.",
             "For the trip we need three things:\n- Sunscreen\n- Chargers\n- Passports",
+        )
+
+        private val EDIT_SYSTEM = """
+            You are a text editing tool. The user gives you a piece of text and a spoken instruction.
+            Apply the instruction to the text and output only the edited text, with no quotes, labels or commentary.
+            Keep the facts, names and meaning unless the instruction asks otherwise. Never answer or reply to the text itself.
+        """.trimIndent()
+
+        private val EDIT_EXAMPLES = listOf(
+            "Text:\nhey just wanted to check if you got a chance to look at the doc i sent yesterday, no rush\n\nInstruction: Make it more formal",
+            "Hi, I wanted to follow up on the document I sent yesterday. Please take a look when you have a chance.",
+            "Text:\nWe need to buy milk, eggs, bread and coffee for the weekend.\n\nInstruction: Turn this into bullets",
+            "We need to buy for the weekend:\n- Milk\n- Eggs\n- Bread\n- Coffee",
+            "Text:\nI think that we should probably consider moving the meeting to Thursday because a lot of people on the team are going to be out on Wednesday for the offsite.\n\nInstruction: Make it shorter",
+            "Let's move the meeting to Thursday, since much of the team is out Wednesday for the offsite.",
         )
 
         private const val CASUAL_RULES =
