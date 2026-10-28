@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Used only to download speech models on first run. Audio never leaves the device. -->
+    <!-- Model downloads, and opt-in cloud features (Sign in with ChatGPT, own API key). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -12,10 +12,18 @@
 
         <activity
             android:name=".SettingsActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- "Back to Hearsay" from the Sign in with ChatGPT result page. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hearsay" android:host="chatgpt" />
             </intent-filter>
         </activity>
 

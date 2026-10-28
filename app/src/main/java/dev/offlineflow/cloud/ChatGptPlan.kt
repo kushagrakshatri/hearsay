@@ -87,7 +87,7 @@ object ChatGptPlan {
     fun signIn(context: Context): Account {
         val c = context.applicationContext
         val server = openListener()
-        server.use {
+        return server.use {
             val redirect = "http://127.0.0.1:${server.localPort}$CALLBACK_PATH"
             val state = token(24); val nonce = token(24); val verifier = token(48)
             val existing = savedClientId(c)
@@ -110,71 +110,118 @@ object ChatGptPlan {
             c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
             server.soTimeout = 5 * 60_000
-            val query = awaitCallback(server) ?: throw PlanException("Sign-in timed out")
-            if (query["state"] != state) throw PlanException("Sign-in failed (state mismatch)")
-            query["error"]?.let {
-                throw PlanException(if (it == "access_denied") "ChatGPT plan use wasn't allowed" else "Sign-in failed: $it")
+            val (socket, query) = awaitCallback(server) ?: throw PlanException("Sign-in timed out")
+            // Keep the browser's request open until the exchange finishes, so its page shows the real outcome.
+            socket.use {
+                try {
+                    val account = finish(c, query, state, nonce, verifier, redirect, existing)
+                    reply(socket, page("You're signed in", "Hearsay will use your ChatGPT plan for cleanup and commands.", ok = true))
+                    account
+                } catch (t: Throwable) {
+                    Log.e(TAG, "sign-in failed", t)
+                    val msg = (t as? PlanException)?.message ?: "${t.javaClass.simpleName}: ${t.message}"
+                    runCatching { reply(socket, page("Sign-in didn't finish", msg, ok = false)) }
+                    throw if (t is PlanException) t else PlanException(msg)
+                }
             }
-            val code = query["code"] ?: throw PlanException("Sign-in failed (no code)")
-            val clientId = when {
-                existing == null -> query["client_id"]?.takeIf { it != "dynamic_agent_client" }
-                    ?: throw PlanException("Registration didn't finish. Try again.")
-                query["client_id"] != null && query["client_id"] != existing -> throw PlanException("Sign-in returned a different app registration")
-                else -> existing
-            }
-            val tokens = postForm(TOKEN, mapOf(
+        }
+    }
+
+    private fun finish(
+        c: Context, query: Map<String, String>, state: String, nonce: String, verifier: String, redirect: String, existing: String?,
+    ): Account {
+        if (query["state"] != state) throw PlanException("Sign-in failed (state mismatch)")
+        query["error"]?.let {
+            throw PlanException(if (it == "access_denied") "ChatGPT plan use wasn't allowed" else "Sign-in failed: $it ${query["error_description"].orEmpty()}")
+        }
+        val code = query["code"] ?: throw PlanException("Sign-in failed (no code)")
+        val clientId = when {
+            existing == null -> query["client_id"]?.takeIf { it != "dynamic_agent_client" }
+                ?: throw PlanException("Registration didn't finish (no client id). Try again.")
+            query["client_id"] != null && query["client_id"] != existing -> throw PlanException("Sign-in returned a different app registration")
+            else -> existing
+        }
+        val tokens = try {
+            postForm(TOKEN, mapOf(
                 "grant_type" to "authorization_code", "client_id" to clientId, "code" to code,
                 "code_verifier" to verifier, "redirect_uri" to redirect, "resource" to RESOURCE,
             ))
-            val claims = IdToken.verify(tokens.getString("id_token"), clientId, nonce)
-            val scopes = scopesOf(tokens)
-            if (PLAN_SCOPE !in scopes) throw PlanException("ChatGPT plan use wasn't granted")
-            saveClientId(c, clientId)
-            val account = Account(
-                email = claims.optString("email"), subject = claims.getString("sub"), clientId = clientId,
-                idToken = tokens.getString("id_token"), accessToken = tokens.getString("access_token"),
-                refreshToken = tokens.optString("refresh_token"),
-                expiresAt = System.currentTimeMillis() + tokens.optLong("expires_in", 3600) * 1000, scopes = scopes,
-            )
-            synchronized(lock) { write(c, account) }
-            pickModel(c, account)
-            return account
+        } catch (e: Responses.HttpError) {
+            throw PlanException("Token exchange failed (${e.code}): ${e.body.take(160)}")
         }
+        val idToken = tokens.optString("id_token")
+        if (idToken.isEmpty()) throw PlanException("No ID token in the token response")
+        val claims = try { IdToken.verify(idToken, clientId, nonce) } catch (e: PlanException) { throw e }
+            catch (t: Throwable) { throw PlanException("ID token check failed: ${t.javaClass.simpleName} ${t.message.orEmpty()}") }
+        // Granted scopes: token response, else the callback, else the access token's own claim.
+        val scopes = scopesOf(tokens).ifEmpty { query["scope"].orEmpty().split(' ', '+').filter { it.isNotBlank() } }
+            .ifEmpty { jwtClaim(tokens.optString("access_token"), "scope").split(' ').filter { it.isNotBlank() } }
+        if (PLAN_SCOPE !in scopes) throw PlanException("ChatGPT plan use wasn't granted (scopes: ${scopes.joinToString(" ")})")
+        saveClientId(c, clientId)
+        val account = Account(
+            email = claims.optString("email"), subject = claims.getString("sub"), clientId = clientId,
+            idToken = idToken, accessToken = tokens.getString("access_token"),
+            refreshToken = tokens.optString("refresh_token"),
+            expiresAt = System.currentTimeMillis() + tokens.optLong("expires_in", 3600) * 1000, scopes = scopes,
+        )
+        synchronized(lock) { write(c, account) }
+        pickModel(c, account)
+        return account
     }
+
+    private fun jwtClaim(jwt: String, name: String): String = runCatching {
+        JSONObject(String(Base64.getUrlDecoder().decode(jwt.split('.')[1]))).optString(name)
+    }.getOrDefault("")
+
+    /** Last sign-in error, shown in Settings until the next attempt. */
+    fun lastError(c: Context): String? = c.getSharedPreferences("hearsay", Context.MODE_PRIVATE).getString("chatgpt_error", null)
+    fun setLastError(c: Context, msg: String?) =
+        c.getSharedPreferences("hearsay", Context.MODE_PRIVATE).edit().putString("chatgpt_error", msg).apply()
 
     private fun openListener(): ServerSocket {
         val lo = InetAddress.getByName("127.0.0.1")
         return runCatching { ServerSocket(1455, 4, lo) }.getOrElse { ServerSocket(0, 4, lo) }
     }
 
-    /** Accepts loopback requests until one hits the callback path; answers with a small page. */
-    private fun awaitCallback(server: ServerSocket): Map<String, String>? {
+    /** Accepts loopback requests until one hits the callback path; returns that socket still open. */
+    private fun awaitCallback(server: ServerSocket): Pair<java.net.Socket, Map<String, String>>? {
         val deadline = System.currentTimeMillis() + 5 * 60_000
         while (System.currentTimeMillis() < deadline) {
             val socket = runCatching { server.accept() }.getOrNull() ?: return null
-            socket.use { s ->
-                val line = s.getInputStream().bufferedReader().readLine() ?: return@use
-                val target = line.split(" ").getOrNull(1) ?: ""
-                val ok = target.startsWith(CALLBACK_PATH)
-                val body = if (ok) PAGE else "Not found"
-                s.getOutputStream().write(
-                    ("HTTP/1.1 ${if (ok) "200 OK" else "404 Not Found"}\r\nContent-Type: text/html; charset=utf-8\r\n" +
-                        "Content-Length: ${body.toByteArray().size}\r\nConnection: close\r\n\r\n$body").toByteArray()
-                )
-                if (ok) return parseQuery(target.substringAfter('?', ""))
-            }
+            // Browsers open speculative connections that never send a request; don't wait on those forever.
+            socket.soTimeout = 3_000
+            val line = runCatching { socket.getInputStream().bufferedReader().readLine() }.getOrNull()
+            if (line == null) { runCatching { socket.close() }; continue }
+            val target = line.split(" ").getOrNull(1) ?: ""
+            if (target.startsWith(CALLBACK_PATH)) return socket to parseQuery(target.substringAfter('?', ""))
+            runCatching { reply(socket, "Not found", status = "404 Not Found"); socket.close() }
         }
         return null
     }
 
-    private val PAGE = """
-        <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Hearsay</title></head><body style="font-family:sans-serif;text-align:center;padding:48px 24px">
-        <h2>You're signed in</h2><p>Hearsay will use your ChatGPT plan for cleanup and commands.</p>
-        <p><a style="display:inline-block;padding:12px 20px;background:#000;color:#fff;border-radius:24px;text-decoration:none"
-        href="intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;component=dev.offlineflow/.SettingsActivity;end">Back to Hearsay</a></p>
-        </body></html>
-    """.trimIndent()
+    private fun reply(socket: java.net.Socket, body: String, status: String = "200 OK") {
+        val bytes = body.toByteArray()
+        socket.getOutputStream().apply {
+            write(("HTTP/1.1 $status\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\n" +
+                "Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n").toByteArray())
+            write(bytes); flush()
+        }
+    }
+
+    /** Result page; its button (and an automatic attempt) opens Hearsay via the hearsay:// link. */
+    private fun page(title: String, message: String, ok: Boolean): String {
+        val esc = message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        val back = "hearsay://chatgpt?result=${if (ok) "ok" else "error"}"
+        return """
+            <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>Hearsay</title></head><body style="font-family:sans-serif;text-align:center;padding:48px 24px">
+            <h2>$title</h2><p>$esc</p>
+            <p><a style="display:inline-block;padding:12px 20px;background:#000;color:#fff;border-radius:24px;text-decoration:none"
+            href="$back">Back to Hearsay</a></p>
+            ${if (ok) "<script>setTimeout(function(){location.href='$back'},400)</script>" else ""}
+            </body></html>
+        """.trimIndent()
+    }
 
     /** Uses gpt-6-luna when this account offers it, else the first listed model. */
     private fun pickModel(c: Context, a: Account) = runCatching {

@@ -225,6 +225,8 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() { super.onResume(); refresh() }
 
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); refresh() }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) refresh() // the keyboard picker is a dialog, so no onResume after it
@@ -271,6 +273,9 @@ class SettingsActivity : AppCompatActivity() {
         box.removeAllViews()
         val account = ChatGptPlan.account(this)
         if (account == null) {
+            if (!signingIn) ChatGptPlan.lastError(this)?.let { err ->
+                box.addView(TextView(this).apply { textSize = 13f; setTextColor(Color.parseColor("#D32F2F")); text = "Sign-in didn't finish: $err" })
+            }
             box.addView(Button(this).apply {
                 text = if (signingIn) "Waiting for ChatGPT sign-in…" else "Continue with ChatGPT"
                 isAllCaps = false; isEnabled = !signingIn
@@ -307,11 +312,12 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun signInWithChatGpt() {
         if (signingIn) return
-        signingIn = true; refreshPlan()
+        signingIn = true; ChatGptPlan.setLastError(this, null); refreshPlan()
         // App-wide scope: the activity sits in the background while the browser is open.
         @Suppress("OPT_IN_USAGE")
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val result = runCatching { ChatGptPlan.signIn(this@SettingsActivity) }
+            ChatGptPlan.setLastError(this@SettingsActivity, result.exceptionOrNull()?.let { it.message ?: it.javaClass.simpleName })
             runOnUiThread {
                 signingIn = false
                 result.onFailure { toast(it.message ?: "Sign-in failed") }
