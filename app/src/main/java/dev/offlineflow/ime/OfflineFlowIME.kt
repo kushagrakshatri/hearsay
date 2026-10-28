@@ -24,6 +24,7 @@ import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
+import dev.offlineflow.cleanup.Snippets
 import dev.offlineflow.cleanup.Style
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.*
@@ -226,6 +227,14 @@ class OfflineFlowIME : InputMethodService() {
                 return@launch
             }
             val asrMs = SystemClock.elapsedRealtime() - t0
+            // A snippet trigger on its own inserts the saved text exactly, skipping cleanup.
+            Snippets.load(this@OfflineFlowIME).match(raw)?.let { snippet ->
+                val text = withLeadingSpace(snippet)
+                currentInputConnection?.commitText(text, 1)
+                lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
+                status.text = "Snippet inserted · ${asrMs} ms"
+                return@launch
+            }
             val s = style
             val useLlm = s != Style.VERBATIM && models.selectedCleanup?.let { models.isReady(it) } == true && raw.isNotBlank()
             if (useLlm) status.text = "Cleaning up…"

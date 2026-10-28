@@ -19,6 +19,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import dev.offlineflow.cleanup.Dictionary
+import dev.offlineflow.cleanup.Snippets
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,6 +110,26 @@ class SettingsActivity : AppCompatActivity() {
                 Dictionary.save(this@SettingsActivity, dict.text.toString())
                 val d = Dictionary.load(this@SettingsActivity)
                 Toast.makeText(this@SettingsActivity, "Saved ${d.terms.size} words, ${d.fixes.size} fixes", Toast.LENGTH_SHORT).show()
+            })
+
+            addView(heading("\nSnippets"))
+            addView(TextView(context).apply {
+                textSize = 13f
+                text = "One per line: what you say = what gets typed. Say just the phrase and Hearsay inserts the text exactly. " +
+                    "Use \\n for a line break, e.g. my address = 1 Main St\\nSan Jose, CA"
+            })
+            val snips = EditText(context).apply {
+                setText(Snippets.text(context))
+                hint = "my email = you@example.com\nmy address = 1 Main St\\nSan Jose, CA"
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                minLines = 3; maxLines = 12
+                gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            }
+            addView(snips)
+            addView(button("Save snippets") {
+                Snippets.save(this@SettingsActivity, snips.text.toString())
+                val n = Snippets.load(this@SettingsActivity).entries.size
+                Toast.makeText(this@SettingsActivity, "Saved $n snippets", Toast.LENGTH_SHORT).show()
             })
 
             addView(heading(""))
