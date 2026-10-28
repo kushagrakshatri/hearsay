@@ -122,7 +122,7 @@ class OfflineFlowIME : InputMethodService() {
         }
         cleaner?.let { if (cleanerModel == want) return it }
         cleaner?.close(); cleaner = null; cleanerModel = null
-        return LlmCleaner.load(models.file(want)).also { cleaner = it; cleanerModel = want }
+        return LlmCleaner.load(want, models.file(want)).also { cleaner = it; cleanerModel = want }
     }
 
     private fun warmUp() {

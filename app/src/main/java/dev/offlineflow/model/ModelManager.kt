@@ -44,23 +44,33 @@ class ModelManager(context: Context) {
                 ),
             ),
         ),
-        QWEN25_1_5B(
-            "Qwen2.5 1.5B Instruct · better cleanup", Kind.CLEANUP, Engine.LLAMA, "llm",
+        QWEN35_2B(
+            "Qwen3.5 2B (Alibaba) · balanced", Kind.CLEANUP, Engine.LLAMA, "llm",
             listOf(
                 Asset(
-                    "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-                    "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-                    1_117_320_736, "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+                    "Qwen3.5-2B-Q4_K_M.gguf",
+                    "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf",
+                    1_280_835_840, "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
                 ),
             ),
         ),
-        QWEN25_0_5B(
-            "Qwen2.5 0.5B Instruct · fastest cleanup", Kind.CLEANUP, Engine.LLAMA, "llm",
+        GEMMA4_E2B(
+            "Gemma 4 E2B (Google) · best quality, slower", Kind.CLEANUP, Engine.LLAMA, "llm",
             listOf(
                 Asset(
-                    "qwen2.5-0.5b-instruct-q4_k_m.gguf",
-                    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-                    491_400_032, "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+                    "gemma-4-E2B-it-Q4_0.gguf",
+                    "https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_0.gguf",
+                    2_841_481_184, "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52",
+                ),
+            ),
+        ),
+        QWEN35_0_8B(
+            "Qwen3.5 0.8B (Alibaba) · fastest", Kind.CLEANUP, Engine.LLAMA, "llm",
+            listOf(
+                Asset(
+                    "Qwen3.5-0.8B-Q4_K_M.gguf",
+                    "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+                    532_517_120, "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517",
                 ),
             ),
         );
@@ -78,9 +88,12 @@ class ModelManager(context: Context) {
             ?.let { name -> Model.entries.firstOrNull { it.name == name && it.kind == Kind.SPEECH } } ?: recommended
         set(value) { require(value.kind == Kind.SPEECH); prefs.edit().putString(KEY_MODEL, value.name).apply() }
 
-    /** Cleanup LLM: 1.5B on ~8 GB+ phones (it shares RAM with the speech model), else 0.5B. */
+    /**
+     * Cleanup LLM default: Qwen3.5 2B on ~8 GB+ phones (it shares RAM with the speech model),
+     * else 0.8B. Gemma 4 E2B is opt-in: best quality but ~2.8 GB and slower per word.
+     */
     val recommendedCleanup: Model
-        get() = if (totalRam >= 7_000_000_000L) Model.QWEN25_1_5B else Model.QWEN25_0_5B
+        get() = if (totalRam >= 7_000_000_000L) Model.QWEN35_2B else Model.QWEN35_0_8B
 
     /** null = LLM cleanup off (rules only). */
     var selectedCleanup: Model?

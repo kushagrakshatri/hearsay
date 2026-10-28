@@ -89,6 +89,6 @@ Mic (AudioRecord, 16 kHz mono)
 
 ## Update Oct 28, 2026: local LLM cleanup (M1)
 - New Gradle module `:llm` builds llama.cpp (submodule third_party/llama.cpp, pinned 8642541 / v0.8.0) into libhearsayllm.so, separate from whisper's ggml; both libs link with `--exclude-libs,ALL`.
-- Cleanup models (GGUF, SHA-256 pinned): Qwen2.5 1.5B Instruct Q4_K_M (~1.1 GB, default on ≥ ~8 GB RAM) and Qwen2.5 0.5B Instruct Q4_K_M (~490 MB, default otherwise); "Off" = RulesCleaner. Both Apache-2.0.
-- System prompt + 4 few-shot examples are evaluated once and kept in the KV cache; each utterance only decodes its own turn. Greedy decoding, output rejected (fallback to rules) when empty or length ratio is off.
+- Cleanup models (GGUF, SHA-256 pinned, all Apache-2.0): Qwen3.5 2B Q4_K_M (~1.28 GB, default on ≥ ~8 GB RAM), Qwen3.5 0.8B Q4_K_M (~530 MB, default otherwise), Gemma 4 E2B Q4_0 (~2.84 GB, opt-in, best quality/slower). "Off" = RulesCleaner. Replaced Qwen2.5 the same day after the user asked about Gemma.
+- Prompts are formatted in Kotlin per family (ChatML with empty <think> for Qwen3.5; <|turn> format for Gemma 4). System prompt + 4 few-shot examples are decoded once and the sequence state is snapshotted (works for hybrid/SWA memory); each utterance restores it and decodes only its own turn. Greedy decoding, output rejected (fallback to rules) when empty or length ratio is off.
 - IME status shows "speech X + cleanup Y" ms; "Raw" still swaps back to the exact transcript.

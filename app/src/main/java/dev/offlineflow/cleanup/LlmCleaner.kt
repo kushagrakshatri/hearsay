@@ -1,6 +1,7 @@
 package dev.offlineflow.cleanup
 
 import dev.offlineflow.llm.LlamaEngine
+import dev.offlineflow.model.ModelManager
 import java.io.File
 
 /**
@@ -8,15 +9,18 @@ import java.io.File
  * spoken self-corrections, fixes punctuation, and keeps the speaker's words otherwise.
  * Falls back to [RulesCleaner] whenever the model's output looks off.
  */
-class LlmCleaner private constructor(private val llm: LlamaEngine) : Cleaner, AutoCloseable {
+class LlmCleaner private constructor(
+    private val llm: LlamaEngine,
+    private val format: Format,
+) : Cleaner, AutoCloseable {
 
     override fun clean(raw: String): String {
         val input = RulesCleaner.clean(raw) // cheap pre-pass: strips [BLANK_AUDIO], ums
         if (input.isBlank()) return input
         val words = input.split(Regex("\\s+")).size
         if (words < 3) return input // nothing for the model to improve
-        val out = runCatching { llm.complete(input, maxTokens = words * 2 + 32) }.getOrDefault("")
-            .let(::stripWrapping)
+        val out = runCatching { llm.complete(format.turn(input), maxTokens = words * 2 + 32) }.getOrDefault("")
+            .let(format::strip).let(::stripWrapping)
         return if (looksSane(input, out)) out else input
     }
 
@@ -61,9 +65,47 @@ class LlmCleaner private constructor(private val llm: LlamaEngine) : Cleaner, Au
             "For the trip we need three things:\n- Sunscreen\n- Chargers\n- Passports",
         )
 
-        fun load(model: File): LlmCleaner = LlmCleaner(
-            LlamaEngine.load(model, SYSTEM, EXAMPLES,
-                threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4))
-        )
+        fun load(model: ModelManager.Model, file: File): LlmCleaner {
+            val format = if (model == ModelManager.Model.GEMMA4_E2B) Format.GEMMA4 else Format.CHATML_NO_THINK
+            val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+            return LlmCleaner(LlamaEngine.load(file, format.prefix(SYSTEM, EXAMPLES), threads), format)
+        }
+    }
+
+    /** Chat formats, written out by hand so behavior doesn't depend on template detection. */
+    enum class Format {
+        /** Qwen3.x: ChatML with an empty think block, which turns reasoning off. */
+        CHATML_NO_THINK {
+            override fun prefix(system: String, examples: List<String>) = buildString {
+                append("<|im_start|>system\n").append(system).append("<|im_end|>\n")
+                examples.chunked(2).forEach { (u, a) ->
+                    append("<|im_start|>user\n").append(u).append("<|im_end|>\n")
+                    append("<|im_start|>assistant\n").append(a).append("<|im_end|>\n")
+                }
+            }
+            override fun turn(user: String) =
+                "<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        },
+        /** Gemma 4: <|turn>role … <turn|>; BOS is added by the tokenizer. Thinking off by default. */
+        GEMMA4 {
+            override fun prefix(system: String, examples: List<String>) = buildString {
+                append("<|turn>system\n").append(system).append("<turn|>\n")
+                examples.chunked(2).forEach { (u, a) ->
+                    append("<|turn>user\n").append(u).append("<turn|>\n")
+                    append("<|turn>model\n").append(a).append("<turn|>\n")
+                }
+            }
+            override fun turn(user: String) = "<|turn>user\n$user<turn|>\n<|turn>model\n"
+        };
+
+        abstract fun prefix(system: String, examples: List<String>): String
+        abstract fun turn(user: String): String
+
+        /** Drops any reasoning block and trailing end-of-turn markers the model printed. */
+        fun strip(out: String): String = out
+            .replace(Regex("(?s)<think>.*?</think>"), "")
+            .replace(Regex("(?s)<\\|channel>.*?<channel\\|>"), "")
+            .substringBefore("<|im_end|>").substringBefore("<turn|>").substringBefore("<|turn>")
+            .trim()
     }
 }

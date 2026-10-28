@@ -4,15 +4,16 @@ import java.io.File
 
 /**
  * A small instruction-tuned LLM (GGUF) running on-device through llama.cpp.
- * The system prompt and few-shot [examples] are evaluated once at load and cached,
- * so each [complete] call only pays for the new user turn. Not thread-safe.
+ * [prefix] (already chat-formatted: system prompt + few-shot turns) is evaluated once at
+ * load and snapshotted, so each [complete] call only pays for its own suffix.
+ * Not thread-safe.
  */
 class LlamaEngine private constructor(private var handle: Long) : AutoCloseable {
 
-    /** Greedy completion of one user turn. Blocking; call off the main thread. */
-    fun complete(user: String, maxTokens: Int): String {
+    /** Greedy completion after restoring the cached prefix. Blocking; off the main thread. */
+    fun complete(suffix: String, maxTokens: Int): String {
         check(handle != 0L) { "LlamaEngine is closed" }
-        return nativeComplete(handle, user, maxTokens).trim()
+        return nativeComplete(handle, suffix, maxTokens)
     }
 
     override fun close() {
@@ -20,23 +21,19 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
         handle = 0L
     }
 
-    private external fun nativeComplete(handle: Long, user: String, maxTokens: Int): String
+    private external fun nativeComplete(handle: Long, suffix: String, maxTokens: Int): String
     private external fun nativeFree(handle: Long)
 
     companion object {
         init { System.loadLibrary("hearsayllm") }
 
-        /** [examples] alternate user, assistant, user, assistant… */
-        fun load(model: File, system: String, examples: List<String>, threads: Int): LlamaEngine {
+        fun load(model: File, prefix: String, threads: Int): LlamaEngine {
             require(model.exists()) { "Model not found: ${model.path}" }
-            require(examples.size % 2 == 0) { "examples must be user/assistant pairs" }
-            val h = nativeInit(model.absolutePath, threads, system, examples.toTypedArray())
+            val h = nativeInit(model.absolutePath, threads, prefix)
             check(h != 0L) { "Failed to load ${model.name}" }
             return LlamaEngine(h)
         }
 
-        @JvmStatic private external fun nativeInit(
-            path: String, threads: Int, system: String, examples: Array<String>,
-        ): Long
+        @JvmStatic private external fun nativeInit(path: String, threads: Int, prefix: String): Long
     }
 }
