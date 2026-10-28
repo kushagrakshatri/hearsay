@@ -111,18 +111,20 @@ object ChatGptPlan {
 
             server.soTimeout = 5 * 60_000
             val (socket, query) = awaitCallback(server) ?: throw PlanException("Sign-in timed out")
-            // Keep the browser's request open until the exchange finishes, so its page shows the real outcome.
+            // Android blocks network for apps in the background (Hearsay is, while the browser is open), so
+            // send the browser straight back to Hearsay and do the exchange once we're in the foreground again.
             socket.use {
-                try {
-                    val account = finish(c, query, state, nonce, verifier, redirect, existing)
-                    reply(socket, page("You're signed in", "Hearsay will use your ChatGPT plan for cleanup and commands.", ok = true))
-                    account
-                } catch (t: Throwable) {
-                    Log.e(TAG, "sign-in failed", t)
-                    val msg = (t as? PlanException)?.message ?: "${t.javaClass.simpleName}: ${t.message}"
-                    runCatching { reply(socket, page("Sign-in didn't finish", msg, ok = false)) }
-                    throw if (t is PlanException) t else PlanException(msg)
+                val ok = query["error"] == null && query["state"] == state
+                runCatching {
+                    reply(socket, if (ok) page("Almost done", "Finishing sign-in in Hearsay.", ok = true)
+                    else page("Sign-in didn't finish", query["error_description"] ?: query["error"] ?: "State mismatch", ok = false))
                 }
+            }
+            try {
+                finish(c, query, state, nonce, verifier, redirect, existing)
+            } catch (t: Throwable) {
+                Log.e(TAG, "sign-in failed", t)
+                throw if (t is PlanException) t else PlanException("${t.javaClass.simpleName}: ${t.message}")
             }
         }
     }
@@ -142,16 +144,16 @@ object ChatGptPlan {
             else -> existing
         }
         val tokens = try {
-            postForm(TOKEN, mapOf(
+            whenOnline { postForm(TOKEN, mapOf(
                 "grant_type" to "authorization_code", "client_id" to clientId, "code" to code,
                 "code_verifier" to verifier, "redirect_uri" to redirect, "resource" to RESOURCE,
-            ))
+            )) }
         } catch (e: Responses.HttpError) {
             throw PlanException("Token exchange failed (${e.code}): ${e.body.take(160)}")
         }
         val idToken = tokens.optString("id_token")
         if (idToken.isEmpty()) throw PlanException("No ID token in the token response")
-        val claims = try { IdToken.verify(idToken, clientId, nonce) } catch (e: PlanException) { throw e }
+        val claims = try { whenOnline { IdToken.verify(idToken, clientId, nonce) } } catch (e: PlanException) { throw e }
             catch (t: Throwable) { throw PlanException("ID token check failed: ${t.javaClass.simpleName} ${t.message.orEmpty()}") }
         // Granted scopes: token response, else the callback, else the access token's own claim.
         val scopes = scopesOf(tokens).ifEmpty { query["scope"].orEmpty().split(' ', '+').filter { it.isNotBlank() } }
@@ -167,6 +169,20 @@ object ChatGptPlan {
         synchronized(lock) { write(c, account) }
         pickModel(c, account)
         return account
+    }
+
+    /**
+     * Retries network failures (not HTTP errors) for up to 90 s: right after the browser hands back,
+     * Hearsay may still be in the background with its network blocked until the user is back in the app.
+     */
+    private fun <T> whenOnline(block: () -> T): T {
+        val deadline = System.currentTimeMillis() + 90_000
+        while (true) {
+            try { return block() } catch (e: java.io.IOException) {
+                if (System.currentTimeMillis() > deadline) throw e
+                Thread.sleep(1_500)
+            }
+        }
     }
 
     private fun jwtClaim(jwt: String, name: String): String = runCatching {
