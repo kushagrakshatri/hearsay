@@ -74,3 +74,9 @@ jobs:
         with:
           name: hearsay-screens
           path: shots/
+      - name: Push screenshots to the ui-screens branch (main only)
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          cd shots && git init -q -b ui-screens && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Screens for ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-screens
