@@ -27,7 +27,7 @@ object RulesCleaner : Cleaner {
     /** For code, URLs and search: the transcript as heard, minus noise tags and one trailing period. */
     fun verbatim(raw: String): String {
         var t = raw.replace(bracketed, " ").replace(spaces, " ").trim()
-        if (t.endsWith(".") && !t.endsWith("..") && t.count { it == '.' } == 1) t = t.dropLast(1)
+        if (t.endsWith(".") && !t.endsWith("..")) t = t.dropLast(1) // ASR's sentence period, not part of a URL
         return t
     }
 }
