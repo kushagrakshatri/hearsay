@@ -23,3 +23,5 @@ add_subdirectory(${WHISPER_DIR} whisper)
 add_library(offlineflow SHARED whisper_jni.cpp)
 find_library(log-lib log)
 target_link_libraries(offlineflow whisper ${log-lib})
+# Keep this library's statically linked ggml private (the llm module ships its own copy).
+target_link_options(offlineflow PRIVATE "-Wl,--exclude-libs,ALL")

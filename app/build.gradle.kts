@@ -71,6 +71,11 @@ android {
         }
     }
 
+    packaging {
+        // Both native modules bundle the same NDK C++ runtime.
+        jniLibs { pickFirsts += "**/libc++_shared.so" }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -88,4 +93,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation(files(sherpaAar))
+    implementation(project(":llm"))
 }

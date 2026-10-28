@@ -19,18 +19,23 @@ import android.widget.TextView
 import dev.offlineflow.asr.Engines
 import dev.offlineflow.asr.SpeechEngine
 import dev.offlineflow.audio.Recorder
+import dev.offlineflow.cleanup.Cleaner
+import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.*
 
 /**
  * M0 keyboard: hold the mic, talk, release. Raw on-device transcript, lightly
- * tidied by RulesCleaner, is committed at the cursor. "Raw" swaps the last insert
+ * cleaned up by a local LLM (or RulesCleaner when cleanup is off), is committed at the cursor. "Raw" swaps the last insert
  * back to the exact transcript.
  */
 class OfflineFlowIME : InputMethodService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val asrDispatcher = Dispatchers.Default.limitedParallelism(1)
+    private val llmDispatcher = Dispatchers.Default.limitedParallelism(1)
+    private var cleaner: LlmCleaner? = null
+    private var cleanerModel: ModelManager.Model? = null
     private lateinit var models: ModelManager
     private var engine: SpeechEngine? = null
     private var engineModel: ModelManager.Model? = null
@@ -96,6 +101,7 @@ class OfflineFlowIME : InputMethodService() {
     override fun onDestroy() {
         scope.cancel()
         engine?.close(); engine = null
+        cleaner?.close(); cleaner = null
         super.onDestroy()
     }
 
@@ -107,11 +113,24 @@ class OfflineFlowIME : InputMethodService() {
         return Engines.load(models, want).also { engine = it; engineModel = want }
     }
 
+    /** Returns the selected cleanup LLM, or RulesCleaner when off / not downloaded. LLM thread only. */
+    private fun cleanerForSelected(): Cleaner {
+        val want = models.selectedCleanup?.takeIf { models.isReady(it) }
+        if (want == null) {
+            cleaner?.close(); cleaner = null; cleanerModel = null
+            return RulesCleaner
+        }
+        cleaner?.let { if (cleanerModel == want) return it }
+        cleaner?.close(); cleaner = null; cleanerModel = null
+        return LlmCleaner.load(models.file(want)).also { cleaner = it; cleanerModel = want }
+    }
+
     private fun warmUp() {
-        if (!models.isReady(models.selected)) return
-        scope.launch(asrDispatcher) {
-            runCatching { engineForSelected() }
-                .onFailure { Log.e(TAG, "model load failed", it) }
+        if (models.isReady(models.selected)) scope.launch(asrDispatcher) {
+            runCatching { engineForSelected() }.onFailure { Log.e(TAG, "speech model load failed", it) }
+        }
+        scope.launch(llmDispatcher) {
+            runCatching { cleanerForSelected() }.onFailure { Log.e(TAG, "cleanup model load failed", it) }
         }
     }
 
@@ -147,7 +166,17 @@ class OfflineFlowIME : InputMethodService() {
                 status.text = "Transcription failed: ${t.message ?: t.javaClass.simpleName}"
                 return@launch
             }
-            val cleaned = RulesCleaner.clean(raw)
+            val asrMs = SystemClock.elapsedRealtime() - t0
+            val useLlm = models.selectedCleanup?.let { models.isReady(it) } == true && raw.isNotBlank()
+            if (useLlm) status.text = "Cleaning up…"
+            val t1 = SystemClock.elapsedRealtime()
+            val cleaned = try {
+                withContext(llmDispatcher) { cleanerForSelected().clean(raw) }
+            } catch (t: Throwable) {
+                Log.e(TAG, "cleanup failed, using rules", t)
+                RulesCleaner.clean(raw)
+            }
+            val cleanMs = SystemClock.elapsedRealtime() - t1
             val ms = SystemClock.elapsedRealtime() - t0
             if (cleaned.isNotEmpty()) {
                 val text = withLeadingSpace(cleaned)
@@ -155,8 +184,9 @@ class OfflineFlowIME : InputMethodService() {
                 lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
             }
             status.text = if (cleaned.isEmpty()) "Heard nothing · ${ms} ms"
+                else if (useLlm) "Done in ${ms} ms · speech ${asrMs} + cleanup ${cleanMs} · ${audio.size / Recorder.SAMPLE_RATE}s audio"
                 else "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
-            Log.i(TAG, "latency=${ms}ms audio=${audio.size}samples")
+            Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
         }
     }
 

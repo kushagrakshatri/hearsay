@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -23,28 +24,39 @@ import kotlinx.coroutines.withContext
 class SettingsActivity : AppCompatActivity() {
     private lateinit var models: ModelManager
     private lateinit var info: TextView
-    private lateinit var progress: ProgressBar
-    private lateinit var downloadButton: Button
-    private var downloading = false
+    private lateinit var speechProgress: ProgressBar
+    private lateinit var speechButton: Button
+    private lateinit var cleanupProgress: ProgressBar
+    private lateinit var cleanupButton: Button
+    private val downloading = mutableSetOf<ModelManager.Model>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         models = ModelManager(this)
         val pad = (24 * resources.displayMetrics.density).toInt()
         info = TextView(this).apply { textSize = 16f }
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
+        fun bar() = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
+        speechProgress = bar(); cleanupProgress = bar()
 
         fun button(label: String, action: () -> Unit) = Button(this).apply { text = label; isAllCaps = false; setOnClickListener { action() } }
+        fun heading(t: String) = TextView(this).apply { text = t; textSize = 15f }
 
-        setContentView(LinearLayout(this).apply {
+        val speechModels = ModelManager.Model.entries.filter { it.kind == ModelManager.Kind.SPEECH }
+        val cleanupModels = ModelManager.Model.entries.filter { it.kind == ModelManager.Kind.CLEANUP }
+
+        speechButton = button("") { download(models.selected, speechButton, speechProgress) }
+        cleanupButton = button("") { models.selectedCleanup?.let { download(it, cleanupButton, cleanupProgress) } }
+
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(pad, pad, pad, pad)
             addView(TextView(context).apply { text = "Hearsay"; textSize = 28f })
             addView(TextView(context).apply { text = "Voice dictation that never leaves your phone."; textSize = 15f })
             addView(info)
             addView(button("1. Allow microphone") { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1) })
-            addView(TextView(context).apply { text = "\nSpeech model"; textSize = 15f })
+
+            addView(heading("\nSpeech model"))
             addView(RadioGroup(context).apply {
-                ModelManager.Model.entries.forEachIndexed { i, m ->
+                speechModels.forEachIndexed { i, m ->
                     val rec = if (m == models.recommended) " · recommended for this phone" else ""
                     addView(RadioButton(context).apply {
                         id = 1000 + i
@@ -52,16 +64,34 @@ class SettingsActivity : AppCompatActivity() {
                         isChecked = m == models.selected
                     })
                 }
-                setOnCheckedChangeListener { _, checkedId ->
-                    models.selected = ModelManager.Model.entries[checkedId - 1000]; refresh()
+                setOnCheckedChangeListener { _, id -> models.selected = speechModels[id - 1000]; refresh() }
+            })
+            addView(speechButton); addView(speechProgress)
+
+            addView(heading("\nCleanup (removes fillers, applies corrections, fixes punctuation)"))
+            addView(RadioGroup(context).apply {
+                cleanupModels.forEachIndexed { i, m ->
+                    val rec = if (m == models.recommendedCleanup) " · recommended for this phone" else ""
+                    addView(RadioButton(context).apply {
+                        id = 2000 + i
+                        text = "${m.label} (~${m.approxMb} MB)$rec"
+                        isChecked = m == models.selectedCleanup
+                    })
+                }
+                addView(RadioButton(context).apply {
+                    id = 2999; text = "Off · basic rules only"; isChecked = models.selectedCleanup == null
+                })
+                setOnCheckedChangeListener { _, id ->
+                    models.selectedCleanup = if (id == 2999) null else cleanupModels[id - 2000]; refresh()
                 }
             })
-            downloadButton = button("2. Download speech model") { download() }
-            addView(downloadButton)
-            addView(progress)
+            addView(cleanupButton); addView(cleanupProgress)
+
+            addView(heading(""))
             addView(button("3. Enable keyboard") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
             addView(button("4. Switch to Hearsay") { getSystemService(InputMethodManager::class.java).showInputMethodPicker() })
-        })
+        }
+        setContentView(ScrollView(this).apply { addView(content) })
     }
 
     override fun onResume() { super.onResume(); refresh() }
@@ -72,25 +102,39 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun refresh() {
         val mic = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        val m = models.selected
-        val model = models.isReady(m)
-        info.text = "\nMicrophone: ${if (mic) "✓" else "needed"}\n${m.shortName}: ${if (model) "✓ ready" else "not downloaded"}\n"
-        if (!downloading) downloadButton.text = if (model) "2. ${m.shortName} downloaded ✓" else "2. Download ${m.shortName} (~${m.approxMb} MB)"
-        if (!downloading) progress.progress = if (model) 100 else 0
+        val s = models.selected
+        val c = models.selectedCleanup
+        val cleanupLine = when {
+            c == null -> "Cleanup: basic rules"
+            models.isReady(c) -> "Cleanup: ${c.shortName} ✓ ready"
+            else -> "Cleanup: ${c.shortName} not downloaded (basic rules until then)"
+        }
+        info.text = "\nMicrophone: ${if (mic) "✓" else "needed"}\n" +
+            "Speech: ${s.shortName} ${if (models.isReady(s)) "✓ ready" else "not downloaded"}\n$cleanupLine\n"
+        show(s, speechButton, speechProgress, "2. ")
+        if (c == null) {
+            cleanupButton.isEnabled = false; cleanupButton.text = "Cleanup model not needed"; cleanupProgress.progress = 0
+        } else {
+            cleanupButton.isEnabled = true; show(c, cleanupButton, cleanupProgress, "2b. ")
+        }
     }
 
-    private fun download() {
-        val m = models.selected
-        if (downloading || models.isReady(m)) return
-        downloading = true
-        downloadButton.text = "Downloading ${m.shortName}… keep this screen open"
+    private fun show(m: ModelManager.Model, button: Button, bar: ProgressBar, step: String) {
+        if (m in downloading) return
+        val ready = models.isReady(m)
+        button.text = if (ready) "$step${m.shortName} downloaded ✓" else "${step}Download ${m.shortName} (~${m.approxMb} MB)"
+        bar.progress = if (ready) 100 else 0
+    }
+
+    private fun download(m: ModelManager.Model, button: Button, bar: ProgressBar) {
+        if (m in downloading || models.isReady(m)) return
+        downloading += m
+        button.text = "Downloading ${m.shortName}… keep this screen open"
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    models.download(m) { pct -> runOnUiThread { progress.progress = pct } }
-                }
+                runCatching { models.download(m) { pct -> runOnUiThread { bar.progress = pct } } }
             }
-            downloading = false
+            downloading -= m
             refresh()
             result.onFailure { info.text = "\nDownload failed: ${it.message}\n" }
         }

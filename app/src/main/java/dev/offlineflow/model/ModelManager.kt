@@ -19,13 +19,14 @@ class ModelManager(context: Context) {
         context.getSystemService(ActivityManager::class.java).getMemoryInfo(it)
     }.totalMem
 
-    enum class Engine { WHISPER, PARAKEET }
+    enum class Kind { SPEECH, CLEANUP }
+    enum class Engine { WHISPER, PARAKEET, LLAMA }
 
     data class Asset(val name: String, val url: String, val bytes: Long, val sha256: String)
 
-    enum class Model(val label: String, val engine: Engine, val subdir: String, val assets: List<Asset>) {
+    enum class Model(val label: String, val kind: Kind, val engine: Engine, val subdir: String, val assets: List<Asset>) {
         PARAKEET_V2(
-            "Parakeet TDT 0.6B v2 (NVIDIA) · most accurate", Engine.PARAKEET, "parakeet-tdt-0.6b-v2-int8",
+            "Parakeet TDT 0.6B v2 (NVIDIA) · most accurate", Kind.SPEECH, Engine.PARAKEET, "parakeet-tdt-0.6b-v2-int8",
             listOf(
                 hf("encoder.int8.onnx", 652_184_296, "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab"),
                 hf("decoder.int8.onnx", 7_257_753, "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e"),
@@ -34,12 +35,32 @@ class ModelManager(context: Context) {
             ),
         ),
         WHISPER_BASE_EN(
-            "Whisper base.en (OpenAI) · small and light", Engine.WHISPER, "",
+            "Whisper base.en (OpenAI) · small and light", Kind.SPEECH, Engine.WHISPER, "",
             listOf(
                 Asset(
                     "ggml-base.en-q5_1.bin",
                     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin",
                     59_721_011, "4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f",
+                ),
+            ),
+        ),
+        QWEN25_1_5B(
+            "Qwen2.5 1.5B Instruct · better cleanup", Kind.CLEANUP, Engine.LLAMA, "llm",
+            listOf(
+                Asset(
+                    "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+                    "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+                    1_117_320_736, "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+                ),
+            ),
+        ),
+        QWEN25_0_5B(
+            "Qwen2.5 0.5B Instruct · fastest cleanup", Kind.CLEANUP, Engine.LLAMA, "llm",
+            listOf(
+                Asset(
+                    "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+                    "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+                    491_400_032, "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
                 ),
             ),
         );
@@ -54,8 +75,24 @@ class ModelManager(context: Context) {
 
     var selected: Model
         get() = prefs.getString(KEY_MODEL, null)
-            ?.let { name -> Model.entries.firstOrNull { it.name == name } } ?: recommended
-        set(value) { prefs.edit().putString(KEY_MODEL, value.name).apply() }
+            ?.let { name -> Model.entries.firstOrNull { it.name == name && it.kind == Kind.SPEECH } } ?: recommended
+        set(value) { require(value.kind == Kind.SPEECH); prefs.edit().putString(KEY_MODEL, value.name).apply() }
+
+    /** Cleanup LLM: 1.5B on ~8 GB+ phones (it shares RAM with the speech model), else 0.5B. */
+    val recommendedCleanup: Model
+        get() = if (totalRam >= 7_000_000_000L) Model.QWEN25_1_5B else Model.QWEN25_0_5B
+
+    /** null = LLM cleanup off (rules only). */
+    var selectedCleanup: Model?
+        get() = when (val v = prefs.getString(KEY_CLEANUP, null)) {
+            null -> recommendedCleanup
+            OFF -> null
+            else -> Model.entries.firstOrNull { it.name == v && it.kind == Kind.CLEANUP } ?: recommendedCleanup
+        }
+        set(value) {
+            require(value == null || value.kind == Kind.CLEANUP)
+            prefs.edit().putString(KEY_CLEANUP, value?.name ?: OFF).apply()
+        }
 
     fun dir(m: Model): File = if (m.subdir.isEmpty()) root else File(root, m.subdir)
     fun file(m: Model, asset: Asset = m.assets.first()) = File(dir(m), asset.name)
@@ -108,6 +145,8 @@ class ModelManager(context: Context) {
 
     companion object {
         private const val KEY_MODEL = "model"
+        private const val KEY_CLEANUP = "cleanup"
+        private const val OFF = "OFF"
         private const val PARAKEET_REPO =
             "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main"
 

@@ -86,3 +86,9 @@ Mic (AudioRecord, 16 kHz mono)
 - Every downloaded model file is pinned by size + SHA-256 and deleted on mismatch.
 - Every push to main publishes a GitHub Release `build-N` with `hearsay-debug.apk`; signed with a committed debug key so builds upgrade in place. Newest: https://github.com/kushagrakshatri/hearsay/releases/latest/download/hearsay-debug.apk
 - Candidates later: Moonshine (tiny/base) for low-end phones; streaming/partials.
+
+## Update Oct 28, 2026: local LLM cleanup (M1)
+- New Gradle module `:llm` builds llama.cpp (submodule third_party/llama.cpp, pinned 8642541 / v0.8.0) into libhearsayllm.so, separate from whisper's ggml; both libs link with `--exclude-libs,ALL`.
+- Cleanup models (GGUF, SHA-256 pinned): Qwen2.5 1.5B Instruct Q4_K_M (~1.1 GB, default on ≥ ~8 GB RAM) and Qwen2.5 0.5B Instruct Q4_K_M (~490 MB, default otherwise); "Off" = RulesCleaner. Both Apache-2.0.
+- System prompt + 4 few-shot examples are evaluated once and kept in the KV cache; each utterance only decodes its own turn. Greedy decoding, output rejected (fallback to rules) when empty or length ratio is off.
+- IME status shows "speech X + cleanup Y" ms; "Raw" still swaps back to the exact transcript.
