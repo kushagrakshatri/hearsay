@@ -9,13 +9,26 @@ import kotlin.math.sqrt
 
 /**
  * Captures 16 kHz mono float PCM into memory. Nothing is written to disk.
+ * With a [gate], speech is tracked live: [onSpeechEnd] fires (once, on the mic thread) after
+ * [endSilenceMs] of silence following speech (or [noSpeechMs] with no speech at all), and [stop] returns only the speech stretches.
  * Caller must hold RECORD_AUDIO.
  */
-class Recorder(private val onLevel: (Float) -> Unit = {}) {
+class Recorder(
+    private val gate: SpeechGate? = null,
+    private val endSilenceMs: Int = 1500,
+    private val noSpeechMs: Int = 8000,
+    private val onSpeechEnd: () -> Unit = {},
+    private val onLevel: (Float) -> Unit = {},
+) {
     private var record: AudioRecord? = null
     private var worker: Thread? = null
     @Volatile private var running = false
     private val chunks = ArrayList<FloatArray>()
+    @Volatile private var endFired = false
+
+    /** Whether the VAD heard any speech (true when there is no VAD). Valid after [stop]. */
+    var heardSpeech = true
+        private set
 
     @SuppressLint("MissingPermission")
     fun start() {
@@ -37,6 +50,15 @@ class Recorder(private val onLevel: (Float) -> Unit = {}) {
                     val c = buf.copyOf(n)
                     synchronized(chunks) { chunks.add(c) }
                     onLevel(rms(c))
+                    gate?.let { g ->
+                        runCatching { g.accept(c) }
+                        val silentTooLong = if (g.heardSpeech) g.trailingSilence >= endSilenceMs * SAMPLE_RATE / 1000L
+                            else synchronized(chunks) { chunks.size } * 100 >= noSpeechMs
+                        if (!endFired && silentTooLong) {
+                            endFired = true
+                            onSpeechEnd()
+                        }
+                    }
                 }
             }
         }
@@ -52,7 +74,11 @@ class Recorder(private val onLevel: (Float) -> Unit = {}) {
         val out = FloatArray(all.sumOf { it.size })
         var i = 0
         for (c in all) { c.copyInto(out, i); i += c.size }
-        return Silence.trim(out)
+        val g = gate ?: return Silence.trim(out)
+        val speech = runCatching { g.finish() }.getOrNull() ?: return Silence.trim(out)
+        g.close()
+        heardSpeech = speech.isNotEmpty()
+        return if (heardSpeech) SpeechGate.cut(out, speech) else FloatArray(0)
     }
 
     private fun rms(x: FloatArray): Float {
@@ -64,7 +90,7 @@ class Recorder(private val onLevel: (Float) -> Unit = {}) {
     companion object { const val SAMPLE_RATE = 16_000 }
 }
 
-/** Energy-based trim of leading/trailing silence. M1 swaps this for Silero VAD. */
+/** Energy-based trim of leading/trailing silence; the fallback when the VAD is unavailable. */
 object Silence {
     fun trim(x: FloatArray, frame: Int = 320, threshold: Float = 0.01f): FloatArray {
         if (x.isEmpty()) return x

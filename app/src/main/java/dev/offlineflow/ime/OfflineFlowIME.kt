@@ -19,6 +19,7 @@ import android.widget.TextView
 import dev.offlineflow.asr.Engines
 import dev.offlineflow.asr.SpeechEngine
 import dev.offlineflow.audio.Recorder
+import dev.offlineflow.audio.SpeechGate
 import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
@@ -26,7 +27,8 @@ import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.*
 
 /**
- * M0 keyboard: hold the mic, talk, release. Raw on-device transcript, lightly
+ * Keyboard: hold the mic and talk, or tap it for hands-free (stops on its own when you pause,
+ * or tap again). Raw on-device transcript, lightly
  * cleaned up by a local LLM (or RulesCleaner when cleanup is off), is committed at the cursor. "Raw" swaps the last insert
  * back to the exact transcript.
  */
@@ -40,6 +42,8 @@ class OfflineFlowIME : InputMethodService() {
     private var engine: SpeechEngine? = null
     private var engineModel: ModelManager.Model? = null
     private var recorder: Recorder? = null
+    private var micDownAt = 0L
+    private var handsFree = false
 
     private lateinit var status: TextView
     private lateinit var mic: Button
@@ -96,6 +100,8 @@ class OfflineFlowIME : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         recorder?.stop(); recorder = null
+        handsFree = false
+        if (::mic.isInitialized) mic.text = "Hold to talk"
     }
 
     override fun onDestroy() {
@@ -137,8 +143,20 @@ class OfflineFlowIME : InputMethodService() {
     @SuppressLint("ClickableViewAccessibility")
     private fun onMicTouch(v: View, e: MotionEvent): Boolean {
         when (e.action) {
-            MotionEvent.ACTION_DOWN -> startDictation()
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> finishDictation()
+            MotionEvent.ACTION_DOWN -> {
+                if (handsFree) { finishDictation(); return true } // second tap ends hands-free
+                micDownAt = SystemClock.elapsedRealtime()
+                startDictation()
+            }
+            MotionEvent.ACTION_UP -> {
+                if (recorder == null || handsFree) return true
+                if (SystemClock.elapsedRealtime() - micDownAt < TAP_MS) {
+                    handsFree = true
+                    status.text = "Listening… stops when you pause, or tap"
+                    mic.text = "Tap to stop"
+                } else finishDictation()
+            }
+            MotionEvent.ACTION_CANCEL -> if (!handsFree) finishDictation()
         }
         return true
     }
@@ -146,13 +164,20 @@ class OfflineFlowIME : InputMethodService() {
     private fun startDictation() {
         if (!hasMicPermission() || !models.isReady(models.selected)) return
         status.text = "Listening…"
-        recorder = Recorder().also { it.start() }
+        val gate = SpeechGate.create(assets)
+        recorder = Recorder(gate, onSpeechEnd = {
+            // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
+            mic.post { if (handsFree) finishDictation() }
+        }).also { it.start() }
     }
 
     private fun finishDictation() {
         val rec = recorder ?: return
         recorder = null
+        handsFree = false
+        mic.text = "Hold to talk"
         val audio = rec.stop()
+        if (!rec.heardSpeech) { status.text = "Didn't hear any speech"; return }
         if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
         status.text = if (engine == null || engineModel != models.selected) "Loading model, then transcribing…" else "Transcribing…"
         val t0 = SystemClock.elapsedRealtime()
@@ -211,5 +236,6 @@ class OfflineFlowIME : InputMethodService() {
 
     companion object {
         private const val TAG = "OfflineFlowIME"
+        private const val TAP_MS = 350L
     }
 }

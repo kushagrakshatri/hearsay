@@ -92,3 +92,8 @@ Mic (AudioRecord, 16 kHz mono)
 - Cleanup models (GGUF, SHA-256 pinned, all Apache-2.0): Qwen3.5 2B Q4_K_M (~1.28 GB, default on ≥ ~8 GB RAM), Qwen3.5 0.8B Q4_K_M (~530 MB, default otherwise), Gemma 4 E2B Q4_0 (~2.84 GB, opt-in, best quality/slower). "Off" = RulesCleaner. Replaced Qwen2.5 the same day after the user asked about Gemma.
 - Prompts are formatted in Kotlin per family (ChatML with empty <think> for Qwen3.5; <|turn> format for Gemma 4). System prompt + 4 few-shot examples are decoded once and the sequence state is snapshotted (works for hybrid/SWA memory); each utterance restores it and decodes only its own turn. Greedy decoding, output rejected (fallback to rules) when empty or length ratio is off.
 - IME status shows "speech X + cleanup Y" ms; "Raw" still swaps back to the exact transcript.
+
+## Update Oct 28, 2026: Silero VAD + hands-free (completes M1)
+- Silero VAD (silero_vad.onnx, 644 KB, MIT, bundled in assets, SHA-256 9e2449e1…) runs through the sherpa-onnx Vad API on the mic thread (threshold 0.4, min silence 0.4 s, min speech 0.15 s).
+- Only speech stretches (padded 250 ms) reach the ASR model; long pauses are cut. No speech at all → "Didn't hear any speech" and nothing is transcribed (stops Whisper hallucinating on silence). Energy trim remains the fallback if the VAD can't load.
+- Mic: hold to talk (unchanged), or a quick tap (<350 ms) for hands-free, which stops after 1.5 s of silence following speech, after 8 s with no speech, or on a second tap.
