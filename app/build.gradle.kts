@@ -94,4 +94,5 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation(files(sherpaAar))
     implementation(project(":llm"))
+    testImplementation("junit:junit:4.13.2")
 }

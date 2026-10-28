@@ -65,11 +65,18 @@ class LlmCleaner private constructor(
             "For the trip we need three things:\n- Sunscreen\n- Chargers\n- Passports",
         )
 
-        fun load(model: ModelManager.Model, file: File): LlmCleaner {
+        fun load(model: ModelManager.Model, file: File, dictionary: Dictionary): LlmCleaner {
             val format = if (model == ModelManager.Model.GEMMA4_E2B) Format.GEMMA4 else Format.CHATML_NO_THINK
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-            return LlmCleaner(LlamaEngine.load(file, format.prefix(SYSTEM, EXAMPLES), threads), format)
+            val words = dictionary.spellings.take(MAX_DICTIONARY)
+            val system = if (words.isEmpty()) SYSTEM
+                else SYSTEM + "\nThe speaker uses these words and names; when the transcript has something that sounds like one, spell it exactly like this: " +
+                    words.joinToString(", ") + "."
+            return LlmCleaner(LlamaEngine.load(file, format.prefix(system, EXAMPLES), threads), format)
         }
+
+        /** Keeps the cached prompt prefix small enough for the 2048-token context. */
+        private const val MAX_DICTIONARY = 150
     }
 
     /** Chat formats, written out by hand so behavior doesn't depend on template detection. */

@@ -21,6 +21,7 @@ import dev.offlineflow.asr.SpeechEngine
 import dev.offlineflow.audio.Recorder
 import dev.offlineflow.audio.SpeechGate
 import dev.offlineflow.cleanup.Cleaner
+import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
 import dev.offlineflow.model.ModelManager
@@ -38,6 +39,7 @@ class OfflineFlowIME : InputMethodService() {
     private val llmDispatcher = Dispatchers.Default.limitedParallelism(1)
     private var cleaner: LlmCleaner? = null
     private var cleanerModel: ModelManager.Model? = null
+    private var cleanerDictKey: String? = null
     private lateinit var models: ModelManager
     private var engine: SpeechEngine? = null
     private var engineModel: ModelManager.Model? = null
@@ -120,15 +122,18 @@ class OfflineFlowIME : InputMethodService() {
     }
 
     /** Returns the selected cleanup LLM, or RulesCleaner when off / not downloaded. LLM thread only. */
-    private fun cleanerForSelected(): Cleaner {
+    private fun cleanerForSelected(dictionary: Dictionary = Dictionary.load(this)): Cleaner {
         val want = models.selectedCleanup?.takeIf { models.isReady(it) }
         if (want == null) {
             cleaner?.close(); cleaner = null; cleanerModel = null
             return RulesCleaner
         }
-        cleaner?.let { if (cleanerModel == want) return it }
+        // The dictionary is part of the cached prompt, so a dictionary edit reloads the prefix.
+        cleaner?.let { if (cleanerModel == want && cleanerDictKey == dictionary.key) return it }
         cleaner?.close(); cleaner = null; cleanerModel = null
-        return LlmCleaner.load(want, models.file(want)).also { cleaner = it; cleanerModel = want }
+        return LlmCleaner.load(want, models.file(want), dictionary).also {
+            cleaner = it; cleanerModel = want; cleanerDictKey = dictionary.key
+        }
     }
 
     private fun warmUp() {
@@ -195,11 +200,13 @@ class OfflineFlowIME : InputMethodService() {
             val useLlm = models.selectedCleanup?.let { models.isReady(it) } == true && raw.isNotBlank()
             if (useLlm) status.text = "Cleaning up…"
             val t1 = SystemClock.elapsedRealtime()
+            val dictionary = Dictionary.load(this@OfflineFlowIME)
+            val heard = dictionary.apply(raw)
             val cleaned = try {
-                withContext(llmDispatcher) { cleanerForSelected().clean(raw) }
+                withContext(llmDispatcher) { dictionary.apply(cleanerForSelected(dictionary).clean(heard)) }
             } catch (t: Throwable) {
                 Log.e(TAG, "cleanup failed, using rules", t)
-                RulesCleaner.clean(raw)
+                dictionary.apply(RulesCleaner.clean(heard))
             }
             val cleanMs = SystemClock.elapsedRealtime() - t1
             val ms = SystemClock.elapsedRealtime() - t0

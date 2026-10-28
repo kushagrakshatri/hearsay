@@ -6,7 +6,10 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
+import android.text.InputType
 import android.widget.Button
+import android.widget.EditText
+import android.widget.Toast
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioButton
@@ -15,6 +18,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -86,6 +90,26 @@ class SettingsActivity : AppCompatActivity() {
                 }
             })
             addView(cleanupButton); addView(cleanupProgress)
+
+            addView(heading("\nPersonal dictionary"))
+            addView(TextView(context).apply {
+                textSize = 13f
+                text = "One per line. Names and jargon get spelled exactly as you write them. " +
+                    "To fix something it keeps mishearing, write what it hears, then -> and what you want, e.g. hear say -> Hearsay"
+            })
+            val dict = EditText(context).apply {
+                setText(Dictionary.text(context))
+                hint = "Hearsay\nGitHub\nhear say -> Hearsay"
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                minLines = 4; maxLines = 12
+                gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            }
+            addView(dict)
+            addView(button("Save dictionary") {
+                Dictionary.save(this@SettingsActivity, dict.text.toString())
+                val d = Dictionary.load(this@SettingsActivity)
+                Toast.makeText(this@SettingsActivity, "Saved ${d.terms.size} words, ${d.fixes.size} fixes", Toast.LENGTH_SHORT).show()
+            })
 
             addView(heading(""))
             addView(button("3. Enable keyboard") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })

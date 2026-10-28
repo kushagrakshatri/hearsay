@@ -97,3 +97,9 @@ Mic (AudioRecord, 16 kHz mono)
 - Silero VAD (silero_vad.onnx, 644 KB, MIT, bundled in assets, SHA-256 9e2449e1…) runs through the sherpa-onnx Vad API on the mic thread (threshold 0.4, min silence 0.4 s, min speech 0.15 s).
 - Only speech stretches (padded 250 ms) reach the ASR model; long pauses are cut. No speech at all → "Didn't hear any speech" and nothing is transcribed (stops Whisper hallucinating on silence). Energy trim remains the fallback if the VAD can't load.
 - Mic: hold to talk (unchanged), or a quick tap (<350 ms) for hands-free, which stops after 1.5 s of silence following speech, after 8 s with no speech, or on a second tap.
+
+## Update Oct 28, 2026: personal dictionary (M2, part 1)
+- Settings has a free-text dictionary: one entry per line; `heard -> written` lines are fixes. Stored in app prefs only.
+- Applied in three places: (1) to the ASR text (fixes, exact-case, split-word joins like "hear say" → "Hearsay", one-letter-off for terms ≥6 letters); (2) in the LLM system prompt ("spell these exactly", up to 150 entries; a dictionary change reloads the cached prefix); (3) again on the cleaned text. "Raw" still restores the exact ASR transcript.
+- ASR-level biasing (Whisper initial prompt / sherpa hotwords) deferred: Parakeet TDT hotword support in sherpa-onnx is unverified.
+- CI now runs `:app:testDebugUnitTest` (DictionaryTest) before assembling.
