@@ -12,7 +12,10 @@ import kotlin.math.sqrt
 class LevelView(context: Context) : View(context) {
     private val levels = FloatArray(48)
     private var head = 0
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2E7D32") }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4F46E5") }
+    var color: Int
+        get() = paint.color
+        set(v) { paint.color = v; invalidate() }
     private val minBar = 2 * resources.displayMetrics.density
 
     /** Adds one RMS reading (0..1). Main thread. */

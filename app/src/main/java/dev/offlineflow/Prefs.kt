@@ -46,6 +46,10 @@ object Prefs {
     fun chatGptWelcomed(c: Context): Boolean = p(c).getBoolean("chatgpt_welcomed", false)
     fun setChatGptWelcomed(c: Context) = p(c).edit().putBoolean("chatgpt_welcomed", true).apply()
 
+    /** The guided first-run setup was finished or skipped. */
+    fun setupDone(c: Context): Boolean = p(c).getBoolean("setup_done", false)
+    fun setSetupDone(c: Context) = p(c).edit().putBoolean("setup_done", true).apply()
+
     /** Apps where the user picked a style with the keyboard chip. */
     fun styleOverrides(c: Context): Int = p(c).all.keys.count { it.startsWith(STYLE_PREFIX) }
 

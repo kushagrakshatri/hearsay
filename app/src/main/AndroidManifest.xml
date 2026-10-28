@@ -6,9 +6,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".HearsayApp"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+        android:theme="@style/Theme.Hearsay">
 
         <activity
             android:name=".SettingsActivity"
@@ -26,6 +29,11 @@
                 <data android:scheme="hearsay" android:host="chatgpt" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".SetupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".ime.OfflineFlowIME"

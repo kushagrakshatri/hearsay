@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hearsay" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#C0C1FF</item>
+        <item name="colorOnPrimary">#1F1A8A</item>
+        <item name="colorPrimaryContainer">#3730A3</item>
+        <item name="colorOnPrimaryContainer">#E0E0FF</item>
+        <item name="colorSecondaryContainer">#45455A</item>
+        <item name="colorOnSecondaryContainer">#E2E0F9</item>
+        <item name="colorTertiary">#EFB8C8</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

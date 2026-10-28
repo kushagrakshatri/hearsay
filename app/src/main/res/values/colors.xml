@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand palette (indigo), used when the phone has no wallpaper colors (Android 10 and 11). -->
+    <color name="brand">#4F46E5</color>
+    <color name="brand_deep">#3730A3</color>
+    <color name="icon_bg_start">#6366F1</color>
+    <color name="icon_bg_end">#3730A3</color>
+</resources>

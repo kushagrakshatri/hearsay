@@ -4,8 +4,18 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ComponentCallbacks2
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
+import android.text.TextUtils
+import android.view.ContextThemeWrapper
+import android.widget.ImageView
+import androidx.core.graphics.ColorUtils
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.R as M
+import dev.offlineflow.R
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.SystemClock
@@ -15,7 +25,6 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import dev.offlineflow.Prefs
@@ -57,8 +66,10 @@ class OfflineFlowIME : InputMethodService() {
     private var handsFree = false
 
     private lateinit var status: TextView
-    private lateinit var mic: Button
-    private lateinit var styleChip: Button
+    private lateinit var mic: MicButton
+    private lateinit var micHint: TextView
+    private lateinit var undoKey: ImageView
+    private lateinit var styleChip: TextView
     private var style = Style.POLISHED
     private var editorPkg: String? = null
     private var lastRaw: String? = null
@@ -75,50 +86,136 @@ class OfflineFlowIME : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
+        // Material You colors from the wallpaper on Android 12+, brand colors otherwise; follows dark mode.
+        val t = DynamicColors.wrapContextIfAvailable(ContextThemeWrapper(this, R.style.Theme_Hearsay))
+        fun c(attr: Int) = MaterialColors.getColor(t, attr, Color.GRAY)
         val dp = resources.displayMetrics.density
-        status = TextView(this).apply {
-            gravity = Gravity.CENTER; textSize = 14f; setPadding(0, (8 * dp).toInt(), 0, (8 * dp).toInt())
+        fun px(v: Int) = (v * dp).toInt()
+        val onSurface = c(M.attr.colorOnSurface)
+        val keyBg = c(M.attr.colorSurfaceContainerHighest)
+
+        status = TextView(t).apply {
+            textSize = 13f; setTextColor(c(M.attr.colorOnSurfaceVariant)); maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
         }
-        mic = Button(this).apply {
-            text = "Hold to talk"; textSize = 18f; isAllCaps = false
-            background = GradientDrawable().apply { cornerRadius = 48 * dp; setColor(Color.parseColor("#2E7D32")) }
-            setTextColor(Color.WHITE)
-            setOnTouchListener(::onMicTouch)
-        }
-        val raw = Button(this).apply { text = "Raw"; isAllCaps = false; setOnClickListener { swapToRaw() } }
-        styleChip = Button(this).apply {
-            isAllCaps = false; textSize = 13f
+        styleChip = TextView(t).apply {
+            textSize = 13f; setTextColor(c(M.attr.colorOnSecondaryContainer)); gravity = Gravity.CENTER
+            setPadding(px(14), px(6), px(14), px(6))
+            background = GradientDrawable().apply { cornerRadius = 16 * dp; setColor(c(M.attr.colorSecondaryContainer)) }
+            contentDescription = "Writing style. Tap to change for this app"
             setOnClickListener {
                 style = style.next()
                 editorPkg?.let { Style.save(this@OfflineFlowIME, it, style) }
                 text = style.label
                 status.text = "${style.label} in this app" + if (style == Style.VERBATIM) " · no AI rewrite" else ""
+                it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 warmStyle()
             }
         }
-        val next = Button(this).apply {
-            text = "⌨"; setOnClickListener {
-                if (Build.VERSION.SDK_INT >= 28) switchToPreviousInputMethod()
+        mic = MicButton(t).apply {
+            idleColor = c(M.attr.colorPrimary); iconColor = c(M.attr.colorOnPrimary)
+            activeColor = c(M.attr.colorError); busyColor = c(M.attr.colorPrimary)
+            setOnTouchListener(::onMicTouch)
+        }
+        micHint = TextView(t).apply {
+            textSize = 12f; setTextColor(c(M.attr.colorOnSurfaceVariant)); gravity = Gravity.CENTER
+        }
+        fun key(icon: Int, desc: String) = ImageView(t).apply {
+            setImageResource(icon); imageTintList = ColorStateList.valueOf(onSurface)
+            scaleType = ImageView.ScaleType.CENTER; contentDescription = desc
+            background = RippleDrawable(ColorStateList.valueOf(ColorUtils.setAlphaComponent(onSurface, 40)),
+                GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(keyBg) }, null)
+            isClickable = true
+            layoutParams = LinearLayout.LayoutParams(px(52), px(52)).apply { marginStart = px(4); marginEnd = px(4) }
+        }
+        val switchKey = key(R.drawable.ic_keyboard, "Switch keyboard").apply {
+            setOnClickListener { tap(it); if (Build.VERSION.SDK_INT >= 28) switchToPreviousInputMethod() }
+            setOnLongClickListener {
+                getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker(); true
             }
         }
-        val back = Button(this).apply {
-            text = "⌫"; setOnClickListener { currentInputConnection?.deleteSurroundingText(1, 0) }
-        }
-        wave = LevelView(this).apply { visibility = View.GONE }
-        val row = LinearLayout(this).apply {
+        undoKey = key(R.drawable.ic_undo, "Undo cleanup").apply { setOnClickListener { tap(it); swapToRaw() } }
+        val backKey = key(R.drawable.ic_backspace, "Delete").apply { setOnTouchListener(Repeater { deleteOne() }) }
+        val enterKey = key(R.drawable.ic_return, "Enter").apply { setOnClickListener { tap(it); enter() } }
+        updateUndo()
+
+        wave = LevelView(t).apply { visibility = View.INVISIBLE; color = c(M.attr.colorError) }
+        val side = { g: Int -> LinearLayout(t).apply { orientation = LinearLayout.HORIZONTAL; gravity = g or Gravity.CENTER_VERTICAL } }
+        val left = side(Gravity.START).apply { addView(switchKey); addView(undoKey) }
+        val right = side(Gravity.END).apply { addView(backKey); addView(enterKey) }
+        val main = LinearLayout(t).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            addView(next); addView(mic, LinearLayout.LayoutParams(0, (72 * dp).toInt(), 1f)); addView(raw); addView(back)
+            addView(left, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(mic, LinearLayout.LayoutParams(px(112), px(112)))
+            addView(right, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
-        return LinearLayout(this).apply {
+        return LinearLayout(t).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt())
-            addView(LinearLayout(context).apply {
+            setBackgroundColor(c(M.attr.colorSurfaceContainer))
+            setPadding(px(12), px(10), px(12), px(12))
+            addView(LinearLayout(t).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(px(4), 0, 0, 0)
                 addView(status, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(styleChip)
             })
-            addView(wave, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (28 * dp).toInt()))
-            addView(row)
+            addView(wave, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(24)).apply { topMargin = px(6) })
+            addView(main)
+            addView(micHint)
+            setMic(MicButton.State.IDLE)
+        }
+    }
+
+    /** Sets the mic's look and the hint under it. */
+    private fun setMic(state: MicButton.State) {
+        if (!::mic.isInitialized) return
+        mic.state = state
+        micHint.text = when (state) {
+            MicButton.State.IDLE -> if (hasSelection) "Talk to edit the selection" else "Hold to talk · tap for hands-free"
+            MicButton.State.LISTENING -> "Listening… let go when done"
+            MicButton.State.HANDS_FREE -> "Listening… pause or tap to stop"
+            MicButton.State.BUSY -> ""
+        }
+    }
+
+    private fun updateUndo() {
+        if (!::undoKey.isInitialized) return
+        val on = lastInserted != null && lastRaw != null && lastRaw != lastInserted
+        undoKey.alpha = if (on) 1f else 0.35f; undoKey.isEnabled = on
+    }
+
+    private fun tap(v: View) { v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
+
+    private fun deleteOne() {
+        val ic = currentInputConnection ?: return
+        val sel = ic.getSelectedText(0)
+        if (!sel.isNullOrEmpty()) ic.commitText("", 1) else ic.deleteSurroundingText(1, 0)
+    }
+
+    private fun enter() {
+        val info = currentInputEditorInfo
+        val action = (info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION
+        val multiLine = ((info?.inputType ?: 0) and android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        val noEnterAction = ((info?.imeOptions ?: 0) and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
+        if (!multiLine && !noEnterAction && action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) {
+            currentInputConnection?.performEditorAction(action)
+        } else sendKeyChar('\n')
+    }
+
+    /** Fires once on press, then repeats while held (backspace). */
+    private inner class Repeater(private val action: () -> Unit) : View.OnTouchListener {
+        private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        private var view: View? = null
+        private val tick = object : Runnable {
+            override fun run() { action(); handler.postDelayed(this, 50) }
+        }
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
+            when (e.action) {
+                MotionEvent.ACTION_DOWN -> { view = v; v.isPressed = true; tap(v); action(); handler.postDelayed(tick, 400) }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { v.isPressed = false; handler.removeCallbacks(tick) }
+            }
+            return true
         }
     }
 
@@ -127,7 +224,7 @@ class OfflineFlowIME : InputMethodService() {
         idleJob?.cancel(); idleJob = null
         lastRaw = null; lastInserted = null
         hasSelection = info != null && info.initialSelStart >= 0 && info.initialSelStart != info.initialSelEnd
-        mic.text = idleLabel()
+        setMic(MicButton.State.IDLE); updateUndo()
         editorPkg = info?.packageName
         style = Style.forEditor(this, info)
         styleChip.text = style.label
@@ -145,8 +242,8 @@ class OfflineFlowIME : InputMethodService() {
         super.onFinishInputView(finishingInput)
         recorder?.stop(); recorder = null
         handsFree = false
-        if (::mic.isInitialized) mic.text = idleLabel()
-        if (::wave.isInitialized) { wave.visibility = View.GONE; wave.clear() }
+        setMic(MicButton.State.IDLE)
+        if (::wave.isInitialized) { wave.visibility = View.INVISIBLE; wave.clear() }
         // Keyboard hidden: free the cleanup LLM after a minute and the speech model after five,
         // so a hidden keyboard doesn't hold gigabytes of RAM. Reopening cancels this.
         idleJob?.cancel()
@@ -243,8 +340,7 @@ class OfflineFlowIME : InputMethodService() {
                 if (recorder == null || handsFree) return true
                 if (SystemClock.elapsedRealtime() - micDownAt < TAP_MS) {
                     handsFree = true
-                    status.text = "Listening… stops when you pause, or tap"
-                    mic.text = "Tap to stop"
+                    setMic(MicButton.State.HANDS_FREE)
                 } else finishDictation()
             }
             MotionEvent.ACTION_CANCEL -> if (!handsFree) finishDictation()
@@ -255,22 +351,23 @@ class OfflineFlowIME : InputMethodService() {
     private fun startDictation() {
         if (!hasMicPermission() || !speechAvailable()) return
         status.text = "Listening…"
+        setMic(MicButton.State.LISTENING)
         val gate = SpeechGate.create(assets)
         buzz()
         wave.clear(); wave.visibility = View.VISIBLE
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
             mic.post { if (handsFree) finishDictation() }
-        }, onLevel = { level -> wave.post { wave.push(level) } }).also { it.start() }
+        }, onLevel = { level -> wave.post { wave.push(level); mic.push(level) } }).also { it.start() }
     }
 
     private fun finishDictation() {
         val rec = recorder ?: return
         recorder = null
         handsFree = false
-        mic.text = idleLabel()
+        setMic(MicButton.State.IDLE)
         buzz()
-        wave.visibility = View.GONE
+        wave.visibility = View.INVISIBLE
         val audio = rec.stop()
         // Captured now: the selection decides whether this is a command or a replacement.
         val selected = currentInputConnection?.getSelectedText(0)?.toString()?.takeIf { it.isNotEmpty() }
@@ -284,7 +381,9 @@ class OfflineFlowIME : InputMethodService() {
         }
         val t0 = SystemClock.elapsedRealtime()
         val cloudAsrModel = Prefs.cloudSpeechModel(this)
+        setMic(MicButton.State.BUSY)
         scope.launch {
+          try {
             val raw = try {
                 if (cloud != null) {
                     try {
@@ -363,6 +462,10 @@ class OfflineFlowIME : InputMethodService() {
                 else "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
             cloudNote?.let { status.text = "${status.text} · cloud skipped: ${it.take(60)}"; cloudNote = null }
             Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
+          } finally {
+            if (recorder == null) setMic(MicButton.State.IDLE)
+            updateUndo()
+          }
         }
     }
 
@@ -415,6 +518,7 @@ class OfflineFlowIME : InputMethodService() {
             currentInputConnection?.deleteSurroundingText(ins.length, 0)
             lastInserted = null; lastRaw = null
             status.text = "Removed the last dictation"
+            updateUndo()
         } else status.text = "Nothing to scratch"
     }
 
@@ -423,13 +527,11 @@ class OfflineFlowIME : InputMethodService() {
         val sel = newSelStart != newSelEnd
         if (sel == hasSelection) return
         hasSelection = sel
-        if (::mic.isInitialized && recorder == null) mic.text = idleLabel()
+        if (recorder == null && ::mic.isInitialized && mic.state == MicButton.State.IDLE) setMic(MicButton.State.IDLE)
         if (sel && !CloudText.on(this)) scope.launch(llmDispatcher) {
             runCatching { (cleanerForSelected() as? LlmCleaner)?.warmEdit() }.onFailure { Log.e(TAG, "edit warm-up failed", it) }
         }
     }
-
-    private fun idleLabel() = if (hasSelection) "Talk to edit selection" else "Hold to talk"
 
     private fun rulesFor(text: String, s: Style): String {
         val t = RulesCleaner.clean(text)
@@ -445,6 +547,7 @@ class OfflineFlowIME : InputMethodService() {
             ic.commitText(raw, 1)
             lastInserted = raw
         }
+        updateUndo()
     }
 
     private fun withLeadingSpace(s: String): String {
