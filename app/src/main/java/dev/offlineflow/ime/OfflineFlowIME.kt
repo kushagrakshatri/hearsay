@@ -126,12 +126,18 @@ class OfflineFlowIME : InputMethodService() {
         recorder = null
         val audio = rec.stop()
         if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
-        status.text = "Transcribing…"
+        status.text = if (engine == null) "Loading model, then transcribing…" else "Transcribing…"
         val t0 = SystemClock.elapsedRealtime()
         scope.launch {
-            val raw = withContext(asrDispatcher) {
-                val eng = engine ?: WhisperEngine.load(models.file(MODEL)).also { engine = it }
-                eng.transcribe(audio)
+            val raw = try {
+                withContext(asrDispatcher) {
+                    val eng = engine ?: WhisperEngine.load(models.file(MODEL)).also { engine = it }
+                    eng.transcribe(audio)
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "transcription failed", t)
+                status.text = "Transcription failed: ${t.message ?: t.javaClass.simpleName}"
+                return@launch
             }
             val cleaned = RulesCleaner.clean(raw)
             val ms = SystemClock.elapsedRealtime() - t0
@@ -140,7 +146,8 @@ class OfflineFlowIME : InputMethodService() {
                 currentInputConnection?.commitText(text, 1)
                 lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
             }
-            status.text = "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
+            status.text = if (cleaned.isEmpty()) "Heard nothing · ${ms} ms"
+                else "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
             Log.i(TAG, "latency=${ms}ms audio=${audio.size}samples")
         }
     }
