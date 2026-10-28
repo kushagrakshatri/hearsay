@@ -226,7 +226,8 @@ class SettingsActivity : AppCompatActivity() {
     private fun micOk() = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     private fun enabledOk() = getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
     private fun currentOk() = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.startsWith("$packageName/") == true
-    private fun allSet() = micOk() && models.isReady(models.selected) && enabledOk() && currentOk()
+    /** Ready once the keyboard can dictate; being the current keyboard right now isn't required. */
+    private fun allSet() = micOk() && models.isReady(models.selected) && enabledOk()
 
     private fun refresh() {
         refreshStatus()
@@ -245,9 +246,13 @@ class SettingsActivity : AppCompatActivity() {
     private fun refreshStatus() {
         statusBox.removeAllViews()
         if (!allSet()) {
-            val left = listOf(micOk(), models.isReady(models.selected), enabledOk(), currentOk()).count { !it }
+            val next = when {
+                !micOk() -> "Next: allow the microphone."
+                !models.isReady(models.selected) -> "Next: download the speech model."
+                else -> "Next: turn on the Hearsay keyboard."
+            }
             statusBox.addView(ui.title("Finish setting up", 18f))
-            statusBox.addView(ui.hint("$left step${if (left == 1) "" else "s"} left before you can dictate."))
+            statusBox.addView(ui.hint(next))
             statusBox.addView(ui.filled("Continue setup") { startActivity(Intent(this, SetupActivity::class.java)) }.withTopMargin(14))
             return
         }
@@ -264,6 +269,9 @@ class SettingsActivity : AppCompatActivity() {
                 addView(ui.hint("${models.selected.shortName} on-device · cleanup: $cleanup"))
             })
         })
+        if (!currentOk()) statusBox.addView(ui.tonal("Switch to Hearsay keyboard") {
+            getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+        }.withTopMargin(14))
         val (box, _) = ui.field("", "Try it: tap here and hold the mic", multiline = 2)
         statusBox.addView(box)
     }

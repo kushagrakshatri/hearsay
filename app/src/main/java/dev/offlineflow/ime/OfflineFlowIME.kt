@@ -12,6 +12,8 @@ import android.text.TextUtils
 import android.view.ContextThemeWrapper
 import android.widget.ImageView
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.R as M
@@ -163,6 +165,14 @@ class OfflineFlowIME : InputMethodService() {
             addView(main)
             addView(micHint)
             setMic(MicButton.State.IDLE)
+            // Android 15 draws the keyboard edge to edge: keep the hint clear of the gesture bar
+            // and the system's back / switch-keyboard buttons.
+            val base = paddingBottom
+            ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
+                val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars() or WindowInsetsCompat.Type.mandatorySystemGestures())
+                v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, base + nav.bottom)
+                insets
+            }
         }
     }
 
@@ -231,9 +241,9 @@ class OfflineFlowIME : InputMethodService() {
         status.text = when {
             !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
             !speechAvailable() -> "Open the Hearsay app to download the speech model"
-            CloudText.usingPlan(this) -> "Ready · using ChatGPT plan · ${models.selected.shortName} on-device"
-            CloudClient.speechOn(this) || CloudText.on(this) -> "Ready · cloud mode on"
-            else -> "Ready · on-device · ${models.selected.shortName}"
+            CloudText.usingPlan(this) -> "Ready · cleanup via ChatGPT"
+            CloudClient.speechOn(this) || CloudText.on(this) -> "Ready · own-key cloud on"
+            else -> "Ready · fully on-device"
         }
         warmUp()
     }
