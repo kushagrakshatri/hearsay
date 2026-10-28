@@ -36,13 +36,12 @@ adb shell pm grant $P android.permission.RECORD_AUDIO
 adb shell ime enable $P/.ime.OfflineFlowIME
 adb shell ime set $P/.ime.OfflineFlowIME
 start
-$UI tap "Whisper base.en"
-$UI tap "Basic rules only"
 $UI tap "Download Whisper"
-for i in $(seq 1 60); do sleep 3; python3 - <<'PY' && break
-import sys; sys.path.insert(0, "tools/ui"); import ui; sys.exit(0 if ui.find("Ready to dictate") or not ui.find("Downloading") else 1)
+for i in $(seq 1 80); do sleep 3; python3 - <<'PY' && break
+import sys; sys.path.insert(0, "tools/ui"); import ui; sys.exit(0 if ui.find("Ready to dictate") else 1)
 PY
 done
+$UI tap "Basic rules only"
 start; shot settings-ready
 $UI tapnoscroll "Try it"; shot keyboard-idle 2.5
 $UI hold "Microphone" 4000; shot keyboard-listening 1.5; sleep 4; shot keyboard-after 2

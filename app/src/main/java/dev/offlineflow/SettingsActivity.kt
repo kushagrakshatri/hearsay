@@ -208,8 +208,9 @@ class SettingsActivity : AppCompatActivity() {
             })
         }
         val scroll = ScrollView(this).apply { clipToPadding = false; addView(content) }
-        Ui.edgeToEdge(this, scroll)
-        setContentView(scroll)
+        val frame = android.widget.FrameLayout(this).apply { addView(scroll) }
+        Ui.edgeToEdgeScroll(this, frame, scroll)
+        setContentView(frame)
     }
 
     override fun onResume() { super.onResume(); refresh() }
@@ -280,7 +281,7 @@ class SettingsActivity : AppCompatActivity() {
         if (m in downloading) return
         val ready = models.isReady(m)
         button.visibility = if (ready) View.GONE else View.VISIBLE
-        bar.visibility = if (ready) View.GONE else View.VISIBLE
+        bar.visibility = View.GONE  // only while downloading; an empty track reads as a full bar
         button.text = "Download ${m.shortName} (~${m.approxMb} MB)"
         button.isEnabled = true
         bar.setProgressCompat(0, false)

@@ -59,10 +59,11 @@ class Ui(val ctx: Context) {
         text = label; isAllCaps = false; minHeight = dp(52); cornerRadius = dp(26); setOnClickListener { action() }
     }
 
-    fun tonal(label: String, action: () -> Unit) = filled(label, action).apply {
-        backgroundTintList = ColorStateList.valueOf(color(M.attr.colorSecondaryContainer))
-        setTextColor(color(M.attr.colorOnSecondaryContainer))
-    }
+    /** Inflated from XML so it gets the real Material 3 tonal style (incl. disabled state). */
+    fun tonal(label: String, action: () -> Unit) =
+        (android.view.LayoutInflater.from(ctx).inflate(R.layout.btn_tonal, null, false) as MaterialButton).apply {
+            text = label; cornerRadius = dp(26); setOnClickListener { action() }
+        }
 
     fun outlined(label: String, action: () -> Unit) =
         MaterialButton(ctx, null, M.attr.materialButtonOutlinedStyle).apply {
@@ -120,6 +121,21 @@ class Ui(val ctx: Context) {
 
     companion object {
         /** Draws behind the system bars and pads [root] so content clears them and the keyboard. */
+        /**
+         * For scrolling screens: [frame] takes the top/side insets (so content never slides under the
+         * status bar), [scroll] takes the bottom inset and keeps drawing behind the gesture bar.
+         */
+        fun edgeToEdgeScroll(activity: Activity, frame: View, scroll: View) {
+            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+            val sb = scroll.paddingBottom
+            ViewCompat.setOnApplyWindowInsetsListener(frame) { v, insets ->
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+                v.setPadding(bars.left, bars.top, bars.right, 0)
+                scroll.setPadding(scroll.paddingLeft, scroll.paddingTop, scroll.paddingRight, sb + bars.bottom)
+                insets
+            }
+        }
+
         fun edgeToEdge(activity: Activity, root: View, extraTop: Int = 0, extraBottom: Int = 0) {
             WindowCompat.setDecorFitsSystemWindows(activity.window, false)
             val l = root.paddingLeft; val t = root.paddingTop; val r = root.paddingRight; val b = root.paddingBottom
