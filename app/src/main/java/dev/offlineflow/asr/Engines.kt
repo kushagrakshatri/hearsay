@@ -7,5 +7,6 @@ object Engines {
     fun load(models: ModelManager, model: ModelManager.Model): SpeechEngine = when (model.engine) {
         ModelManager.Engine.WHISPER -> WhisperEngine.load(models.file(model))
         ModelManager.Engine.PARAKEET -> ParakeetEngine.load(models.dir(model))
+        ModelManager.Engine.LLAMA -> error("${model.name} is a cleanup model, not a speech model")
     }
 }
