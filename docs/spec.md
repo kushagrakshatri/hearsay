@@ -80,3 +80,9 @@ Mic (AudioRecord, 16 kHz mono)
 - Which cleanup model ships as default (benchmark 2–3 candidates in M1).
 - ~~Minimum Android version~~ Decided: Android 10+ (minSdk 29).
 - ~~Name and license~~ Decided: Hearsay (renamed from offline-flow Oct 27), Apache-2.0. Kotlin package stays dev.offlineflow for now.
+
+## Update Oct 28, 2026: speech engines and distribution
+- Two on-device ASR engines behind `SpeechEngine`: **Parakeet TDT 0.6B v2 int8** (NVIDIA, via sherpa-onnx 2.0.1 AAR, ~661 MB, default on phones with ≥ ~6 GB RAM) and **Whisper base.en q5_1** (whisper.cpp, ~60 MB, default otherwise / fallback). User picks in the setup screen.
+- Every downloaded model file is pinned by size + SHA-256 and deleted on mismatch.
+- Every push to main publishes a GitHub Release `build-N` with `hearsay-debug.apk`; signed with a committed debug key so builds upgrade in place. Newest: https://github.com/kushagrakshatri/hearsay/releases/latest/download/hearsay-debug.apk
+- Candidates later: Moonshine (tiny/base) for low-end phones; streaming/partials.

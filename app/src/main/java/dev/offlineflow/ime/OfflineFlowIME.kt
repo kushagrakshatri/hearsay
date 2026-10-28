@@ -16,15 +16,15 @@ import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.offlineflow.asr.Engines
 import dev.offlineflow.asr.SpeechEngine
-import dev.offlineflow.asr.WhisperEngine
 import dev.offlineflow.audio.Recorder
 import dev.offlineflow.cleanup.RulesCleaner
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.*
 
 /**
- * M0 keyboard: hold the mic, talk, release. Raw whisper.cpp transcript, lightly
+ * M0 keyboard: hold the mic, talk, release. Raw on-device transcript, lightly
  * tidied by RulesCleaner, is committed at the cursor. "Raw" swaps the last insert
  * back to the exact transcript.
  */
@@ -33,6 +33,7 @@ class OfflineFlowIME : InputMethodService() {
     private val asrDispatcher = Dispatchers.Default.limitedParallelism(1)
     private lateinit var models: ModelManager
     private var engine: SpeechEngine? = null
+    private var engineModel: ModelManager.Model? = null
     private var recorder: Recorder? = null
 
     private lateinit var status: TextView
@@ -81,8 +82,8 @@ class OfflineFlowIME : InputMethodService() {
         lastRaw = null; lastInserted = null
         status.text = when {
             !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
-            !models.isReady(MODEL) -> "Open the Hearsay app to download the speech model"
-            else -> "Ready · on-device"
+            !models.isReady(models.selected) -> "Open the Hearsay app to download the speech model"
+            else -> "Ready · on-device · ${models.selected.shortName}"
         }
         warmUp()
     }
@@ -98,10 +99,18 @@ class OfflineFlowIME : InputMethodService() {
         super.onDestroy()
     }
 
+    /** Returns the engine for the selected model, (re)loading it if the choice changed. ASR thread only. */
+    private fun engineForSelected(): SpeechEngine {
+        val want = models.selected
+        engine?.let { if (engineModel == want) return it }
+        engine?.close(); engine = null; engineModel = null
+        return Engines.load(models, want).also { engine = it; engineModel = want }
+    }
+
     private fun warmUp() {
-        if (engine != null || !models.isReady(MODEL)) return
+        if (!models.isReady(models.selected)) return
         scope.launch(asrDispatcher) {
-            runCatching { engine = WhisperEngine.load(models.file(MODEL)) }
+            runCatching { engineForSelected() }
                 .onFailure { Log.e(TAG, "model load failed", it) }
         }
     }
@@ -116,7 +125,7 @@ class OfflineFlowIME : InputMethodService() {
     }
 
     private fun startDictation() {
-        if (!hasMicPermission() || !models.isReady(MODEL)) return
+        if (!hasMicPermission() || !models.isReady(models.selected)) return
         status.text = "Listening…"
         recorder = Recorder().also { it.start() }
     }
@@ -126,13 +135,12 @@ class OfflineFlowIME : InputMethodService() {
         recorder = null
         val audio = rec.stop()
         if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
-        status.text = if (engine == null) "Loading model, then transcribing…" else "Transcribing…"
+        status.text = if (engine == null || engineModel != models.selected) "Loading model, then transcribing…" else "Transcribing…"
         val t0 = SystemClock.elapsedRealtime()
         scope.launch {
             val raw = try {
                 withContext(asrDispatcher) {
-                    val eng = engine ?: WhisperEngine.load(models.file(MODEL)).also { engine = it }
-                    eng.transcribe(audio)
+                    engineForSelected().transcribe(audio)
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "transcription failed", t)
@@ -173,6 +181,5 @@ class OfflineFlowIME : InputMethodService() {
 
     companion object {
         private const val TAG = "OfflineFlowIME"
-        val MODEL = ModelManager.Model.BASE_EN_Q5
     }
 }
