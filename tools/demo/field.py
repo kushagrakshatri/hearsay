@@ -10,7 +10,7 @@ def text():
     if not focused: return ""
     n = focused[0]
     t = n.get("text", "")
-    return "" if t == n.get("hint", "") else t
+    return "" if t in (n.get("hint", ""), "Message", "Compose email") else t
 
 if __name__ == "__main__":
     if sys.argv[1] == "text":

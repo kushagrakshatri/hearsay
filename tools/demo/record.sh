@@ -18,11 +18,13 @@ adb shell pm grant $P android.permission.RECORD_AUDIO
 adb shell pm grant $P android.permission.POST_NOTIFICATIONS 2>/dev/null
 # Clean status bar for filming: full battery, strong signal, 9:41.
 adb shell settings put global sysui_demo_allowed 1
-adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941 >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 >/dev/null
-adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
+bar() {
+  adb shell am broadcast -a com.android.systemui.demo -e command enter >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941 >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e mobile show -e level 4 -e datatype none >/dev/null
+  adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
+}
 
 # Models: pushed straight into app storage (same files and paths the in-app downloader writes).
 adb shell am start -n $P/$N.SettingsActivity >/dev/null; sleep 4; adb shell am force-stop $P
@@ -49,11 +51,18 @@ adb shell ime reset
 adb shell am start -n $P/$N.SettingsActivity >/dev/null; sleep 3
 adb shell settings put secure enabled_accessibility_services $P/$N.bubble.BubbleService
 adb shell settings put secure accessibility_enabled 1; sleep 3
+# The service binds only to a running app; re-toggle until it shows as bound.
+for i in 1 2 3; do
+  adb shell dumpsys accessibility | grep -q "BubbleService" && adb shell dumpsys accessibility | grep -iA2 "Bound services" | grep -q Bubble && break
+  adb shell settings put secure enabled_accessibility_services null; sleep 1
+  adb shell settings put secure enabled_accessibility_services $P/$N.bubble.BubbleService; sleep 3
+done
+adb shell dumpsys accessibility | grep -iA2 "Bound services" | tee $OUT/a11y.txt
 
 chat() { # name m1 [m2 ...]
   local name=$1; shift; local args=(); local i=1
   for m in "$@"; do args+=(--es m$i "'$m'"); i=$((i+1)); done
-  adb shell am start -S -n $P/$N.demo.DemoActivity --es scene chat --es name "$name" "${args[@]}" >/dev/null; sleep 2.5
+  adb shell am start -f 0x10008000 -n $P/$N.demo.DemoActivity --es scene chat --es name "$name" "${args[@]}" >/dev/null; sleep 2.5
 }
 field() { python3 tools/ui/ui.py tapnoscroll "$1"; sleep 2; }
 fieldtext() { python3 tools/demo/field.py text; }
@@ -70,7 +79,7 @@ say() { # clip: press the mic for the clip's length while it plays into the demo
   python3 tools/demo/field.py wait "$before" 60
   log "text $clip after $(echo "$(now) - $t1" | bc) s: $(fieldtext)"
 }
-rec() { adb shell rm -f /sdcard/$1.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/$1.mp4 & REC=$!; T0=$(now); sleep 1; log "== $1"; }
+rec() { bar; adb shell rm -f /sdcard/$1.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/$1.mp4 & REC=$!; T0=$(now); sleep 1; log "== $1"; }
 stop() { sleep 1; adb shell pkill -INT screenrecord; wait $REC 2>/dev/null; sleep 2; adb pull /sdcard/$1.mp4 $OUT/$1.mp4 >/dev/null; }
 send() { python3 tools/ui/ui.py tapnoscroll Send; }
 
@@ -80,7 +89,7 @@ chat Maya "warming up"; field Message; say edit; say edit; adb shell input keyev
 chat Maya "dinner this week?" "that new place on Santana Row finally opened"
 rec chat; field Message; say chat; sleep 2.5; send; sleep 2.5; stop chat
 
-adb shell am start -S -n $P/$N.demo.DemoActivity --es scene mail >/dev/null; sleep 2.5
+adb shell am start -f 0x10008000 -n $P/$N.demo.DemoActivity --es scene mail >/dev/null; sleep 2.5
 rec mail; field "Compose email"; say mail; sleep 3
 adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_A; sleep 1.5
 say edit; sleep 3.5; stop mail
