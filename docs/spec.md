@@ -109,3 +109,10 @@ Mic (AudioRecord, 16 kHz mono)
 - Styles: Casual (texting: conversational, light punctuation, no period on a single short sentence), Polished (email/docs/work chat: complete sentences), Verbatim (code, URLs, numbers, passwords, search: transcript as heard + dictionary, no LLM).
 - Default from the app (known messaging / work / code packages) and field type (URI, email address, password, number, filter → Verbatim; short message → Casual; else Polished). A chip on the keyboard cycles the style; the choice is saved per app.
 - Each style has its own system rules and few-shot examples; llama.cpp prefixes are cached per style (lazily, warmed when the keyboard opens), so switching styles costs one prefix evaluation once.
+
+## Update Oct 28, 2026: floating mic (default) + keyboard (fallback)
+- Floating mic: an AccessibilityService draws a round mic (TYPE_ACCESSIBILITY_OVERLAY) above whatever keyboard the user has, when an editable, non-password field is focused. Hold to talk, tap for hands-free, drag to move. Text is inserted with ACTION_SET_TEXT + ACTION_SET_SELECTION, falling back to clipboard paste (clipboard restored). Supports styles, dictionary, snippets, "scratch that", and voice edits on selected text. It reads only the focused field.
+- The Hearsay keyboard stays as the fallback: most reliable insertion, undo-to-raw, works where accessibility is blocked.
+- Models are shared between the two (core/Brain), so only one copy is loaded.
+- Known limits: secure/banking fields and some apps refuse accessibility text; Android 13+ requires "Allow restricted settings" for sideloaded APKs; Play reviews accessibility use closely (F-Droid first).
+- Not in the bubble yet: undo-to-raw, live waveform beyond the mic halo.
