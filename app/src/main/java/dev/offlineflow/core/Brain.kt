@@ -81,24 +81,29 @@ object Brain {
 
     class Cleaned(val text: String, val usedLlm: Boolean, val cloudNote: String?)
 
-    /** Raw text → cleaned text in [style]: ChatGPT / own key first when on, then the local LLM, then rules. */
-    suspend fun clean(ctx: Context, models: ModelManager, raw: String, style: Style): Cleaned {
-        val dictionary = Dictionary.load(ctx)
-        val heard = dictionary.apply(raw)
+    /**
+     * Raw text → cleaned text in [style]: ChatGPT / own key first when on, then the local LLM, then rules.
+     * [names] are names seen on screen for this dictation: exact sound-alike fixes plus a hint to the LLM.
+     */
+    suspend fun clean(ctx: Context, models: ModelManager, raw: String, style: Style, names: List<String> = emptyList()): Cleaned {
+        val saved = Dictionary.load(ctx)
+        val screen = Dictionary.exact(names)
+        fun fix(t: String) = screen.apply(saved.apply(t))
+        val heard = fix(raw)
         if (style == Style.VERBATIM) return Cleaned(RulesCleaner.verbatim(heard), false, null)
         var note: String? = null
         suspend fun local() = withContext(llm) {
-            when (val c = cleaner(models, dictionary)) {
-                is LlmCleaner -> dictionary.apply(c.clean(heard, style))
-                else -> dictionary.apply(rules(heard, style))
+            when (val c = cleaner(models, saved)) {
+                is LlmCleaner -> fix(c.clean(heard, style, names))
+                else -> fix(rules(heard, style))
             }
         }
         val usedLlm = models.selectedCleanup?.let { models.isReady(it) } == true || CloudText.on(ctx)
         val text = try {
             if (CloudText.on(ctx)) try {
                 withContext(Dispatchers.IO) {
-                    dictionary.apply(LlmCleaner.cleanWithOrThrow(heard, style) { input, words ->
-                        CloudText.chat(ctx, LlmCleaner.cleanupMessages(style, dictionary.spellings, input), words * 2 + 32)
+                    fix(LlmCleaner.cleanWithOrThrow(heard, style) { input, words ->
+                        CloudText.chat(ctx, LlmCleaner.cleanupMessages(style, saved.spellings, input, names), words * 2 + 32)
                     })
                 }
             } catch (t: Throwable) {
@@ -108,7 +113,7 @@ object Brain {
             } else local()
         } catch (t: Throwable) {
             Log.e(TAG, "cleanup failed, using rules", t)
-            dictionary.apply(rules(heard, style))
+            fix(rules(heard, style))
         }
         return Cleaned(text, usedLlm, note)
     }

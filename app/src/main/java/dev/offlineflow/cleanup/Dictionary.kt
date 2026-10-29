@@ -8,7 +8,7 @@ import android.content.Context
  *   hear say -> Hearsay     a fix: whenever the left side is heard, write the right side
  * Stored on-device in app preferences; never leaves the phone.
  */
-class Dictionary(val terms: List<String>, val fixes: List<Pair<String, String>>) {
+class Dictionary(val terms: List<String>, val fixes: List<Pair<String, String>>, private val fuzzy: Boolean = true) {
 
     val isEmpty: Boolean get() = terms.isEmpty() && fixes.isEmpty()
 
@@ -51,7 +51,7 @@ class Dictionary(val terms: List<String>, val fixes: List<Pair<String, String>>)
                 }
                 if (!gapsOk) continue
                 val heard = norm(piece.joinToString("") { it.value })
-                if (heard == target || (span == 1 && termWords == 1 && target.length >= 6 && heard.length >= 5 &&
+                if (heard == target || (fuzzy && span == 1 && termWords == 1 && target.length >= 6 && heard.length >= 5 &&
                         heard.first() == target.first() && editDistance(heard, target) <= 1)) {
                     matched = span; break
                 }
@@ -86,6 +86,9 @@ class Dictionary(val terms: List<String>, val fixes: List<Pair<String, String>>)
         }
 
         fun load(context: Context): Dictionary = parse(text(context))
+
+        /** Names seen on screen: fixed only on an exact sound-out match (case, split words), never a near miss. */
+        fun exact(terms: List<String>) = Dictionary(terms.distinct(), emptyList(), fuzzy = false)
 
         fun text(context: Context): String =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "") ?: ""

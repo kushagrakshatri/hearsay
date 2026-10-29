@@ -40,18 +40,24 @@ import dev.offlineflow.audio.Recorder
 import dev.offlineflow.audio.SpeechGate
 import dev.offlineflow.cleanup.Commands
 import dev.offlineflow.cleanup.Continuity
+import dev.offlineflow.cleanup.CorrectionWatch
+import dev.offlineflow.cleanup.ScreenNames
+import dev.offlineflow.cleanup.Words
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.Snippets
 import dev.offlineflow.cleanup.Style
 import dev.offlineflow.cloud.CloudClient
 import dev.offlineflow.cloud.CloudText
 import dev.offlineflow.core.Brain
+import dev.offlineflow.core.Learning
 import dev.offlineflow.ime.MicButton
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -62,8 +68,11 @@ import kotlin.math.abs
  * is up, a round mic floats just above it. Hold to talk, tap for hands-free, drag to move.
  * Text goes into the focused field through accessibility (set text, or paste as a fallback).
  *
- * It reads only the focused field: its app, input type, text and selection, to insert at the
- * cursor and pick the writing style.
+ * It reads the focused field (its app, input type, text and selection) to insert at the cursor
+ * and pick the writing style. When "names on screen" is on, it also reads the visible text of
+ * the app you're dictating into at the moment you stop talking, keeps only the names in it, and
+ * uses them for that one dictation. It watches the field after inserting so a word you fix
+ * can be learned. Nothing it reads is stored except the learned word.
  */
 class BubbleService : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -87,6 +96,8 @@ class BubbleService : AccessibilityService() {
     private var lastInserted: String? = null
     private var idleJob: Job? = null
     private var warmedFor: String? = null
+    private val watch = CorrectionWatch()
+    private var watchedText: String? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -96,6 +107,16 @@ class BubbleService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+            // The user typing in the field we just dictated into: note it, learn once they've paused.
+            val w = watch.watching ?: return
+            val src = runCatching { event.source }.getOrNull() ?: return
+            if (src != w || src.isPassword) return
+            watchedText = current(src).first
+            main.removeCallbacks(learnRunnable)
+            main.postDelayed(learnRunnable, LEARN_AFTER_MS)
+            return
+        }
         // Coalesce bursts of focus / window events into one check.
         main.removeCallbacks(checkRunnable)
         main.postDelayed(checkRunnable, 120)
@@ -104,11 +125,50 @@ class BubbleService : AccessibilityService() {
     override fun onInterrupt() {}
 
     private val checkRunnable = Runnable { check() }
+    private val learnRunnable = Runnable { learnNow() }
+
+    /** Compares what we inserted with what the user left there, and learns any fixed names. */
+    private fun learnNow() {
+        main.removeCallbacks(learnRunnable)
+        val w = watch.watching ?: return
+        val text = watchedText ?: run { watch.clear(); return }
+        val change = watch.edited(w, text, SystemClock.elapsedRealtime())
+        watch.clear(); watchedText = null
+        if (change == null) return
+        scope.launch {
+            val added = withContext(Dispatchers.IO) { runCatching { Learning.learn(this@BubbleService, change.first, change.second) }.getOrDefault(emptyList()) }
+            if (added.isEmpty()) return@launch
+            val msg = Learning.message(added)
+            if (root?.visibility == View.VISIBLE) say(msg)
+            else android.widget.Toast.makeText(this@BubbleService, "Hearsay: $msg", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Names and jargon visible in the app being dictated into; empty when the user turned it off. */
+    private fun screenNames(node: AccessibilityNodeInfo): List<String> {
+        if (!Prefs.screenContext(this)) return emptyList()
+        val root = runCatching { node.window?.root }.getOrNull() ?: rootInActiveWindow ?: return emptyList()
+        val texts = ArrayList<String>()
+        var seen = 0
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            if (seen++ > 800 || depth > 30) return
+            if (n.isPassword) return
+            if (n.isVisibleToUser) {
+                n.text?.toString()?.takeIf { it.isNotBlank() }?.let { texts += it }
+                n.contentDescription?.toString()?.takeIf { it.isNotBlank() && it.length < 120 }?.let { texts += it }
+            }
+            for (i in 0 until minOf(n.childCount, 80)) n.getChild(i)?.let { walk(it, depth + 1) }
+        }
+        walk(root, 0)
+        val common = Words.common(this)
+        return ScreenNames.from(texts, { w -> w.lowercase().replace('\u2019', '\'') in common })
+    }
 
     /** Shows the bubble above the keyboard when there's a field to dictate into, hides it otherwise. */
     private fun check() {
         if (recorder != null || busy || dragging) return
         val target = runCatching { target() }.getOrNull()
+        if (watch.watching != null && target != watch.watching) learnNow()
         val ime = runCatching { windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }.getOrNull()
         if (target == null || ime == null || !Prefs.bubbleOn(this) || hearsayKeyboardActive() || !hasMic() ||
             !(models.isReady(models.selected) || CloudClient.speechOn(this))) {
@@ -275,6 +335,7 @@ class BubbleService : AccessibilityService() {
 
     private fun startListening() {
         if (!hasMic()) { say("Open Hearsay to allow the microphone"); return }
+        learnNow()
         mic.state = MicButton.State.LISTENING
         buzz()
         recorder = Recorder(SpeechGate.create(assets), endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
@@ -299,6 +360,8 @@ class BubbleService : AccessibilityService() {
         busy = true; mic.state = MicButton.State.BUSY
         say(if (Brain.engineLoaded(models.selected)) "Writing it down\u2026" else "Warming up\u2026", 0)
         val t0 = SystemClock.elapsedRealtime()
+        // Read the names on screen while the speech model works.
+        val names = target()?.let { n -> scope.async(Dispatchers.Default) { runCatching { screenNames(n) }.getOrDefault(emptyList()) } }
         scope.launch {
             try {
                 val raw = try { Brain.transcribe(this@BubbleService, models, audio) } catch (t: Throwable) {
@@ -319,11 +382,11 @@ class BubbleService : AccessibilityService() {
                     put(node, text, sel, edited, spaced = false); say("Done"); return@launch
                 }
                 Snippets.load(this@BubbleService).match(raw)?.let { snippet ->
-                    put(node, text, sel, snippet, spaced = true); say("Snippet added"); return@launch
+                    put(node, text, sel, snippet, spaced = true); watch.clear(); say("Snippet added"); return@launch
                 }
                 val style = Style.forApp(this@BubbleService, node.packageName?.toString(), node.inputType)
                 if (style != Style.VERBATIM && Brain.cleanupAvailable(this@BubbleService, models)) say("Polishing\u2026", 0)
-                val cleaned = Brain.clean(this@BubbleService, models, raw, style)
+                val cleaned = Brain.clean(this@BubbleService, models, raw, style, names?.await().orEmpty())
                 if (cleaned.text.isBlank()) { say("Didn't catch any words"); return@launch }
                 val before = text.substring(0, sel.first).takeLast(2)
                 val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)
@@ -364,6 +427,8 @@ class BubbleService : AccessibilityService() {
             })
         } else paste(node, piece)
         lastInserted = piece
+        watch.begin(node, updated, before.length, piece, SystemClock.elapsedRealtime())
+        watchedText = null
     }
 
     private fun paste(node: AccessibilityNodeInfo, piece: String) {
@@ -386,7 +451,7 @@ class BubbleService : AccessibilityService() {
                 putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, start)
                 putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, start)
             })
-            lastInserted = null; say("Removed what you just said")
+            lastInserted = null; watch.clear(); say("Removed what you just said")
         } else say("Nothing to remove")
     }
 
@@ -415,6 +480,8 @@ class BubbleService : AccessibilityService() {
         private const val SIZE_DP = 60
         // Gboard and others report their window top below the suggestion toolbar; clear it by default.
         private const val TOOLBAR_DP = 48
+        /** Learn a fix once the user has stopped typing in the field for this long. */
+        private const val LEARN_AFTER_MS = 12_000L
 
         /** Whether the user switched the floating mic on in Accessibility settings. */
         fun enabled(c: Context): Boolean {

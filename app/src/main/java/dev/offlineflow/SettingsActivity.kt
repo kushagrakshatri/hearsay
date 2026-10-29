@@ -50,6 +50,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var stylesInfo: TextView
     private lateinit var stylesReset: MaterialButton
     private lateinit var storageBox: LinearLayout
+    private var dictField: android.widget.EditText? = null
     private var planBox: LinearLayout? = null
     private var signingIn = false
     private val downloading = mutableSetOf<ModelManager.Model>()
@@ -146,9 +147,13 @@ class SettingsActivity : AppCompatActivity() {
             addView(ui.hint("Changed your mind? The undo key brings back what you said."))
         }
         val (dictBox, dict) = ui.field(Dictionary.text(this), "One per line", multiline = 5)
+        dictField = dict
         val dictSheet = ui.column().apply {
             addView(ui.hint("Names and jargon Hearsay should spell your way. If it keeps mishearing something, " +
                 "teach it: hear say -> Hearsay"))
+            addView(switch("Learn from my fixes", Prefs.learnWords(context)) { Prefs.setLearnWords(context, it) })
+            addView(ui.hint("Fix a name Hearsay got wrong and it adds it here by itself. Everyday words are never learned."))
+            addView(ui.space(8))
             addView(dictBox)
             addView(ui.filled("Save") {
                 Dictionary.save(this@SettingsActivity, dict.text.toString())
@@ -169,6 +174,10 @@ class SettingsActivity : AppCompatActivity() {
             addView(ui.hint("A mic that floats above whatever keyboard you use. Tap a text box and it appears. " +
                 "Hold to talk, tap for hands-free, drag to move it."))
             addView(ui.space(12)); addView(bubbleBox)
+            addView(ui.space(8))
+            addView(switch("Spell names on screen", Prefs.screenContext(context)) { Prefs.setScreenContext(context, it) })
+            addView(ui.hint("When you stop talking, Hearsay looks at the names shown in the app (a chat, an email thread) " +
+                "so it spells them the same way. It happens on this phone and nothing is saved."))
         }
         storageBox = ui.column()
         val storageSheet = ui.column().apply { addView(ui.hint("Models downloaded to this phone.")); addView(ui.space(4)); addView(storageBox) }
@@ -257,7 +266,12 @@ class SettingsActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    override fun onResume() { super.onResume(); refresh() }
+    override fun onResume() {
+        super.onResume()
+        // Words learned while away show up in the dictionary box (unless it's being edited).
+        dictField?.let { f -> if (!f.hasFocus()) Dictionary.text(this).let { if (f.text.toString() != it) f.setText(it) } }
+        refresh()
+    }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); refresh() }
 

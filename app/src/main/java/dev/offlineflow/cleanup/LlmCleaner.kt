@@ -18,9 +18,13 @@ class LlmCleaner private constructor(
 
     override fun clean(raw: String): String = clean(raw, Style.POLISHED)
 
-    /** Cleans [raw] in [style]. The first use of a style evaluates and caches its prompt. */
-    fun clean(raw: String, style: Style): String = cleanWith(raw, style) { input, words ->
-        llm.complete(prefixFor(style), format.turn(input), maxTokens = words * 2 + 32).let(format::strip)
+    /**
+     * Cleans [raw] in [style]. The first use of a style evaluates and caches its prompt.
+     * [names] (seen on screen) ride in a short note after the cached prompt, for this call only.
+     */
+    fun clean(raw: String, style: Style, names: List<String> = emptyList()): String = cleanWith(raw, style) { input, words ->
+        val note = namesNote(names)?.let(format::note).orEmpty()
+        llm.complete(prefixFor(style), note + format.turn(input), maxTokens = words * 2 + 32).let(format::strip)
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
@@ -81,16 +85,23 @@ class LlmCleaner private constructor(
         fun editTurn(text: String, instruction: String) = "Text:\n$text\n\nInstruction: $instruction"
 
         /** Chat messages (role, content) for an OpenAI-compatible endpoint: cleanup. */
-        fun cleanupMessages(style: Style, dictionary: List<String>, input: String): List<Pair<String, String>> =
-            messages(systemFor(style, dictionary.take(MAX_DICTIONARY)), examplesFor(style), input)
+        fun cleanupMessages(style: Style, dictionary: List<String>, input: String, names: List<String> = emptyList()): List<Pair<String, String>> =
+            messages(systemFor(style, dictionary.take(MAX_DICTIONARY)), examplesFor(style), input, namesNote(names))
+
+        /** The per-dictation note listing names on screen, or null when there are none. */
+        fun namesNote(names: List<String>): String? = names.take(MAX_NAMES).takeIf { it.isNotEmpty() }?.let {
+            "Names and words on the speaker's screen right now: " + it.joinToString(", ") +
+                ". If the transcript has something that sounds like one of them, spell it exactly that way. Otherwise ignore this list."
+        }
 
         /** Chat messages (role, content) for an OpenAI-compatible endpoint: command mode. */
         fun editMessages(text: String, instruction: String): List<Pair<String, String>> =
             messages(EDIT_SYSTEM, EDIT_EXAMPLES, editTurn(text, instruction))
 
-        private fun messages(system: String, examples: List<String>, user: String) = buildList {
+        private fun messages(system: String, examples: List<String>, user: String, note: String? = null) = buildList {
             add("system" to system)
             examples.chunked(2).forEach { (u, a) -> add("user" to u); add("assistant" to a) }
+            if (note != null) add("system" to note)
             add("user" to user)
         }
 
@@ -187,6 +198,8 @@ class LlmCleaner private constructor(
             return LlmCleaner(LlamaEngine.load(file, threads), format, dictionary.spellings.take(MAX_DICTIONARY))
         }
 
+        private const val MAX_NAMES = 30
+
         /** Keeps the cached prompt prefixes small enough for the 2048-token context. */
         private const val MAX_DICTIONARY = 150
     }
@@ -202,6 +215,7 @@ class LlmCleaner private constructor(
                     append("<|im_start|>assistant\n").append(a).append("<|im_end|>\n")
                 }
             }
+            override fun note(text: String) = "<|im_start|>system\n$text<|im_end|>\n"
             override fun turn(user: String) =
                 "<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
         },
@@ -214,11 +228,14 @@ class LlmCleaner private constructor(
                     append("<|turn>model\n").append(a).append("<turn|>\n")
                 }
             }
+            override fun note(text: String) = "<|turn>system\n$text<turn|>\n"
             override fun turn(user: String) = "<|turn>user\n$user<turn|>\n<|turn>model\n"
         };
 
         abstract fun prefix(system: String, examples: List<String>): String
         abstract fun turn(user: String): String
+        /** A system note placed between the cached prefix and the user's turn. */
+        abstract fun note(text: String): String
 
         /** Drops any reasoning block and trailing end-of-turn markers the model printed. */
         fun strip(out: String): String = out

@@ -38,6 +38,11 @@ import dev.offlineflow.audio.SpeechGate
 import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.Commands
 import dev.offlineflow.cleanup.Continuity
+import dev.offlineflow.cleanup.CorrectionWatch
+import dev.offlineflow.cleanup.ScreenNames
+import dev.offlineflow.cleanup.Words
+import dev.offlineflow.core.Learning
+import android.view.inputmethod.ExtractedTextRequest
 import dev.offlineflow.cloud.CloudClient
 import dev.offlineflow.cloud.CloudText
 import dev.offlineflow.cleanup.Dictionary
@@ -76,6 +81,8 @@ class OfflineFlowIME : InputMethodService() {
     private var cloudNote: String? = null
     private var lastInserted: String? = null
     private var hasSelection = false
+    private val watch = CorrectionWatch()
+    private var fieldKey: String? = null
     private var idleJob: Job? = null
     private lateinit var wave: LevelView
 
@@ -270,6 +277,10 @@ class OfflineFlowIME : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         idleJob?.cancel(); idleJob = null
+        // Back in a field we dictated into (e.g. after fixing a word with another keyboard): learn from it.
+        val key = info?.let { "${it.packageName}:${it.fieldId}" }
+        learnFrom(key)
+        fieldKey = key
         lastRaw = null; lastInserted = null
         hasSelection = info != null && info.initialSelStart >= 0 && info.initialSelStart != info.initialSelEnd
         setMic(MicButton.State.IDLE); updateUndo()
@@ -447,20 +458,23 @@ class OfflineFlowIME : InputMethodService() {
             val useLlm = s != Style.VERBATIM && cleanupAvailable() && raw.isNotBlank()
             if (useLlm) say("Polishing\u2026", R.drawable.ic_sparkle)
             val t1 = SystemClock.elapsedRealtime()
-            val dictionary = Dictionary.load(this@OfflineFlowIME)
-            val heard = dictionary.apply(raw)
+            val saved = Dictionary.load(this@OfflineFlowIME)
+            val names = namesNearCursor()
+            val screen = Dictionary.exact(names)
+            fun fixWords(t: String) = screen.apply(saved.apply(t))
+            val heard = fixWords(raw)
             val ctx = this@OfflineFlowIME
             suspend fun local() = withContext(llmDispatcher) {
-                when (val c = cleanerForSelected(dictionary)) {
-                    is LlmCleaner -> dictionary.apply(c.clean(heard, s))
-                    else -> dictionary.apply(rulesFor(heard, s))
+                when (val c = cleanerForSelected(saved)) {
+                    is LlmCleaner -> fixWords(c.clean(heard, s, names))
+                    else -> fixWords(rulesFor(heard, s))
                 }
             }
             val cleaned = if (s == Style.VERBATIM) RulesCleaner.verbatim(heard) else try {
                 if (CloudText.on(ctx)) try {
                     withContext(Dispatchers.IO) {
-                        dictionary.apply(LlmCleaner.cleanWithOrThrow(heard, s) { input, words ->
-                            CloudText.chat(ctx, LlmCleaner.cleanupMessages(s, dictionary.spellings, input), words * 2 + 32)
+                        fixWords(LlmCleaner.cleanWithOrThrow(heard, s) { input, words ->
+                            CloudText.chat(ctx, LlmCleaner.cleanupMessages(s, saved.spellings, input, names), words * 2 + 32)
                         })
                     }
                 } catch (t: Throwable) {
@@ -471,7 +485,7 @@ class OfflineFlowIME : InputMethodService() {
                 } else local()
             } catch (t: Throwable) {
                 Log.e(TAG, "cleanup failed, using rules", t)
-                dictionary.apply(rulesFor(heard, s))
+                fixWords(rulesFor(heard, s))
             }
             val cleanMs = SystemClock.elapsedRealtime() - t1
             val ms = SystemClock.elapsedRealtime() - t0
@@ -480,6 +494,7 @@ class OfflineFlowIME : InputMethodService() {
                 val text = withLeadingSpace(if (s == Style.VERBATIM) cleaned else Continuity.apply(cleaned, before))
                 currentInputConnection?.commitText(text, 1)
                 lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
+                startWatch(text)
             }
             if (cleaned.isEmpty()) say("Didn't catch any words")
             else if (cloudNote != null) say("Done \u00b7 ${secs(ms)} \u00b7 ChatGPT unavailable, cleaned on this phone", R.drawable.ic_check)
@@ -529,6 +544,40 @@ class OfflineFlowIME : InputMethodService() {
             lastRaw = ins; lastInserted = text
         }
         say("Done \u00b7 undo brings back the original", R.drawable.ic_check)
+    }
+
+    /** The field's whole text (as far as the app shares it) and where the cursor is. */
+    private fun fieldText(): Pair<String, Int>? {
+        val et = currentInputConnection?.getExtractedText(ExtractedTextRequest(), 0) ?: return null
+        val t = et.text?.toString() ?: return null
+        return t to et.selectionEnd
+    }
+
+    /** Remembers what was just inserted, so a fix the user makes to it later can be learned. */
+    private fun startWatch(piece: String) {
+        val key = fieldKey ?: return
+        val (text, cursor) = fieldText() ?: return
+        watch.begin(key, text, cursor - piece.length, piece, SystemClock.elapsedRealtime())
+    }
+
+    private fun learnFrom(key: String?) {
+        val w = watch.watching ?: return
+        if (key == null || key != w) { watch.clear(); return }
+        val now = fieldText()?.first ?: return
+        val change = watch.edited(key, now, SystemClock.elapsedRealtime()) ?: return
+        watch.clear()
+        scope.launch {
+            val added = withContext(Dispatchers.IO) { runCatching { Learning.learn(this@OfflineFlowIME, change.first, change.second) }.getOrDefault(emptyList()) }
+            if (added.isNotEmpty()) say(Learning.message(added), R.drawable.ic_book)
+        }
+    }
+
+    /** Names in the text already in the field (a reply thread, an email you're writing), for spelling. */
+    private fun namesNearCursor(): List<String> {
+        val before = currentInputConnection?.getTextBeforeCursor(1500, 0)?.toString().orEmpty()
+        if (before.isBlank()) return emptyList()
+        val common = Words.common(this)
+        return ScreenNames.from(listOf(before), { w -> w.lowercase().replace('\u2019', '\'') in common }, limit = 15)
     }
 
     private fun lastInsertAtCursor(): Boolean {

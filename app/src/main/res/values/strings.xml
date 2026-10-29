@@ -2,5 +2,5 @@
     <string name="app_name">Hearsay</string>
     <string name="ime_name">Hearsay voice</string>
     <string name="bubble_name">Hearsay floating mic</string>
-    <string name="bubble_description">Shows a mic above your keyboard so you can dictate into any text box. Hearsay reads only the text box you are typing in, to put your words at the cursor. Your voice is processed on this phone.</string>
+    <string name="bubble_description">Shows a mic above your keyboard so you can dictate into any text box. Hearsay reads the text box you are typing in, to put your words at the cursor and learn words you fix. If you allow it, it also reads names shown on screen when you finish speaking, to spell them right, and keeps none of it. Your voice is processed on this phone.</string>
 </resources>

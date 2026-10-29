@@ -56,6 +56,14 @@ object Prefs {
     fun setBubblePos(c: Context, x: Int, dy: Int) = p(c).edit().putInt("bubble_x", x).putInt("bubble_dy", dy).apply()
     fun resetBubblePos(c: Context) = p(c).edit().remove("bubble_x").remove("bubble_dy").apply()
 
+    /** Learn names and terms from the user's fixes to dictated text. */
+    fun learnWords(c: Context): Boolean = p(c).getBoolean("learn_words", true)
+    fun setLearnWords(c: Context, on: Boolean) = p(c).edit().putBoolean("learn_words", on).apply()
+
+    /** Floating mic: read names visible on screen (for that one dictation, never stored) to spell them right. */
+    fun screenContext(c: Context): Boolean = p(c).getBoolean("screen_context", true)
+    fun setScreenContext(c: Context, on: Boolean) = p(c).edit().putBoolean("screen_context", on).apply()
+
     fun setupDone(c: Context): Boolean = p(c).getBoolean("setup_done", false)
     fun setSetupDone(c: Context) = p(c).edit().putBoolean("setup_done", true).apply()
 
