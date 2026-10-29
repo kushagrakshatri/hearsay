@@ -47,6 +47,15 @@ object Prefs {
     fun setChatGptWelcomed(c: Context) = p(c).edit().putBoolean("chatgpt_welcomed", true).apply()
 
     /** The guided first-run setup was finished or skipped. */
+    // Floating mic: shown when its accessibility service is on and this is true; position is
+    // x from the right edge and y relative to the keyboard's top (MIN_VALUE = default).
+    fun bubbleOn(c: Context): Boolean = p(c).getBoolean("bubble_on", true)
+    fun setBubbleOn(c: Context, on: Boolean) = p(c).edit().putBoolean("bubble_on", on).apply()
+    fun bubbleX(c: Context): Int = p(c).getInt("bubble_x", -1)
+    fun bubbleDy(c: Context): Int = p(c).getInt("bubble_dy", Int.MIN_VALUE)
+    fun setBubblePos(c: Context, x: Int, dy: Int) = p(c).edit().putInt("bubble_x", x).putInt("bubble_dy", dy).apply()
+    fun resetBubblePos(c: Context) = p(c).edit().remove("bubble_x").remove("bubble_dy").apply()
+
     fun setupDone(c: Context): Boolean = p(c).getBoolean("setup_done", false)
     fun setSetupDone(c: Context) = p(c).edit().putBoolean("setup_done", true).apply()
 

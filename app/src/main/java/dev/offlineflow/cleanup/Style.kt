@@ -45,6 +45,15 @@ enum class Style(val label: String) {
             return default(pkg, info?.inputType ?: 0)
         }
 
+        /** Same as [forEditor] for a field we only know by app and input type (the floating mic). */
+        fun forApp(context: Context, pkg: String?, inputType: Int): Style {
+            if (pkg != null) {
+                val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(key(pkg), null)
+                saved?.let { s -> entries.firstOrNull { it.name == s }?.let { return it } }
+            }
+            return default(pkg, inputType)
+        }
+
         fun save(context: Context, pkg: String, style: Style) =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(key(pkg), style.name).apply()
 

@@ -29,7 +29,7 @@ import kotlinx.coroutines.withContext
  * switch to it, try it. Steps that are already done are skipped automatically.
  */
 class SetupActivity : AppCompatActivity() {
-    private enum class Step { WELCOME, MIC, MODELS, ENABLE, SWITCH, TRY }
+    private enum class Step { WELCOME, MIC, MODELS, BUBBLE, ENABLE, SWITCH, TRY }
 
     private lateinit var ui: Ui
     private lateinit var models: ModelManager
@@ -39,6 +39,7 @@ class SetupActivity : AppCompatActivity() {
     private lateinit var secondary: MaterialButton
     private var step = Step.WELCOME
     private var downloading = false
+    private var keyboardChosen = false
     private val bars = mutableMapOf<ModelManager.Model, LinearProgressIndicator>()
     private val labels = mutableMapOf<ModelManager.Model, TextView>()
 
@@ -92,14 +93,17 @@ class SetupActivity : AppCompatActivity() {
     private fun micOk() = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     private fun modelsOk() = models.isReady(models.selected) && (models.selectedCleanup?.let { models.isReady(it) } ?: true)
     private fun enabledOk() = getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
+    private fun bubbleOk() = dev.offlineflow.bubble.BubbleService.enabled(this)
     private fun currentOk() = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.startsWith("$packageName/") == true
 
     private fun done(s: Step) = when (s) {
         Step.WELCOME -> false
         Step.MIC -> micOk()
         Step.MODELS -> modelsOk()
-        Step.ENABLE -> enabledOk()
-        Step.SWITCH -> currentOk()
+        Step.BUBBLE -> bubbleOk() || keyboardChosen
+        // The keyboard steps only apply when the user picked the keyboard over the floating mic.
+        Step.ENABLE -> bubbleOk() || !keyboardChosen || enabledOk()
+        Step.SWITCH -> bubbleOk() || !keyboardChosen || currentOk()
         Step.TRY -> false
     }
 
@@ -146,6 +150,18 @@ class SetupActivity : AppCompatActivity() {
                 primary.text = "Download"; secondary.text = "Later"
                 refreshModels()
             }
+            Step.BUBBLE -> {
+                header("Turn on the floating mic", "Keep your favorite keyboard. A mic floats above it whenever you're typing, " +
+                    "in any app. In the list that opens, tap Hearsay floating mic and switch it on.")
+                bullet(R.drawable.ic_lock, "Android warns about accessibility access. Hearsay only reads the text box " +
+                    "you're dictating into, to put your words at the cursor.")
+                body.addView(ui.space(8))
+                bullet(R.drawable.ic_settings, "Switch greyed out? Open App info for Hearsay, tap \u22ee, then Allow restricted settings.")
+                body.addView(ui.text("Open App info") {
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")))
+                })
+                primary.text = "Open accessibility settings"; secondary.text = "Use the Hearsay keyboard instead"
+            }
             Step.ENABLE -> {
                 header("Turn on the Hearsay keyboard", "In the list that opens, switch on Hearsay voice, then come back here.")
                 bullet(R.drawable.ic_lock, "Android warns that any keyboard could collect what you type. " +
@@ -158,7 +174,8 @@ class SetupActivity : AppCompatActivity() {
                 primary.text = "Choose keyboard"; secondary.text = "Not now"
             }
             Step.TRY -> {
-                header("You're all set", "Tap the box, then hold the mic and say something like " +
+                header("You're all set", (if (bubbleOk()) "Tap the box and the mic floats up. Hold it and say something like "
+                    else "Tap the box, then hold the mic and say something like ") +
                     "\"um so I'll be there at five, actually six.\" Let go and watch it clean up.")
                 val (box, _) = ui.field("", "Try it here", multiline = 3)
                 body.addView(box)
@@ -216,6 +233,7 @@ class SetupActivity : AppCompatActivity() {
             Step.WELCOME -> show(Step.entries.drop(1).firstOrNull { !done(it) } ?: Step.TRY, auto = true)
             Step.MIC -> requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
             Step.MODELS -> if (modelsOk()) advanceIfDone() else downloadAll()
+            Step.BUBBLE -> SettingsActivity.openAccessibility(this)
             Step.ENABLE -> startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
             Step.SWITCH -> getSystemService(InputMethodManager::class.java).showInputMethodPicker()
             Step.TRY -> finishSetup()
@@ -224,6 +242,7 @@ class SetupActivity : AppCompatActivity() {
 
     private fun onSecondary() {
         if (step == Step.WELCOME) { finishSetup(); return }
+        if (step == Step.BUBBLE) { keyboardChosen = true; show(Step.ENABLE, auto = true); return }
         val next = Step.entries.getOrNull(step.ordinal + 1) ?: return finishSetup()
         show(next, auto = true)
     }

@@ -30,6 +30,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.TextView
 import dev.offlineflow.Prefs
+import dev.offlineflow.core.Brain
 import dev.offlineflow.asr.Engines
 import dev.offlineflow.asr.SpeechEngine
 import dev.offlineflow.audio.Recorder
@@ -55,14 +56,10 @@ import kotlinx.coroutines.*
  */
 class OfflineFlowIME : InputMethodService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val asrDispatcher = Dispatchers.Default.limitedParallelism(1)
-    private val llmDispatcher = Dispatchers.Default.limitedParallelism(1)
-    private var cleaner: LlmCleaner? = null
-    private var cleanerModel: ModelManager.Model? = null
-    private var cleanerDictKey: String? = null
+    // Models live in Brain, shared with the floating mic.
+    private val asrDispatcher = Brain.asr
+    private val llmDispatcher = Brain.llm
     private lateinit var models: ModelManager
-    private var engine: SpeechEngine? = null
-    private var engineModel: ModelManager.Model? = null
     private var recorder: Recorder? = null
     private var micDownAt = 0L
     private var handsFree = false
@@ -318,13 +315,9 @@ class OfflineFlowIME : InputMethodService() {
         }
     }
 
-    private suspend fun releaseLlm() = withContext(llmDispatcher) {
-        cleaner?.close(); cleaner = null; cleanerModel = null; cleanerDictKey = null
-    }
+    private suspend fun releaseLlm() = Brain.releaseLlm()
 
-    private suspend fun releaseAsr() = withContext(asrDispatcher) {
-        engine?.close(); engine = null; engineModel = null
-    }
+    private suspend fun releaseAsr() = Brain.releaseAsr()
 
     /** Local model downloaded, or cloud speech configured. */
     private fun speechAvailable() = models.isReady(models.selected) || CloudClient.speechOn(this)
@@ -335,33 +328,12 @@ class OfflineFlowIME : InputMethodService() {
 
     override fun onDestroy() {
         scope.cancel()
-        engine?.close(); engine = null
-        cleaner?.close(); cleaner = null
         super.onDestroy()
     }
 
-    /** Returns the engine for the selected model, (re)loading it if the choice changed. ASR thread only. */
-    private fun engineForSelected(): SpeechEngine {
-        val want = models.selected
-        engine?.let { if (engineModel == want) return it }
-        engine?.close(); engine = null; engineModel = null
-        return Engines.load(models, want).also { engine = it; engineModel = want }
-    }
+    private fun engineForSelected(): SpeechEngine = Brain.engine(models)
 
-    /** Returns the selected cleanup LLM, or RulesCleaner when off / not downloaded. LLM thread only. */
-    private fun cleanerForSelected(dictionary: Dictionary = Dictionary.load(this)): Cleaner {
-        val want = models.selectedCleanup?.takeIf { models.isReady(it) }
-        if (want == null) {
-            cleaner?.close(); cleaner = null; cleanerModel = null
-            return RulesCleaner
-        }
-        // The dictionary is part of the cached prompt, so a dictionary edit reloads the prefix.
-        cleaner?.let { if (cleanerModel == want && cleanerDictKey == dictionary.key) return it }
-        cleaner?.close(); cleaner = null; cleanerModel = null
-        return LlmCleaner.load(want, models.file(want), dictionary).also {
-            cleaner = it; cleanerModel = want; cleanerDictKey = dictionary.key
-        }
-    }
+    private fun cleanerForSelected(dictionary: Dictionary = Dictionary.load(this)): Cleaner = Brain.cleaner(models, dictionary)
 
     private fun warmUp() {
         if (models.isReady(models.selected) && !CloudClient.speechOn(this)) scope.launch(asrDispatcher) {
@@ -428,7 +400,7 @@ class OfflineFlowIME : InputMethodService() {
         if (audio.size < Recorder.SAMPLE_RATE / 4) { say("Too quick. Hold the mic while you talk."); return }
         val cloud = CloudClient.from(this)?.takeIf { CloudClient.speechOn(this) }
         say(when {
-            engine == null || engineModel != models.selected -> "Warming up\u2026"
+            !Brain.engineLoaded(models.selected) -> "Warming up\u2026"
             else -> "Writing it down\u2026"
         })
         val t0 = SystemClock.elapsedRealtime()

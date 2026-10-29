@@ -1,0 +1,410 @@
+package dev.offlineflow.bubble
+
+import android.Manifest
+import android.accessibilityservice.AccessibilityService
+import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ComponentCallbacks2
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.provider.Settings
+import android.text.TextUtils
+import android.util.Log
+import android.view.ContextThemeWrapper
+import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
+import android.view.WindowManager
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
+import android.widget.LinearLayout
+import android.widget.TextView
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.R as M
+import dev.offlineflow.Prefs
+import dev.offlineflow.R
+import dev.offlineflow.audio.Recorder
+import dev.offlineflow.audio.SpeechGate
+import dev.offlineflow.cleanup.Commands
+import dev.offlineflow.cleanup.Continuity
+import dev.offlineflow.cleanup.LlmCleaner
+import dev.offlineflow.cleanup.Snippets
+import dev.offlineflow.cleanup.Style
+import dev.offlineflow.cloud.CloudClient
+import dev.offlineflow.cloud.CloudText
+import dev.offlineflow.core.Brain
+import dev.offlineflow.ime.MicButton
+import dev.offlineflow.model.ModelManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+/**
+ * The floating mic. When a text field is focused and a keyboard (any keyboard but Hearsay's)
+ * is up, a round mic floats just above it. Hold to talk, tap for hands-free, drag to move.
+ * Text goes into the focused field through accessibility (set text, or paste as a fallback).
+ *
+ * It reads only the focused field: its app, input type, text and selection, to insert at the
+ * cursor and pick the writing style.
+ */
+class BubbleService : AccessibilityService() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val main = Handler(Looper.getMainLooper())
+    private lateinit var models: ModelManager
+    private lateinit var wm: WindowManager
+
+    private var root: LinearLayout? = null
+    private lateinit var mic: MicButton
+    private lateinit var pill: TextView
+    private var params: WindowManager.LayoutParams? = null
+    private var imeTop = 0
+
+    private var recorder: Recorder? = null
+    private var handsFree = false
+    private var busy = false
+    private var downAt = 0L
+    private var downX = 0f; private var downY = 0f
+    private var startX = 0; private var startY = 0
+    private var dragging = false
+    private var lastInserted: String? = null
+    private var idleJob: Job? = null
+    private var warmedFor: String? = null
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        models = ModelManager(this)
+        wm = getSystemService(WindowManager::class.java)
+        check()
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Coalesce bursts of focus / window events into one check.
+        main.removeCallbacks(checkRunnable)
+        main.postDelayed(checkRunnable, 120)
+    }
+
+    override fun onInterrupt() {}
+
+    private val checkRunnable = Runnable { check() }
+
+    /** Shows the bubble above the keyboard when there's a field to dictate into, hides it otherwise. */
+    private fun check() {
+        if (recorder != null || busy || dragging) return
+        val target = runCatching { target() }.getOrNull()
+        val ime = runCatching { windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }.getOrNull()
+        if (target == null || ime == null || !Prefs.bubbleOn(this) || hearsayKeyboardActive() || !hasMic() ||
+            !(models.isReady(models.selected) || CloudClient.speechOn(this))) {
+            hide(); return
+        }
+        val r = Rect(); ime.getBoundsInScreen(r)
+        imeTop = r.top
+        show()
+        warm(target)
+    }
+
+    /** The focused, editable, non-password field, or null. */
+    private fun target(): AccessibilityNodeInfo? {
+        val n = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
+        if (!n.isEditable || n.isPassword) return null
+        return n
+    }
+
+    private fun hearsayKeyboardActive() =
+        Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.startsWith("$packageName/") == true
+
+    private fun hasMic() = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    // ------------------------------------------------------------------ the bubble
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun show() {
+        idleJob?.cancel(); idleJob = null
+        if (root == null) {
+            val t = DynamicColors.wrapContextIfAvailable(ContextThemeWrapper(this, R.style.Theme_Hearsay))
+            fun c(attr: Int) = MaterialColors.getColor(t, attr, Color.GRAY)
+            mic = MicButton(t).apply {
+                idleColor = c(M.attr.colorPrimary); iconColor = c(M.attr.colorOnPrimary)
+                activeColor = c(M.attr.colorError); busyColor = c(M.attr.colorPrimary)
+                elevation = dp(6).toFloat()
+                setOnTouchListener(::onTouch)
+            }
+            pill = TextView(t).apply {
+                textSize = 13f; setTextColor(c(M.attr.colorOnSurface)); maxLines = 2; ellipsize = TextUtils.TruncateAt.END
+                maxWidth = dp(220); visibility = View.GONE; elevation = dp(4).toFloat()
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(c(M.attr.colorSurfaceContainerHighest)) }
+            }
+            root = LinearLayout(t).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(6), dp(6), dp(6), dp(6))
+                addView(pill, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    .apply { marginEnd = dp(8) })
+                addView(mic, LinearLayout.LayoutParams(dp(SIZE_DP), dp(SIZE_DP)))
+            }
+            params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            ).apply { gravity = Gravity.TOP or Gravity.END }
+            place()
+            runCatching { wm.addView(root, params) }.onFailure { Log.e(TAG, "overlay failed", it); root = null; return }
+        } else {
+            place(); runCatching { wm.updateViewLayout(root, params) }
+        }
+        root?.visibility = View.VISIBLE
+    }
+
+    /** x from the right edge; y relative to the keyboard's top so it rides above any keyboard height. */
+    private fun place() {
+        val p = params ?: return
+        p.x = Prefs.bubbleX(this).takeIf { it >= 0 } ?: dp(8)
+        val dy = Prefs.bubbleDy(this).takeIf { it != Int.MIN_VALUE } ?: -dp(SIZE_DP + 20)
+        p.y = (imeTop + dy).coerceIn(dp(48), (imeTop - dp(SIZE_DP + 12)).coerceAtLeast(dp(48)))
+    }
+
+    private fun hide() {
+        val r = root ?: return
+        if (r.visibility != View.VISIBLE) return
+        r.visibility = View.GONE
+        // Hidden: free the cleanup LLM after a minute and the speech model after five.
+        idleJob?.cancel()
+        idleJob = scope.launch {
+            delay(60_000); Brain.releaseLlm()
+            delay(240_000); Brain.releaseAsr()
+        }
+    }
+
+    private fun say(msg: String?, holdMs: Long = 2500) {
+        if (root == null) return
+        main.removeCallbacks(clearPill)
+        if (msg == null) { pill.visibility = View.GONE; return }
+        pill.text = msg; pill.visibility = View.VISIBLE
+        if (holdMs > 0) main.postDelayed(clearPill, holdMs)
+    }
+    private val clearPill = Runnable { if (root != null) pill.visibility = View.GONE }
+
+    private fun warm(node: AccessibilityNodeInfo) {
+        val pkg = node.packageName?.toString()
+        if (warmedFor == pkg) return
+        warmedFor = pkg
+        val style = Style.forApp(this, pkg, node.inputType)
+        if (models.isReady(models.selected) && !CloudClient.speechOn(this)) scope.launch(Brain.asr) {
+            runCatching { Brain.engine(models) }.onFailure { Log.e(TAG, "speech warm-up failed", it) }
+        }
+        if (!CloudText.on(this) && style != Style.VERBATIM) scope.launch(Brain.llm) {
+            runCatching { (Brain.cleaner(models, dev.offlineflow.cleanup.Dictionary.load(this@BubbleService)) as? LlmCleaner)?.warm(style) }
+                .onFailure { Log.e(TAG, "cleanup warm-up failed", it) }
+        }
+    }
+
+    // ------------------------------------------------------------------ touch: hold, tap, drag
+
+    private fun onTouch(v: View, e: MotionEvent): Boolean {
+        val slop = ViewConfiguration.get(this).scaledTouchSlop * 2
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (busy) return true
+                if (handsFree) { finish(); return true }
+                downAt = SystemClock.elapsedRealtime(); downX = e.rawX; downY = e.rawY
+                startX = params?.x ?: 0; startY = params?.y ?: 0
+                dragging = false
+                startListening()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!dragging && !handsFree && (abs(e.rawX - downX) > slop || abs(e.rawY - downY) > slop)) {
+                    dragging = true; cancelListening()
+                }
+                if (dragging) params?.let { p ->
+                    p.x = (startX - (e.rawX - downX)).toInt().coerceAtLeast(0)
+                    p.y = (startY + (e.rawY - downY)).toInt().coerceAtLeast(dp(48))
+                    runCatching { wm.updateViewLayout(root, p) }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (dragging) {
+                    dragging = false
+                    params?.let { Prefs.setBubblePos(this, it.x, it.y - imeTop) }
+                    return true
+                }
+                if (recorder == null || handsFree) return true
+                if (e.actionMasked == MotionEvent.ACTION_UP && SystemClock.elapsedRealtime() - downAt < TAP_MS) {
+                    handsFree = true; mic.state = MicButton.State.HANDS_FREE
+                    say("Listening\u2026 pause or tap to stop", 0)
+                } else finish()
+            }
+        }
+        return true
+    }
+
+    private fun startListening() {
+        if (!hasMic()) { say("Open Hearsay to allow the microphone"); return }
+        mic.state = MicButton.State.LISTENING
+        buzz()
+        recorder = Recorder(SpeechGate.create(assets), endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
+            mic.post { if (handsFree) finish() }
+        }, onLevel = { level -> mic.post { mic.push(level) } }).also { it.start() }
+    }
+
+    private fun cancelListening() {
+        recorder?.stop(); recorder = null; handsFree = false
+        mic.state = MicButton.State.IDLE; say(null)
+    }
+
+    private fun finish() {
+        val rec = recorder ?: return
+        recorder = null; handsFree = false
+        buzz()
+        val audio = rec.stop()
+        if (!rec.heardSpeech || audio.size < Recorder.SAMPLE_RATE / 4) {
+            mic.state = MicButton.State.IDLE
+            say(if (!rec.heardSpeech) "Didn't catch that" else "Hold the mic while you talk"); return
+        }
+        busy = true; mic.state = MicButton.State.BUSY
+        say(if (Brain.engineLoaded(models.selected)) "Writing it down\u2026" else "Warming up\u2026", 0)
+        val t0 = SystemClock.elapsedRealtime()
+        scope.launch {
+            try {
+                val raw = try { Brain.transcribe(this@BubbleService, models, audio) } catch (t: Throwable) {
+                    Log.e(TAG, "transcription failed", t); say("Couldn't write that down"); return@launch
+                }
+                val node = target() ?: run { say("Tap a text box first"); return@launch }
+                node.refresh()
+                val (text, sel) = current(node)
+                val selected = if (sel.first != sel.last) text.substring(sel.first, sel.last) else null
+
+                if (selected == null && Commands.isScratch(raw)) { scratch(node, text, sel); return@launch }
+                if (selected != null && Commands.forSelection(raw)) {
+                    if (!Brain.cleanupAvailable(this@BubbleService, models)) { say("Voice edits need cleanup on"); return@launch }
+                    val instruction = Commands.instruction(raw)
+                    say("${instruction.replaceFirstChar { it.uppercase() }}\u2026", 0)
+                    val edited = Brain.edit(this@BubbleService, models, selected, instruction)
+                        ?: run { say("Couldn't do \u201c$instruction\u201d"); return@launch }
+                    put(node, text, sel, edited, spaced = false); say("Done"); return@launch
+                }
+                Snippets.load(this@BubbleService).match(raw)?.let { snippet ->
+                    put(node, text, sel, snippet, spaced = true); say("Snippet added"); return@launch
+                }
+                val style = Style.forApp(this@BubbleService, node.packageName?.toString(), node.inputType)
+                if (style != Style.VERBATIM && Brain.cleanupAvailable(this@BubbleService, models)) say("Polishing\u2026", 0)
+                val cleaned = Brain.clean(this@BubbleService, models, raw, style)
+                if (cleaned.text.isBlank()) { say("Didn't catch any words"); return@launch }
+                val before = text.substring(0, sel.first).takeLast(2)
+                val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)
+                put(node, text, sel, out, spaced = true)
+                val ms = SystemClock.elapsedRealtime() - t0
+                say("Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f))
+            } finally {
+                busy = false
+                mic.state = MicButton.State.IDLE
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ inserting
+
+    /** The field's real text (not its hint) and selection; no cursor means the end. */
+    private fun current(node: AccessibilityNodeInfo): Pair<String, IntRange> {
+        val raw = node.text?.toString().orEmpty()
+        val text = if (node.isShowingHintText || (raw.isNotEmpty() && raw == node.hintText?.toString())) "" else raw
+        var s = node.textSelectionStart; var e = node.textSelectionEnd
+        if (s < 0 || e < 0 || s > text.length || e > text.length) { s = text.length; e = text.length }
+        return text to (minOf(s, e)..maxOf(s, e))
+    }
+
+    /** Replaces the selection (or inserts at the cursor) with [ins]; falls back to paste when set-text is refused. */
+    private fun put(node: AccessibilityNodeInfo, text: String, sel: IntRange, ins: String, spaced: Boolean) {
+        val before = text.substring(0, sel.first)
+        val piece = if (spaced && before.isNotEmpty() && !before.last().isWhitespace()) " $ins" else ins
+        val updated = before + piece + text.substring(sel.last)
+        val ok = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, updated)
+        })
+        if (ok) {
+            val cursor = before.length + piece.length
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor)
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor)
+            })
+        } else paste(node, piece)
+        lastInserted = piece
+    }
+
+    private fun paste(node: AccessibilityNodeInfo, piece: String) {
+        val cm = getSystemService(ClipboardManager::class.java)
+        val old = runCatching { cm.primaryClip }.getOrNull()
+        cm.setPrimaryClip(ClipData.newPlainText("Hearsay", piece))
+        node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        // Put the user's clipboard back once the paste has landed.
+        main.postDelayed({ runCatching { if (old != null) cm.setPrimaryClip(old) else cm.clearPrimaryClip() } }, 600)
+    }
+
+    private fun scratch(node: AccessibilityNodeInfo, text: String, sel: IntRange) {
+        val ins = lastInserted
+        if (ins != null && text.substring(0, sel.first).endsWith(ins)) {
+            val start = sel.first - ins.length
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text.substring(0, start) + text.substring(sel.last))
+            })
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, start)
+                putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, start)
+            })
+            lastInserted = null; say("Removed what you just said")
+        } else say("Nothing to remove")
+    }
+
+    private fun buzz() {
+        if (Prefs.haptics(this) && root != null) mic.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (recorder == null && !busy && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+            scope.launch { Brain.releaseLlm(); Brain.releaseAsr() }
+        }
+    }
+
+    override fun onDestroy() {
+        recorder?.stop(); recorder = null
+        root?.let { runCatching { wm.removeView(it) } }; root = null
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val TAG = "HearsayBubble"
+        private const val TAP_MS = 350L
+        private const val SIZE_DP = 60
+
+        /** Whether the user switched the floating mic on in Accessibility settings. */
+        fun enabled(c: Context): Boolean {
+            val list = Settings.Secure.getString(c.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+            return list.split(':').any {
+                it.equals("${c.packageName}/${BubbleService::class.java.name}", true) ||
+                    it.equals("${c.packageName}/.bubble.BubbleService", true)
+            }
+        }
+    }
+}

@@ -63,6 +63,8 @@ class SettingsActivity : AppCompatActivity() {
     private val snipSum by lazy { TextView(this) }
     private val storageSum by lazy { TextView(this) }
     private val keySum by lazy { TextView(this) }
+    private val bubbleSum by lazy { TextView(this) }
+    private val bubbleBox by lazy { ui.column() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -163,6 +165,11 @@ class SettingsActivity : AppCompatActivity() {
                 toast("Saved ${Snippets.load(this@SettingsActivity).entries.size} snippets"); refresh()
             }.withTopMargin())
         }
+        val bubbleSheet = ui.column().apply {
+            addView(ui.hint("A mic that floats above whatever keyboard you use. Tap a text box and it appears. " +
+                "Hold to talk, tap for hands-free, drag to move it."))
+            addView(ui.space(12)); addView(bubbleBox)
+        }
         storageBox = ui.column()
         val storageSheet = ui.column().apply { addView(ui.hint("Models downloaded to this phone.")); addView(ui.space(4)); addView(storageBox) }
 
@@ -198,6 +205,7 @@ class SettingsActivity : AppCompatActivity() {
 
             addView(ui.overline("Dictation"))
             addView(ui.group(
+                ui.listRow(R.drawable.ic_mic, "Floating mic", bubbleSum) { sheet("Floating mic", bubbleSheet) },
                 ui.listRow(R.drawable.ic_wave, "Voice", speechSum) { sheet("Voice", speechSheet) },
                 ui.listRow(R.drawable.ic_sparkle, "Cleanup", cleanupSum) { sheet("Cleanup", cleanupSheet) },
                 ui.listRow(R.drawable.ic_lines, "Writing style", styleSum) { sheet("Writing style", styleSheet) },
@@ -264,7 +272,8 @@ class SettingsActivity : AppCompatActivity() {
     private fun enabledOk() = getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == packageName }
     private fun currentOk() = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.startsWith("$packageName/") == true
     /** Ready once the keyboard can dictate; being the current keyboard right now isn't required. */
-    private fun allSet() = micOk() && models.isReady(models.selected) && enabledOk()
+    private fun bubbleOk() = dev.offlineflow.bubble.BubbleService.enabled(this)
+    private fun allSet() = micOk() && models.isReady(models.selected) && (enabledOk() || bubbleOk())
 
     private fun refresh() {
         refreshStatus()
@@ -304,6 +313,12 @@ class SettingsActivity : AppCompatActivity() {
         snipSum.text = if (sn == 0) "Say a phrase, get your email, address\u2026" else "$sn snippet${if (sn == 1) "" else "s"}"
         val bytes = ModelManager.Model.entries.sumOf { models.bytesOnDisk(it) }
         storageSum.text = if (bytes == 0L) "Nothing downloaded yet" else "%.1f GB used by models".format(bytes / 1e9)
+        bubbleSum.text = when {
+            !bubbleOk() -> "Off \u00b7 use your own keyboard with Hearsay"
+            !Prefs.bubbleOn(this) -> "Paused"
+            else -> "On \u00b7 floats above any keyboard"
+        }
+        refreshBubble()
         keySum.text = if (Prefs.cloudSpeech(this) || Prefs.cloudCleanup(this)) "On" else "Off \u00b7 for OpenAI-compatible services"
     }
 
@@ -313,7 +328,7 @@ class SettingsActivity : AppCompatActivity() {
             val next = when {
                 !micOk() -> "Next: allow the microphone."
                 !models.isReady(models.selected) -> "Next: download the speech model."
-                else -> "Next: turn on the Hearsay keyboard."
+                else -> "Next: turn on the floating mic."
             }
             statusBox.addView(ui.title("Finish setting up", 18f))
             statusBox.addView(ui.hint(next))
@@ -330,10 +345,11 @@ class SettingsActivity : AppCompatActivity() {
             addView(ui.column().apply {
                 setPadding(ui.dp(14), 0, 0, 0)
                 addView(ui.title("Ready to dictate", 18f))
-                addView(ui.hint("${models.selected.tier} voice \u00b7 $cleanup"))
+                addView(ui.hint("${models.selected.tier} voice \u00b7 $cleanup \u00b7 " +
+                    if (bubbleOk()) "floating mic" else "Hearsay keyboard"))
             })
         })
-        if (!currentOk()) statusBox.addView(ui.tonal("Switch to Hearsay keyboard") {
+        if (!bubbleOk() && !currentOk()) statusBox.addView(ui.tonal("Switch to Hearsay keyboard") {
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }.withTopMargin(14))
         val (box, _) = ui.field("", "Try it: tap here and hold the mic", multiline = 2)
@@ -461,6 +477,30 @@ class SettingsActivity : AppCompatActivity() {
         return details
     }
 
+    // ------------------------------------------------------------------ floating mic
+
+    private fun refreshBubble() {
+        val box = bubbleBox
+        box.removeAllViews()
+        if (!bubbleOk()) {
+            box.addView(ui.filled("Turn on floating mic") { openAccessibility(this) })
+            box.addView(ui.space(12))
+            box.addView(ui.hint("In the list, tap Hearsay floating mic and switch it on. Android will warn you about " +
+                "accessibility. Hearsay only reads the text box you're dictating into, and nothing leaves your phone."))
+            box.addView(ui.space(8))
+            box.addView(ui.hint("Switch greyed out? Open App info, tap \u22ee at the top, then Allow restricted settings."))
+            box.addView(ui.text("Open App info") {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            })
+            return
+        }
+        box.addView(switch("Show the floating mic", Prefs.bubbleOn(this)) { Prefs.setBubbleOn(this, it); refresh() })
+        box.addView(ui.row().apply {
+            addView(ui.text("Reset position") { Prefs.resetBubblePos(this@SettingsActivity); toast("Back to its spot above the keyboard") })
+            addView(ui.text("Accessibility settings") { openAccessibility(this@SettingsActivity) })
+        })
+    }
+
     // ------------------------------------------------------------------ storage
 
     private fun refreshStorage() {
@@ -550,6 +590,17 @@ class SettingsActivity : AppCompatActivity() {
     private fun <T : View> T.withTopMargin(dp: Int = 12): T = apply {
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             .apply { topMargin = ui.dp(dp) }
+    }
+
+    companion object {
+        /** Opens Accessibility settings, scrolled to Hearsay where the system supports it. */
+        fun openAccessibility(a: android.app.Activity) {
+            val name = android.content.ComponentName(a, dev.offlineflow.bubble.BubbleService::class.java).flattenToString()
+            a.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                putExtra(":settings:fragment_args_key", name)
+                putExtra(":settings:show_fragment_args", Bundle().apply { putString(":settings:fragment_args_key", name) })
+            })
+        }
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
