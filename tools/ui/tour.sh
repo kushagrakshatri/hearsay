@@ -64,7 +64,13 @@ adb shell settings put secure enabled_accessibility_services $P/$P.bubble.Bubble
 adb shell settings put secure accessibility_enabled 1; sleep 2
 { adb shell settings get secure enabled_accessibility_services; adb shell settings get secure default_input_method;
   adb shell dumpsys accessibility | grep -iE "hearsay|offlineflow|Bound services|Enabled services" | head -20; } > "$OUT/bubble-debug.txt" 2>&1
-start; shot bubble-settings
+# Force-stop unbinds accessibility services: start the app, then re-enable so it rebinds, then reopen.
+start
+adb shell settings put secure enabled_accessibility_services null; sleep 1
+adb shell settings put secure enabled_accessibility_services $P/$P.bubble.BubbleService; sleep 3
+adb shell input keyevent HOME; sleep 1; adb shell am start -n $P/.SettingsActivity >/dev/null; sleep 3
+adb shell dumpsys accessibility | grep -iE "Bound services" >> "$OUT/bubble-debug.txt" 2>&1
+shot bubble-settings
 $UI tapnoscroll "Try it: tap here and hold the mic"; shot bubble-over-keyboard 3
 adb logcat -d -s HearsayBubble:* AccessibilityManagerService:* >> "$OUT/bubble-debug.txt" 2>&1
 python3 tools/ui/ui.py tapat 0.89 0.60; shot bubble-tap 1.5
