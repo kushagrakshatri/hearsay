@@ -114,8 +114,11 @@ class BubbleService : AccessibilityService() {
             !(models.isReady(models.selected) || CloudClient.speechOn(this))) {
             hide(); return
         }
+        // Some keyboards report a window that starts below their toolbar; their content root doesn't.
         val r = Rect(); ime.getBoundsInScreen(r)
-        imeTop = r.top
+        var top = r.top
+        runCatching { ime.root?.let { n -> val c = Rect(); n.getBoundsInScreen(c); if (c.height() > 0) top = minOf(top, c.top) } }
+        imeTop = top
         show()
         warm(target)
     }
