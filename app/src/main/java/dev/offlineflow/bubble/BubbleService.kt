@@ -96,6 +96,8 @@ class BubbleService : AccessibilityService() {
     private var lastInserted: String? = null
     private var idleJob: Job? = null
     private var warmedFor: String? = null
+    private var lastEditable: AccessibilityNodeInfo? = null
+    private var lastWhy: String? = null
     private val watch = CorrectionWatch()
     private var watchedText: String? = null
 
@@ -116,6 +118,10 @@ class BubbleService : AccessibilityService() {
             main.removeCallbacks(learnRunnable)
             main.postDelayed(learnRunnable, LEARN_AFTER_MS)
             return
+        }
+        // Remember the last text box the user tapped or focused, for apps that don't report input focus.
+        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_FOCUSED || event?.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            runCatching { event.source }.getOrNull()?.let { if (looksEditable(it)) lastEditable = it }
         }
         // Coalesce bursts of focus / window events into one check.
         main.removeCallbacks(checkRunnable)
@@ -170,6 +176,17 @@ class BubbleService : AccessibilityService() {
         val target = runCatching { target() }.getOrNull()
         if (watch.watching != null && target != watch.watching) learnNow()
         val ime = runCatching { windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }.getOrNull()
+        val why = when {
+            ime == null -> null // no keyboard up: nothing to explain
+            !Prefs.bubbleOn(this) -> "the floating mic is switched off"
+            hearsayKeyboardActive() -> "the Hearsay keyboard is in use, so its own mic shows instead"
+            !hasMic() -> "the microphone isn't allowed yet"
+            !(models.isReady(models.selected) || CloudClient.speechOn(this)) -> "no voice model is downloaded"
+            target == null -> "the app didn't report a text box it lets Hearsay type into" +
+                (if (focusIsPassword()) " (it's a password box)" else "")
+            else -> ""
+        }
+        if (why != null) note(why)
         if (target == null || ime == null || !Prefs.bubbleOn(this) || hearsayKeyboardActive() || !hasMic() ||
             !(models.isReady(models.selected) || CloudClient.speechOn(this))) {
             hide(); return
@@ -196,11 +213,40 @@ class BubbleService : AccessibilityService() {
         return best
     }
 
-    /** The focused, editable, non-password field, or null. */
+    /**
+     * The focused, editable, non-password field, or null. Some apps (web views, Flutter, custom
+     * editors) don't report input focus to the system, so this also checks each window's own focus
+     * and the text box the user last tapped.
+     */
     private fun target(): AccessibilityNodeInfo? {
-        val n = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
-        if (!n.isEditable || n.isPassword) return null
-        return n
+        findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let { n -> if (looksEditable(n)) return n.takeUnless { it.isPassword } }
+        runCatching {
+            for (w in windows) {
+                if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
+                val f = w.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: continue
+                if (looksEditable(f)) return f.takeUnless { it.isPassword }
+            }
+        }
+        lastEditable?.let { n ->
+            if (runCatching { n.refresh() }.getOrDefault(false) && n.isFocused && n.isVisibleToUser && looksEditable(n)) return n.takeUnless { it.isPassword }
+        }
+        return null
+    }
+
+    private fun looksEditable(n: AccessibilityNodeInfo): Boolean =
+        n.isEditable || n.className?.toString()?.endsWith("EditText") == true ||
+            n.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT }
+
+    private fun focusIsPassword() = runCatching { findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.isPassword == true }.getOrDefault(false)
+
+    /** Saves why the mic did or didn't show in the app in front, for Settings to explain. */
+    private fun note(why: String) {
+        val pkg = runCatching { rootInActiveWindow?.packageName?.toString() }.getOrNull() ?: return
+        if (pkg == packageName && why.isEmpty()) return
+        val line = "$pkg|$why"
+        if (line == lastWhy) return
+        lastWhy = line
+        Prefs.setBubbleWhy(this, line)
     }
 
     private fun hearsayKeyboardActive() =

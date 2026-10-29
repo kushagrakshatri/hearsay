@@ -54,6 +54,9 @@ object Prefs {
     fun bubbleX(c: Context): Int = p(c).getInt("bubble_x", -1)
     fun bubbleDy(c: Context): Int = p(c).getInt("bubble_dy", Int.MIN_VALUE)
     fun setBubblePos(c: Context, x: Int, dy: Int) = p(c).edit().putInt("bubble_x", x).putInt("bubble_dy", dy).apply()
+    /** "package|reason" from the floating mic's last check (empty reason = it showed). */
+    fun bubbleWhy(c: Context): String = p(c).getString("bubble_why", null) ?: ""
+    fun setBubbleWhy(c: Context, v: String) = p(c).edit().putString("bubble_why", v).apply()
     fun resetBubblePos(c: Context) = p(c).edit().remove("bubble_x").remove("bubble_dy").apply()
 
     /** Learn names and terms from the user's fixes to dictated text. */

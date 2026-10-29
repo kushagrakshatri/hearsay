@@ -500,7 +500,7 @@ class SettingsActivity : AppCompatActivity() {
             box.addView(ui.filled("Turn on floating mic") { openAccessibility(this) })
             box.addView(ui.space(12))
             box.addView(ui.hint("In the list, tap Hearsay floating mic and switch it on. Android will warn you about " +
-                "accessibility. Hearsay only reads the text box you're dictating into, and nothing leaves your phone."))
+                "accessibility. Hearsay reads the text box you're dictating into (and names on screen, if you allow it), and nothing leaves your phone."))
             box.addView(ui.space(8))
             box.addView(ui.hint("Switch greyed out? Open App info, tap \u22ee at the top, then Allow restricted settings."))
             box.addView(ui.text("Open App info") {
@@ -513,6 +513,12 @@ class SettingsActivity : AppCompatActivity() {
             addView(ui.text("Reset position") { Prefs.resetBubblePos(this@SettingsActivity); toast("Back to its spot above the keyboard") })
             addView(ui.text("Accessibility settings") { openAccessibility(this@SettingsActivity) })
         })
+        // Why it did or didn't show in the last app where a keyboard was up.
+        Prefs.bubbleWhy(this).split('|', limit = 2).takeIf { it.size == 2 }?.let { (pkg, why) ->
+            val app = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+            box.addView(ui.space(8))
+            box.addView(ui.hint(if (why.isEmpty()) "Last seen: showing in $app." else "Last seen in $app: hidden because $why."))
+        }
     }
 
     // ------------------------------------------------------------------ storage
