@@ -195,8 +195,8 @@ class BubbleService : AccessibilityService() {
     private fun place() {
         val p = params ?: return
         p.x = Prefs.bubbleX(this).takeIf { it >= 0 } ?: dp(8)
-        val dy = Prefs.bubbleDy(this).takeIf { it != Int.MIN_VALUE } ?: -dp(SIZE_DP + 20)
-        p.y = (imeTop + dy).coerceIn(dp(48), (imeTop - dp(SIZE_DP + 12)).coerceAtLeast(dp(48)))
+        val dy = Prefs.bubbleDy(this).takeIf { it != Int.MIN_VALUE } ?: -dp(SIZE_DP + 20 + TOOLBAR_DP)
+        p.y = (imeTop + dy).coerceIn(dp(48), (imeTop - dp(SIZE_DP)).coerceAtLeast(dp(48)))
     }
 
     private fun hide() {
@@ -413,6 +413,8 @@ class BubbleService : AccessibilityService() {
         private const val TAG = "HearsayBubble"
         private const val TAP_MS = 350L
         private const val SIZE_DP = 60
+        // Gboard and others report their window top below the suggestion toolbar; clear it by default.
+        private const val TOOLBAR_DP = 48
 
         /** Whether the user switched the floating mic on in Accessibility settings. */
         fun enabled(c: Context): Boolean {
