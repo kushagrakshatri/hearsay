@@ -117,10 +117,23 @@ class BubbleService : AccessibilityService() {
         // Some keyboards report a window that starts below their toolbar; their content root doesn't.
         val r = Rect(); ime.getBoundsInScreen(r)
         var top = r.top
-        runCatching { ime.root?.let { n -> val c = Rect(); n.getBoundsInScreen(c); if (c.height() > 0) top = minOf(top, c.top) } }
+        runCatching { ime.root?.let { top = minOf(top, visibleTop(it, resources.displayMetrics.heightPixels)) } }
         imeTop = top
         show()
         warm(target)
+    }
+
+    /** Top of the keyboard's visible content (keys, toolbar), skipping full-height transparent containers. */
+    private fun visibleTop(root: AccessibilityNodeInfo, screenH: Int): Int {
+        var best = Int.MAX_VALUE
+        val c = Rect()
+        fun walk(n: AccessibilityNodeInfo, depth: Int) {
+            n.getBoundsInScreen(c)
+            if (n.isVisibleToUser && c.height() in 1 until screenH / 2 && c.top > screenH * 3 / 10) best = minOf(best, c.top)
+            if (depth < 5) for (i in 0 until minOf(n.childCount, 40)) n.getChild(i)?.let { walk(it, depth + 1) }
+        }
+        walk(root, 0)
+        return best
     }
 
     /** The focused, editable, non-password field, or null. */
