@@ -182,7 +182,7 @@ class OfflineFlowIME : InputMethodService() {
             })
             // Stage: what's happening right now. Words when idle or done, the live waveform while listening.
             addView(android.widget.FrameLayout(t).apply {
-                addView(status, android.widget.FrameLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                addView(status, android.widget.FrameLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
                 addView(wave, android.widget.FrameLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(44), Gravity.CENTER).apply {
                     marginStart = px(24); marginEnd = px(24)
