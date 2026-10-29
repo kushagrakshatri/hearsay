@@ -34,14 +34,14 @@ android {
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
-        applicationId = "dev.offlineflow"
+        // Store id. Debug builds get ".debug" so they install beside the release.
+        applicationId = "dev.hearsay"
         minSdk = 29
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.0-build.$buildNumber"
         // Opt-in cloud mode (bring your own key). Build with -PnoCloud to compile it out (F-Droid).
         buildConfigField("boolean", "CLOUD", if (project.hasProperty("noCloud")) "false" else "true")
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
             cmake { arguments += listOf("-DANDROID_STL=c++_shared") }
         }
@@ -57,12 +57,31 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // Release key: app/signing/hearsay-release.p12.enc is decrypted in CI with the
+        // HEARSAY_SIGNING_PASSWORD secret (to HEARSAY_KEYSTORE). Without it, release builds are unsigned.
+        val ks = System.getenv("HEARSAY_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+        if (ks != null) create("release") {
+            storeFile = ks
+            storeType = "pkcs12"
+            storePassword = System.getenv("HEARSAY_SIGNING_PASSWORD")
+            keyAlias = "hearsay"
+            keyPassword = System.getenv("HEARSAY_SIGNING_PASSWORD")
+        }
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            // x86_64 only so the CI emulator tour can run it.
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        }
         release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Phones only: every supported phone (Android 10+, enough RAM for the models) is 64-bit ARM.
+            ndk { abiFilters += listOf("arm64-v8a") }
         }
     }
 

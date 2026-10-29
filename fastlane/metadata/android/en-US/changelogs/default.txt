@@ -1,0 +1,1 @@
+First public release: on-device dictation with a floating mic, local LLM cleanup, per-app styles, voice edits, snippets, a dictionary that learns from your fixes, and names-on-screen spelling.

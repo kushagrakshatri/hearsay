@@ -31,18 +31,32 @@ jobs:
         with:
           name: hearsay-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - name: Build signed release APK + AAB (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          HEARSAY_SIGNING_PASSWORD: ${{ secrets.HEARSAY_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$HEARSAY_SIGNING_PASSWORD" ]; then echo "No signing secret; skipping release build"; exit 0; fi
+          export HEARSAY_KEYSTORE="$RUNNER_TEMP/hearsay-release.p12"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in app/signing/hearsay-release.p12.enc \
+            -out "$HEARSAY_KEYSTORE" -pass env:HEARSAY_SIGNING_PASSWORD
+          ./gradlew :app:assembleRelease :app:bundleRelease --stacktrace
+          rm -f "$HEARSAY_KEYSTORE"
+          cp app/build/outputs/apk/release/app-release.apk hearsay.apk
+          cp app/build/outputs/bundle/release/app-release.aab hearsay.aab
+          ls -l hearsay.apk hearsay.aab
       - name: Publish release (main only)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk hearsay-debug.apk
-          gh release create "build-${{ github.run_number }}" hearsay-debug.apk \
+          gh release create "build-${{ github.run_number }}" hearsay-debug.apk $(ls hearsay.apk hearsay.aab 2>/dev/null) \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "Hearsay build ${{ github.run_number }}" \
             --latest \
-            --notes "Debug build of ${{ github.sha }}. Download hearsay-debug.apk below and install it on your phone. Always-newest link: https://github.com/${{ github.repository }}/releases/latest/download/hearsay-debug.apk"
+            --notes "Build of ${{ github.sha }}. hearsay.apk is the signed release for phones; hearsay-debug.apk is the debug build (installs beside it as Hearsay Debug); hearsay.aab is for Google Play. Always-newest link: https://github.com/${{ github.repository }}/releases/latest/download/hearsay.apk"
 
   # Screenshot tour on an emulator: every setup step, settings, keyboard states, light and dark.
   screens:

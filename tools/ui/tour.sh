@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Screenshot tour of every screen and keyboard state, light and dark. Runs on the CI emulator.
 set -u
-P=dev.offlineflow
+P=dev.hearsay.debug
+N=dev.offlineflow
 UI="python3 tools/ui/ui.py"
 OUT=shots; mkdir -p $OUT
 n=0
 # Emulator system apps (Pixel Launcher) sometimes ANR on CI; dismiss the dialog before any shot.
 unstick() { python3 -c 'import sys; sys.path.insert(0, "tools/ui"); import ui; ui.unstick()'; }
 shot() { sleep ${2:-1.5}; unstick; n=$((n+1)); adb exec-out screencap -p > "$OUT/$(printf %02d $n)-$1.png"; echo "shot $1"; }
-start() { adb shell am force-stop $P; adb shell am start -n $P/.SettingsActivity >/dev/null; sleep 3; }
+start() { adb shell am force-stop $P; adb shell am start -n $P/$N.SettingsActivity >/dev/null; sleep 3; }
 scroll_shots() { for i in 1 2 3; do $UI up; shot "$1-scroll$i" 0.5; done; }
 
 adb install -r "$1" || exit 1
@@ -20,7 +21,7 @@ adb shell settings put global hide_error_dialogs 1
 for mode in light dark; do
   adb shell cmd uimode night $([ $mode = dark ] && echo yes || echo no); sleep 2
   adb shell pm clear $P >/dev/null
-  adb shell ime disable $P/.ime.OfflineFlowIME >/dev/null 2>&1
+  adb shell ime disable $P/$N.ime.OfflineFlowIME >/dev/null 2>&1
   # Guided setup, step by step.
   start; shot $mode-setup-welcome
   $UI tapnoscroll "Get started"; shot $mode-setup-mic
@@ -42,7 +43,7 @@ done
 # Make it usable: mic, keyboard, the light voice model, cleanup off. Then the keyboard states.
 adb shell cmd uimode night no; sleep 1
 adb shell pm grant $P android.permission.RECORD_AUDIO
-adb shell ime enable $P/.ime.OfflineFlowIME
+adb shell ime enable $P/$N.ime.OfflineFlowIME
 start
 $UI tap "Cleanup"; $UI tapnoscroll "Off"; adb shell input keyevent BACK; sleep 1
 $UI tap "Voice"; $UI tapnoscroll "Light"; $UI tapnoscroll "Download Light"; sleep 3
@@ -51,24 +52,24 @@ import sys; sys.path.insert(0, "tools/ui"); import ui; sys.exit(1 if ui.find("Do
 PY
 done
 adb shell input keyevent BACK; sleep 1
-start; adb shell ime set $P/.ime.OfflineFlowIME; sleep 2; shot settings-ready
+start; adb shell ime set $P/$N.ime.OfflineFlowIME; sleep 2; shot settings-ready
 $UI tapnoscroll "Try it"; shot keyboard-idle 2.5
 python3 tools/ui/ui.py holdat 0.5 0.855 4000; shot keyboard-listening 1.5; sleep 4; shot keyboard-after 2
 python3 tools/ui/ui.py tapat 0.12 0.70; shot keyboard-style-tap 1
-adb shell cmd uimode night yes; sleep 2; start; adb shell ime set $P/.ime.OfflineFlowIME; sleep 1
+adb shell cmd uimode night yes; sleep 2; start; adb shell ime set $P/$N.ime.OfflineFlowIME; sleep 1
 $UI tapnoscroll "Try it"; shot dark-keyboard-idle 2.5
 # Floating mic over the system keyboard.
 adb shell cmd uimode night no; sleep 1
 adb shell ime reset; sleep 1
-adb shell settings put secure enabled_accessibility_services $P/$P.bubble.BubbleService
+adb shell settings put secure enabled_accessibility_services $P/$N.bubble.BubbleService
 adb shell settings put secure accessibility_enabled 1; sleep 2
 { adb shell settings get secure enabled_accessibility_services; adb shell settings get secure default_input_method;
   adb shell dumpsys accessibility | grep -iE "hearsay|offlineflow|Bound services|Enabled services" | head -20; } > "$OUT/bubble-debug.txt" 2>&1
 # Force-stop unbinds accessibility services: start the app, then re-enable so it rebinds, then reopen.
 start
 adb shell settings put secure enabled_accessibility_services null; sleep 1
-adb shell settings put secure enabled_accessibility_services $P/$P.bubble.BubbleService; sleep 3
-adb shell input keyevent HOME; sleep 1; adb shell am start -n $P/.SettingsActivity >/dev/null; sleep 3
+adb shell settings put secure enabled_accessibility_services $P/$N.bubble.BubbleService; sleep 3
+adb shell input keyevent HOME; sleep 1; adb shell am start -n $P/$N.SettingsActivity >/dev/null; sleep 3
 adb shell dumpsys accessibility | grep -iE "Bound services" >> "$OUT/bubble-debug.txt" 2>&1
 shot bubble-settings
 $UI tapnoscroll "Try it: tap here and hold the mic"; shot bubble-over-keyboard 3

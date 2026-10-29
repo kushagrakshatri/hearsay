@@ -97,6 +97,14 @@ class BubbleService : AccessibilityService() {
     private var idleJob: Job? = null
     private var warmedFor: String? = null
     private var lastEditable: AccessibilityNodeInfo? = null
+    // Undo to what you actually said: the raw words for the last cleaned insert.
+    private var lastRaw: String? = null
+    private var undoable = false
+    // A voice-activity gate made ahead of time, so pressing the mic doesn't stall on loading it.
+    @Volatile private var spareGate: SpeechGate? = null
+    private var pendingX = 0; private var pendingY = 0
+    private var framePosted = false
+    private var snap: android.animation.ValueAnimator? = null
     private var lastWhy: String? = null
     private val watch = CorrectionWatch()
     private var watchedText: String? = null
@@ -274,6 +282,7 @@ class BubbleService : AccessibilityService() {
                 textSize = 13f; setTextColor(c(M.attr.colorOnSurface)); maxLines = 2; ellipsize = TextUtils.TruncateAt.END
                 maxWidth = dp(220); visibility = View.GONE; elevation = dp(4).toFloat()
                 setPadding(dp(14), dp(8), dp(14), dp(8))
+                setOnClickListener { if (undoable) undoToRaw() }
                 background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(c(M.attr.colorSurfaceContainerHighest)) }
             }
             root = LinearLayout(t).apply {
@@ -295,6 +304,12 @@ class BubbleService : AccessibilityService() {
             place(); runCatching { wm.updateViewLayout(root, params) }
         }
         root?.visibility = View.VISIBLE
+        prepGate()
+    }
+
+    private fun prepGate() {
+        if (spareGate != null) return
+        scope.launch(Dispatchers.Default) { if (spareGate == null) spareGate = SpeechGate.create(assets) }
     }
 
     /** x from the right edge; y relative to the keyboard's top so it rides above any keyboard height. */
@@ -319,12 +334,37 @@ class BubbleService : AccessibilityService() {
 
     private fun say(msg: String?, holdMs: Long = 2500) {
         if (root == null) return
+        undoable = false
         main.removeCallbacks(clearPill)
         if (msg == null) { pill.visibility = View.GONE; return }
         pill.text = msg; pill.visibility = View.VISIBLE
         if (holdMs > 0) main.postDelayed(clearPill, holdMs)
     }
-    private val clearPill = Runnable { if (root != null) pill.visibility = View.GONE }
+    private val clearPill = Runnable { undoable = false; if (root != null) pill.visibility = View.GONE }
+
+    /** Swaps the last cleaned insert for the words exactly as heard (the keyboard's undo key, for the bubble). */
+    private fun undoToRaw() {
+        undoable = false
+        val ins = lastInserted ?: return
+        val raw = lastRaw ?: return
+        val node = target() ?: run { say("Tap the text box first"); return }
+        node.refresh()
+        val (text, sel) = current(node)
+        if (!text.substring(0, sel.first).endsWith(ins)) { say("The text changed, so I left it alone"); return }
+        val start = sel.first - ins.length
+        val piece = if (ins.startsWith(" ")) " $raw" else raw
+        val ok = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text.substring(0, start) + piece + text.substring(sel.last))
+        })
+        if (!ok) { say("This app won't let me swap it"); return }
+        val cursor = start + piece.length
+        node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, Bundle().apply {
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor)
+        })
+        lastInserted = piece; lastRaw = null; watch.clear()
+        say("Back to what you said")
+    }
 
     private fun warm(node: AccessibilityNodeInfo) {
         val pkg = node.packageName?.toString()
@@ -349,6 +389,7 @@ class BubbleService : AccessibilityService() {
                 if (busy) return true
                 if (handsFree) { finish(); return true }
                 downAt = SystemClock.elapsedRealtime(); downX = e.rawX; downY = e.rawY
+                snap?.cancel(); snap = null
                 startX = params?.x ?: 0; startY = params?.y ?: 0
                 dragging = false
                 startListening()
@@ -356,17 +397,26 @@ class BubbleService : AccessibilityService() {
             MotionEvent.ACTION_MOVE -> {
                 if (!dragging && !handsFree && (abs(e.rawX - downX) > slop || abs(e.rawY - downY) > slop)) {
                     dragging = true; cancelListening()
+                    mic.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start()
                 }
-                if (dragging) params?.let { p ->
-                    p.x = (startX - (e.rawX - downX)).toInt().coerceAtLeast(0)
-                    p.y = (startY + (e.rawY - downY)).toInt().coerceAtLeast(dp(48))
-                    runCatching { wm.updateViewLayout(root, p) }
+                if (dragging) {
+                    // One window move per frame, however many touch events arrive.
+                    pendingX = (startX - (e.rawX - downX)).toInt().coerceAtLeast(0)
+                    pendingY = (startY + (e.rawY - downY)).toInt().coerceAtLeast(dp(48))
+                    if (!framePosted) {
+                        framePosted = true
+                        android.view.Choreographer.getInstance().postFrameCallback {
+                            framePosted = false
+                            params?.let { p -> p.x = pendingX; p.y = pendingY; runCatching { wm.updateViewLayout(root, p) } }
+                        }
+                    }
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (dragging) {
-                    dragging = false
-                    params?.let { Prefs.setBubblePos(this, it.x, it.y - imeTop) }
+                    mic.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                    params?.let { p -> p.x = pendingX; p.y = pendingY }
+                    snapToEdge()
                     return true
                 }
                 if (recorder == null || handsFree) return true
@@ -384,13 +434,38 @@ class BubbleService : AccessibilityService() {
         learnNow()
         mic.state = MicButton.State.LISTENING
         buzz()
-        recorder = Recorder(SpeechGate.create(assets), endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
+        val gate = spareGate ?: SpeechGate.create(assets)
+        spareGate = null; prepGate()
+        recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             mic.post { if (handsFree) finish() }
         }, onLevel = { level -> mic.post { mic.push(level) } }).also { it.start() }
     }
 
+    /** Glides to the nearer side of the screen after a drag, then saves the spot. */
+    private fun snapToEdge() {
+        val p = params ?: run { dragging = false; return }
+        val w = root?.width ?: 0
+        val screenW = resources.displayMetrics.widthPixels
+        val margin = dp(8)
+        val target = if (p.x + w / 2 > screenW / 2) (screenW - w - margin).coerceAtLeast(margin) else margin
+        snap = android.animation.ValueAnimator.ofInt(p.x, target).apply {
+            duration = 220
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { a -> p.x = a.animatedValue as Int; runCatching { wm.updateViewLayout(root, p) } }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    dragging = false; snap = null
+                    Prefs.setBubblePos(this@BubbleService, p.x, p.y - imeTop)
+                }
+            })
+            start()
+        }
+    }
+
     private fun cancelListening() {
-        recorder?.stop(); recorder = null; handsFree = false
+        // Stopping waits on the mic thread; do it off the main thread so the drag stays smooth.
+        recorder?.let { r -> scope.launch(Dispatchers.Default) { r.stop() } }
+        recorder = null; handsFree = false
         mic.state = MicButton.State.IDLE; say(null)
     }
 
@@ -438,7 +513,13 @@ class BubbleService : AccessibilityService() {
                 val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)
                 put(node, text, sel, out, spaced = true)
                 val ms = SystemClock.elapsedRealtime() - t0
-                say("Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f))
+                val done = "Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f)
+                val rawText = raw.trim()
+                if (style != Style.VERBATIM && out.trim() != rawText && rawText.isNotEmpty()) {
+                    lastRaw = rawText
+                    say("$done \u00b7 tap for original", 5000)
+                    undoable = true
+                } else { lastRaw = null; say(done) }
             } finally {
                 busy = false
                 mic.state = MicButton.State.IDLE
@@ -514,6 +595,8 @@ class BubbleService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        snap?.cancel()
+        spareGate?.close(); spareGate = null
         recorder?.stop(); recorder = null
         root?.let { runCatching { wm.removeView(it) } }; root = null
         scope.cancel()

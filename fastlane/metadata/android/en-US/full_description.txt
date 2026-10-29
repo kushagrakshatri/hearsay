@@ -1,0 +1,25 @@
+Hearsay turns speech into clean, punctuated text in any app, and it all runs on your phone.
+
+Hold the floating mic above your keyboard and talk naturally. Hearsay drops the ums and false starts, applies "no wait, make it Thursday" corrections, and types what you meant where your cursor is.
+
+<b>Private and offline</b>
+• Speech recognition (Parakeet or Whisper) and cleanup (a small local LLM) both run on-device
+• No account, no tracking, no audio saved or sent anywhere
+• Works on a plane and in a basement, with no network lag
+
+<b>It learns you</b>
+• Fix a misheard name once and Hearsay remembers it
+• Spells names it sees on screen, like chat contacts or people in an email thread, the same way (on the phone, nothing saved)
+• Personal dictionary and snippets ("my email" → your address)
+
+<b>Writes the way you would</b>
+• Casual in chats, polished in email, verbatim for code and search, picked per app
+• Edit by voice: select text and say "make this shorter" or "turn it into bullets"
+• "Scratch that" removes what you just said, and one tap brings back your exact words
+
+<b>Works with your keyboard</b>
+The floating mic sits above Gboard, SwiftKey or any keyboard. There's also a dedicated Hearsay voice keyboard.
+
+Hearsay uses Android's accessibility service only to show the floating mic, insert your words into the text box you're using, and (if you allow it) read names on screen for spelling. It never reads password fields.
+
+Free and open source (Apache-2.0).
