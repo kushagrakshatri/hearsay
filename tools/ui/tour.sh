@@ -62,8 +62,11 @@ adb shell cmd uimode night no; sleep 1
 adb shell ime reset; sleep 1
 adb shell settings put secure enabled_accessibility_services $P/$P.bubble.BubbleService
 adb shell settings put secure accessibility_enabled 1; sleep 2
+{ adb shell settings get secure enabled_accessibility_services; adb shell settings get secure default_input_method;
+  adb shell dumpsys accessibility | grep -iE "hearsay|offlineflow|Bound services|Enabled services" | head -20; } > "$OUT/bubble-debug.txt" 2>&1
 start; shot bubble-settings
-$UI tapnoscroll "Try it"; shot bubble-over-keyboard 3
+$UI tapnoscroll "Try it: tap here and hold the mic"; shot bubble-over-keyboard 3
+adb logcat -d -s HearsayBubble:* AccessibilityManagerService:* >> "$OUT/bubble-debug.txt" 2>&1
 python3 tools/ui/ui.py tapat 0.89 0.60; shot bubble-tap 1.5
 adb logcat -d -b crash > "$OUT/crash-log.txt" 2>&1 || true
 echo "done: $n shots"
