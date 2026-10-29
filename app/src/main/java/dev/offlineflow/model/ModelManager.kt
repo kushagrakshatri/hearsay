@@ -77,6 +77,23 @@ class ModelManager(context: Context) {
 
         val approxMb: Int get() = (assets.sumOf { it.bytes } / 1_000_000).toInt()
         val shortName: String get() = label.substringBefore(" (")
+
+        /** What people see: a plain tier name, a one-line promise, and the size. Specs stay in [label]. */
+        val tier: String get() = when (this) {
+            PARAKEET_V2 -> "Accurate"
+            WHISPER_BASE_EN -> "Light"
+            QWEN35_0_8B -> "Fast"
+            QWEN35_2B -> "Balanced"
+            GEMMA4_E2B -> "Best"
+        }
+        val blurb: String get() = when (this) {
+            PARAKEET_V2 -> "Catches more words, names and accents. Best on newer phones."
+            WHISPER_BASE_EN -> "Small and quick. Works well on any phone."
+            QWEN35_0_8B -> "Quick touch-ups. Easy on battery and space."
+            QWEN35_2B -> "Smarter rewrites that still feel instant."
+            GEMMA4_E2B -> "The most natural writing. Slower and needs more space."
+        }
+        val size: String get() = if (approxMb >= 1000) "%.1f GB".format(approxMb / 1000f) else "$approxMb MB"
     }
 
     /** Parakeet peaks around 1.1 GB of RAM; give it to phones with ~6 GB or more. */

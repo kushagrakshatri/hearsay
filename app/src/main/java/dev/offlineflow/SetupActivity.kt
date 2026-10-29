@@ -191,7 +191,7 @@ class SetupActivity : AppCompatActivity() {
         val bar = LinearProgressIndicator(this).apply { max = 100; trackCornerRadius = ui.dp(4) }
         labels[m] = label; bars[m] = bar
         body.addView(ui.card(
-            ui.hint(if (m.kind == ModelManager.Kind.SPEECH) "Speech recognition" else "Cleanup"),
+            ui.hint(if (m.kind == ModelManager.Kind.SPEECH) "Voice \u00b7 turns speech into words" else "Cleanup \u00b7 drops the ums, fixes punctuation"),
             label, ui.space(10), bar,
         ))
     }
@@ -199,7 +199,7 @@ class SetupActivity : AppCompatActivity() {
     private fun refreshModels() {
         for ((m, label) in labels) {
             val ready = models.isReady(m)
-            label.text = "${m.shortName} · ${if (ready) "ready" else "~${m.approxMb} MB"}"
+            label.text = "${m.tier} \u00b7 ${if (ready) "ready" else m.size}"
             // Bars appear only while downloading; an empty track reads as a full bar.
             bars[m]?.visibility = if (downloading && !ready) View.VISIBLE else View.GONE
         }

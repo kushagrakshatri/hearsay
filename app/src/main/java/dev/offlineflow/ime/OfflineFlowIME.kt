@@ -97,9 +97,12 @@ class OfflineFlowIME : InputMethodService() {
         val keyBg = c(M.attr.colorSurfaceContainerHighest)
 
         status = TextView(t).apply {
-            textSize = 13f; setTextColor(c(M.attr.colorOnSurfaceVariant)); maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+            textSize = 14f; setTextColor(c(M.attr.colorOnSurfaceVariant)); maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.CENTER
+            compoundDrawablePadding = px(6)
+            setPadding(px(16), 0, px(16), 0)
         }
+        statusIconTint = c(M.attr.colorOnSurfaceVariant)
         styleChip = TextView(t).apply {
             textSize = 13f; setTextColor(c(M.attr.colorOnSecondaryContainer)); gravity = Gravity.CENTER
             setPadding(px(14), px(6), px(14), px(6))
@@ -109,7 +112,11 @@ class OfflineFlowIME : InputMethodService() {
                 style = style.next()
                 editorPkg?.let { Style.save(this@OfflineFlowIME, it, style) }
                 text = style.label
-                status.text = "${style.label} in this app" + if (style == Style.VERBATIM) " · no AI rewrite" else ""
+                say(when (style) {
+                    Style.CASUAL -> "Casual here \u00b7 relaxed, like you talk"
+                    Style.POLISHED -> "Polished here \u00b7 clean and complete"
+                    Style.VERBATIM -> "Verbatim here \u00b7 exactly what you say"
+                })
                 it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 warmStyle()
             }
@@ -141,7 +148,18 @@ class OfflineFlowIME : InputMethodService() {
         val enterKey = key(R.drawable.ic_return, "Enter").apply { setOnClickListener { tap(it); enter() } }
         updateUndo()
 
-        wave = LevelView(t).apply { visibility = View.INVISIBLE; color = c(M.attr.colorError) }
+        wave = LevelView(t).apply { visibility = View.INVISIBLE; color = c(M.attr.colorPrimary) }
+        val gear = ImageView(t).apply {
+            setImageResource(R.drawable.ic_settings); imageTintList = ColorStateList.valueOf(c(M.attr.colorOnSurfaceVariant))
+            scaleType = ImageView.ScaleType.CENTER; contentDescription = "Hearsay settings"
+            background = RippleDrawable(ColorStateList.valueOf(ColorUtils.setAlphaComponent(onSurface, 40)), null,
+                GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) })
+            setOnClickListener {
+                tap(it)
+                startActivity(android.content.Intent(this@OfflineFlowIME, dev.offlineflow.SettingsActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
         val side = { g: Int -> LinearLayout(t).apply { orientation = LinearLayout.HORIZONTAL; gravity = g or Gravity.CENTER_VERTICAL } }
         val left = side(Gravity.START).apply { addView(switchKey); addView(undoKey) }
         val right = side(Gravity.END).apply { addView(backKey); addView(enterKey) }
@@ -155,13 +173,21 @@ class OfflineFlowIME : InputMethodService() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(c(M.attr.colorSurfaceContainer))
             setPadding(px(12), px(10), px(12), px(12))
+            // Top: style on the left, settings on the right.
             addView(LinearLayout(t).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-                setPadding(px(4), 0, 0, 0)
-                addView(status, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(styleChip)
+                addView(View(t), LinearLayout.LayoutParams(0, 1, 1f))
+                addView(gear, LinearLayout.LayoutParams(px(40), px(40)))
             })
-            addView(wave, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(24)).apply { topMargin = px(6) })
+            // Stage: what's happening right now. Words when idle or done, the live waveform while listening.
+            addView(android.widget.FrameLayout(t).apply {
+                addView(status, android.widget.FrameLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+                addView(wave, android.widget.FrameLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(44), Gravity.CENTER).apply {
+                    marginStart = px(24); marginEnd = px(24)
+                })
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(60)))
             addView(main)
             addView(micHint)
             setMic(MicButton.State.IDLE)
@@ -175,6 +201,21 @@ class OfflineFlowIME : InputMethodService() {
             }
         }
     }
+
+    private var statusIconTint = Color.GRAY
+
+    /** Puts [text] on the stage, with an optional small icon before it. */
+    private fun say(text: String, icon: Int? = null) {
+        if (!::status.isInitialized) return
+        status.text = text
+        val d = icon?.let { resources.getDrawable(it, null)?.mutate() }?.apply {
+            val sz = (16 * resources.displayMetrics.density).toInt()
+            setBounds(0, 0, sz, sz); setTint(statusIconTint)
+        }
+        status.setCompoundDrawablesRelative(d, null, null, null)
+    }
+
+    private fun secs(ms: Long) = if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f)
 
     /** Sets the mic's look and the hint under it. */
     private fun setMic(state: MicButton.State) {
@@ -238,12 +279,13 @@ class OfflineFlowIME : InputMethodService() {
         editorPkg = info?.packageName
         style = Style.forEditor(this, info)
         styleChip.text = style.label
-        status.text = when {
-            !hasMicPermission() -> "Open the Hearsay app to grant microphone access"
-            !speechAvailable() -> "Open the Hearsay app to download the speech model"
-            CloudText.usingPlan(this) -> "Ready · cleanup via ChatGPT"
-            CloudClient.speechOn(this) || CloudText.on(this) -> "Ready · own-key cloud on"
-            else -> "Ready · fully on-device"
+        when {
+            !hasMicPermission() -> say("Open Hearsay to allow the microphone")
+            !speechAvailable() -> say("Open Hearsay to download a voice model")
+            CloudText.usingPlan(this) -> say("Voice on this phone \u00b7 cleanup by ChatGPT", R.drawable.ic_sparkle)
+            CloudClient.speechOn(this) -> say("Cloud speech is on")
+            CloudText.on(this) -> say("Voice on this phone \u00b7 cloud cleanup")
+            else -> say("Private \u00b7 everything stays on this phone", R.drawable.ic_lock)
         }
         warmUp()
     }
@@ -253,7 +295,7 @@ class OfflineFlowIME : InputMethodService() {
         recorder?.stop(); recorder = null
         handsFree = false
         setMic(MicButton.State.IDLE)
-        if (::wave.isInitialized) { wave.visibility = View.INVISIBLE; wave.clear() }
+        if (::wave.isInitialized) { wave.visibility = View.INVISIBLE; wave.clear(); status.visibility = View.VISIBLE }
         // Keyboard hidden: free the cleanup LLM after a minute and the speech model after five,
         // so a hidden keyboard doesn't hold gigabytes of RAM. Reopening cancels this.
         idleJob?.cancel()
@@ -360,7 +402,7 @@ class OfflineFlowIME : InputMethodService() {
 
     private fun startDictation() {
         if (!hasMicPermission() || !speechAvailable()) return
-        status.text = "Listening…"
+        status.visibility = View.INVISIBLE
         setMic(MicButton.State.LISTENING)
         val gate = SpeechGate.create(assets)
         buzz()
@@ -378,17 +420,17 @@ class OfflineFlowIME : InputMethodService() {
         setMic(MicButton.State.IDLE)
         buzz()
         wave.visibility = View.INVISIBLE
+        status.visibility = View.VISIBLE
         val audio = rec.stop()
         // Captured now: the selection decides whether this is a command or a replacement.
         val selected = currentInputConnection?.getSelectedText(0)?.toString()?.takeIf { it.isNotEmpty() }
-        if (!rec.heardSpeech) { status.text = "Didn't hear any speech"; return }
-        if (audio.size < Recorder.SAMPLE_RATE / 4) { status.text = "Too short"; return }
+        if (!rec.heardSpeech) { say("Didn't catch that. Try again a little closer."); return }
+        if (audio.size < Recorder.SAMPLE_RATE / 4) { say("Too quick. Hold the mic while you talk."); return }
         val cloud = CloudClient.from(this)?.takeIf { CloudClient.speechOn(this) }
-        status.text = when {
-            cloud != null -> "Transcribing (cloud)…"
-            engine == null || engineModel != models.selected -> "Loading model, then transcribing…"
-            else -> "Transcribing…"
-        }
+        say(when {
+            engine == null || engineModel != models.selected -> "Warming up\u2026"
+            else -> "Writing it down\u2026"
+        })
         val t0 = SystemClock.elapsedRealtime()
         val cloudAsrModel = Prefs.cloudSpeechModel(this)
         setMic(MicButton.State.BUSY)
@@ -409,7 +451,7 @@ class OfflineFlowIME : InputMethodService() {
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "transcription failed", t)
-                status.text = "Transcription failed: ${t.message ?: t.javaClass.simpleName}"
+                say("Couldn't write that down. ${t.message ?: t.javaClass.simpleName}")
                 return@launch
             }
             val asrMs = SystemClock.elapsedRealtime() - t0
@@ -426,12 +468,12 @@ class OfflineFlowIME : InputMethodService() {
                 val text = withLeadingSpace(snippet)
                 currentInputConnection?.commitText(text, 1)
                 lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
-                status.text = "Snippet inserted · ${asrMs} ms"
+                say("Snippet added", R.drawable.ic_bolt)
                 return@launch
             }
             val s = style
             val useLlm = s != Style.VERBATIM && cleanupAvailable() && raw.isNotBlank()
-            if (useLlm) status.text = "Cleaning up…"
+            if (useLlm) say("Polishing\u2026", R.drawable.ic_sparkle)
             val t1 = SystemClock.elapsedRealtime()
             val dictionary = Dictionary.load(this@OfflineFlowIME)
             val heard = dictionary.apply(raw)
@@ -467,10 +509,10 @@ class OfflineFlowIME : InputMethodService() {
                 currentInputConnection?.commitText(text, 1)
                 lastRaw = withLeadingSpace(raw.trim()); lastInserted = text
             }
-            status.text = if (cleaned.isEmpty()) "Heard nothing · ${ms} ms"
-                else if (useLlm) "Done in ${ms} ms · speech ${asrMs} + cleanup ${cleanMs} · ${audio.size / Recorder.SAMPLE_RATE}s audio"
-                else "Done in ${ms} ms · ${audio.size / Recorder.SAMPLE_RATE}s audio"
-            cloudNote?.let { status.text = "${status.text} · cloud skipped: ${it.take(60)}"; cloudNote = null }
+            if (cleaned.isEmpty()) say("Didn't catch any words")
+            else if (cloudNote != null) say("Done \u00b7 ${secs(ms)} \u00b7 ChatGPT unavailable, cleaned on this phone", R.drawable.ic_check)
+            else say("Done \u00b7 ${secs(ms)}" + if (useLlm || s == Style.VERBATIM) "" else " \u00b7 basic cleanup", R.drawable.ic_check)
+            cloudNote = null
             Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
           } finally {
             if (recorder == null) setMic(MicButton.State.IDLE)
@@ -482,11 +524,11 @@ class OfflineFlowIME : InputMethodService() {
     /** Applies a spoken edit [utterance] to [target] (the selection, or the last insert) with the local LLM. */
     private suspend fun runCommand(target: String, utterance: String, onSelection: Boolean, t0: Long) {
         val instruction = Commands.instruction(utterance)
-        if (target.length > MAX_EDIT_CHARS) { status.text = "Too much text for a command (about 400 words max)"; return }
+        if (target.length > MAX_EDIT_CHARS) { say("That's a lot of text. Edit up to about 400 words at a time."); return }
         if (!cleanupAvailable()) {
-            status.text = "Commands need a cleanup model · open Hearsay settings"; return
+            say("Voice edits need cleanup on. Turn it on in Hearsay."); return
         }
-        status.text = "Editing: $instruction…"
+        say("${instruction.replaceFirstChar { it.uppercase() }}\u2026", R.drawable.ic_sparkle)
         suspend fun local() = withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
         val edited = try {
             if (CloudText.on(this)) try {
@@ -501,20 +543,20 @@ class OfflineFlowIME : InputMethodService() {
         } catch (t: Throwable) {
             Log.e(TAG, "command failed", t); null
         }
-        if (edited == null) { status.text = "Couldn't apply \"$instruction\""; return }
+        if (edited == null) { say("Couldn't do \u201c$instruction\u201d. Try saying it another way."); return }
         val ic = currentInputConnection ?: return
         if (onSelection) {
             ic.commitText(edited, 1) // replaces the selection
             lastRaw = target; lastInserted = edited
         } else {
             val ins = lastInserted ?: return
-            if (ic.getTextBeforeCursor(ins.length, 0)?.toString() != ins) { status.text = "Text changed, command skipped"; return }
+            if (ic.getTextBeforeCursor(ins.length, 0)?.toString() != ins) { say("The text changed, so I left it alone"); return }
             val text = (if (ins.startsWith(" ")) " " else "") + edited
             ic.deleteSurroundingText(ins.length, 0)
             ic.commitText(text, 1)
             lastRaw = ins; lastInserted = text
         }
-        status.text = "$instruction · ${SystemClock.elapsedRealtime() - t0} ms · Raw undoes it"
+        say("Done \u00b7 undo brings back the original", R.drawable.ic_check)
     }
 
     private fun lastInsertAtCursor(): Boolean {
@@ -527,9 +569,9 @@ class OfflineFlowIME : InputMethodService() {
         if (ins != null && lastInsertAtCursor()) {
             currentInputConnection?.deleteSurroundingText(ins.length, 0)
             lastInserted = null; lastRaw = null
-            status.text = "Removed the last dictation"
+            say("Removed what you just said")
             updateUndo()
-        } else status.text = "Nothing to scratch"
+        } else say("Nothing to remove")
     }
 
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {

@@ -117,6 +117,53 @@ class Ui(val ctx: Context) {
         return layout to edit
     }
 
+    /** A settings row: tinted icon in a soft circle, title, live summary, chevron. */
+    fun listRow(@DrawableRes iconRes: Int, title: String, summary: TextView, onClick: () -> Unit) = row().apply {
+        minimumHeight = dp(72); setPadding(dp(20), dp(12), dp(16), dp(12))
+        isClickable = true; isFocusable = true
+        val tv = android.util.TypedValue()
+        ctx.theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+        setBackgroundResource(tv.resourceId)
+        setOnClickListener { onClick() }
+        addView(android.widget.FrameLayout(ctx).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(color(M.attr.colorSecondaryContainer))
+            }
+            addView(icon(iconRes, color(M.attr.colorOnSecondaryContainer), 20),
+                android.widget.FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER))
+        }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        addView(column().apply {
+            setPadding(dp(16), 0, dp(8), 0)
+            addView(body(title, 16f).apply { setTextColor(onSurface) })
+            addView(summary.apply { textSize = 13f; setTextColor(onSurfaceVariant); maxLines = 2 })
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(icon(R.drawable.ic_chevron, onSurfaceVariant, 18))
+    }
+
+    /** A card holding rows with hairlines between them. */
+    fun group(vararg rows: View) = MaterialCardView(ctx).apply {
+        radius = dp(24).toFloat(); cardElevation = 0f; strokeWidth = 0
+        setCardBackgroundColor(surfaceContainer)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { bottomMargin = dp(12) }
+        addView(column().apply {
+            rows.forEachIndexed { i, r ->
+                if (i > 0) addView(View(ctx).apply { setBackgroundColor(color(M.attr.colorOutlineVariant)) },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1).apply { marginStart = dp(76) })
+                addView(r)
+            }
+        })
+    }
+
+    /** A small filled pill, e.g. "Recommended". */
+    fun badge(t: String) = TextView(ctx).apply {
+        text = t; textSize = 11f; setTextColor(color(M.attr.colorOnPrimaryContainer))
+        setPadding(dp(8), dp(2), dp(8), dp(2))
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(10).toFloat(); setColor(color(M.attr.colorPrimaryContainer))
+        }
+    }
+
     fun space(h: Int) = View(ctx).apply { layoutParams = LinearLayout.LayoutParams(1, dp(h)) }
 
     companion object {

@@ -73,4 +73,9 @@ if __name__ == "__main__":
     if cmd == "tap": sys.exit(0 if tap(rest[0]) else 1)
     if cmd == "tapnoscroll": sys.exit(0 if tap(rest[0], scroll=False) else 1)
     if cmd == "hold": hold(rest[0], int(rest[1]))
+    # The keyboard window isn't in uiautomator dumps, so keyboard taps use screen fractions.
+    if cmd in ("tapat", "holdat"):
+        w, h = size(); x, y = int(float(rest[0]) * w), int(float(rest[1]) * h)
+        ms = rest[2] if cmd == "holdat" else "60"
+        subprocess.Popen(["adb", "shell", "input", "swipe", str(x), str(y), str(x), str(y), ms])
     if cmd == "up": swipe_up()

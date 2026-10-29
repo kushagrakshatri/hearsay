@@ -54,6 +54,16 @@ class SettingsActivity : AppCompatActivity() {
     private var signingIn = false
     private val downloading = mutableSetOf<ModelManager.Model>()
 
+    // Live one-line summaries on the home rows.
+    private val speechSum by lazy { TextView(this) }
+    private val cleanupSum by lazy { TextView(this) }
+    private val styleSum by lazy { TextView(this) }
+    private val talkSum by lazy { TextView(this) }
+    private val dictSum by lazy { TextView(this) }
+    private val snipSum by lazy { TextView(this) }
+    private val storageSum by lazy { TextView(this) }
+    private val keySum by lazy { TextView(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ui = Ui(this)
@@ -62,18 +72,105 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, SetupActivity::class.java))
         }
 
-        val speechModels = ModelManager.Model.entries.filter { it.kind == ModelManager.Kind.SPEECH }
-        val cleanupModels = ModelManager.Model.entries.filter { it.kind == ModelManager.Kind.CLEANUP }
-        fun bar() = LinearProgressIndicator(this).apply { max = 100; trackCornerRadius = ui.dp(4) }
+        val speechModels = ModelManager.Model.entries.filter { it.kind == ModelManager.Kind.SPEECH }.sortedBy { it.approxMb }
+        val cleanupModels = ModelManager.Model.entries.filter { it.kind == ModelManager.Kind.CLEANUP }.sortedBy { it.approxMb }
+        fun bar() = LinearProgressIndicator(this).apply { max = 100; trackCornerRadius = ui.dp(4); visibility = View.GONE }
         speechBar = bar(); cleanupBar = bar()
-        speechAction = ui.tonal("") { download(models.selected, speechAction, speechBar) }
-        cleanupAction = ui.tonal("") { models.selectedCleanup?.let { download(it, cleanupAction, cleanupBar) } }
+        speechAction = ui.tonal("") { download(models.selected, speechAction, speechBar) }.withTopMargin()
+        cleanupAction = ui.tonal("") { models.selectedCleanup?.let { download(it, cleanupAction, cleanupBar) } }.withTopMargin()
+
+        // ---- sheet contents (built once; refresh() keeps them current)
+        val speechSheet = ui.column().apply {
+            addView(ui.hint("Turns your voice into words, right on this phone."))
+            addView(RadioGroup(context).apply {
+                speechModels.forEachIndexed { i, m ->
+                    addView(option(1000 + i, m, m == models.recommended, m == models.selected))
+                }
+                setOnCheckedChangeListener { _, id -> models.selected = speechModels[id - 1000]; refresh() }
+            })
+            addView(speechBar); addView(speechAction)
+        }
+        val cleanupSheet = ui.column().apply {
+            addView(ui.hint("Drops the ums, fixes punctuation and spells your words right. " +
+                if (BuildConfig.CLOUD) "Runs on this phone whenever ChatGPT isn't in use." else "Runs on this phone."))
+            addView(RadioGroup(context).apply {
+                cleanupModels.forEachIndexed { i, m ->
+                    addView(option(2000 + i, m, m == models.recommendedCleanup, m == models.selectedCleanup))
+                }
+                addView(radio(2999, "Off", "Just punctuation and your words.", models.selectedCleanup == null))
+                setOnCheckedChangeListener { _, id ->
+                    models.selectedCleanup = if (id == 2999) null else cleanupModels[id - 2000]; refresh()
+                }
+            })
+            addView(cleanupBar); addView(cleanupAction)
+        }
+        stylesInfo = ui.hint("")
+        stylesReset = ui.text("Reset all apps") {
+            Prefs.resetStyleOverrides(this@SettingsActivity); refresh(); toast("Styles reset")
+        }
+        val styleSheet = ui.column().apply {
+            addView(ui.hint("Hearsay picks a style for each app. Tap the chip on the keyboard to change it there."))
+            addView(ui.space(8))
+            addView(example("Casual", "Messages and chats. Relaxed, like you talk."))
+            addView(example("Polished", "Email, docs and work apps. Clean and complete."))
+            addView(example("Verbatim", "Code, links and search. Exactly what you said."))
+            addView(ui.space(8)); addView(stylesInfo); addView(stylesReset)
+        }
+        val talkSheet = ui.column().apply {
+            addView(ui.hint("Hold the mic while you talk, or tap once and Hearsay stops when you pause for:"))
+            addView(ui.space(12))
+            addView(MaterialButtonToggleGroup(context).apply {
+                isSingleSelection = true; isSelectionRequired = true
+                val current = Prefs.pauseMs(context)
+                val ids = Prefs.PAUSES.map { (ms, label) ->
+                    val b = MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        id = View.generateViewId(); text = label.substringAfter("· "); isAllCaps = false
+                    }
+                    addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    if (ms == current) check(b.id)
+                    b.id to ms
+                }.toMap()
+                addOnButtonCheckedListener { _, id, checked -> if (checked) ids[id]?.let { Prefs.setPauseMs(context, it); refresh() } }
+            })
+            addView(ui.space(8))
+            addView(switch("Vibrate when the mic starts and stops", Prefs.haptics(context)) { Prefs.setHaptics(context, it); refresh() })
+        }
+        val commandsSheet = ui.column().apply {
+            addView(ui.hint("Edit with your voice instead of your thumbs."))
+            addView(ui.space(4))
+            addView(example("Select text, then say", "\u201cmake this shorter\u201d \u00b7 \u201cmore formal\u201d \u00b7 \u201cturn it into bullets\u201d", quote = true))
+            addView(example("Right after dictating", "\u201cmake that friendlier\u201d \u00b7 \u201cscratch that\u201d", quote = true))
+            addView(ui.space(6))
+            addView(ui.hint("Changed your mind? The undo key brings back what you said."))
+        }
+        val (dictBox, dict) = ui.field(Dictionary.text(this), "One per line", multiline = 5)
+        val dictSheet = ui.column().apply {
+            addView(ui.hint("Names and jargon Hearsay should spell your way. If it keeps mishearing something, " +
+                "teach it: hear say -> Hearsay"))
+            addView(dictBox)
+            addView(ui.filled("Save") {
+                Dictionary.save(this@SettingsActivity, dict.text.toString())
+                val d = Dictionary.load(this@SettingsActivity)
+                toast("Saved ${d.terms.size} words, ${d.fixes.size} fixes"); refresh()
+            }.withTopMargin())
+        }
+        val (snipBox, snips) = ui.field(Snippets.text(this), "One per line", multiline = 4)
+        val snipSheet = ui.column().apply {
+            addView(ui.hint("Say a short phrase, get the full text. For example: my email = you@example.com"))
+            addView(snipBox)
+            addView(ui.filled("Save") {
+                Snippets.save(this@SettingsActivity, snips.text.toString())
+                toast("Saved ${Snippets.load(this@SettingsActivity).entries.size} snippets"); refresh()
+            }.withTopMargin())
+        }
+        storageBox = ui.column()
+        val storageSheet = ui.column().apply { addView(ui.hint("Models downloaded to this phone.")); addView(ui.space(4)); addView(storageBox) }
 
         val content = ui.column(ui.dp(16), 0).apply {
             setPadding(ui.dp(16), ui.dp(20), ui.dp(16), ui.dp(32))
 
             addView(ui.row().apply {
-                addView(ImageView(context).apply { setImageResource(R.mipmap.ic_launcher) }, LinearLayout.LayoutParams(ui.dp(44), ui.dp(44)))
+                addView(ImageView(context).apply { setImageResource(R.mipmap.ic_launcher) }, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)))
                 addView(ui.column().apply {
                     setPadding(ui.dp(12), 0, 0, 0)
                     addView(ui.title("Hearsay", 26f))
@@ -86,122 +183,44 @@ class SettingsActivity : AppCompatActivity() {
             addView(ui.card(statusBox))
 
             if (BuildConfig.CLOUD) {
-                addView(ui.overline("ChatGPT"))
                 planBox = ui.column()
                 addView(ui.card(
-                    ui.title("Use your ChatGPT plan", 18f),
-                    ui.space(4),
-                    ui.hint("Cleanup and commands run on GPT-6 Luna with your plan. No API key. Speech is still transcribed " +
-                        "on this phone; only the text is sent. Offline or out of usage? Hearsay falls back to on-device."),
+                    ui.row().apply {
+                        addView(ui.icon(R.drawable.ic_sparkle, ui.primary, 22))
+                        addView(ui.title("Boost with ChatGPT", 18f).apply { setPadding(ui.dp(10), 0, 0, 0) })
+                    },
+                    ui.space(6),
+                    ui.hint("Sharper cleanup and edits with your ChatGPT plan. Your voice still stays on this phone."),
                     ui.space(14),
                     planBox!!,
                 ))
             }
 
-            addView(ui.overline("Voice"))
-            addView(ui.card(
-                ui.title("Speech model", 18f),
-                ui.hint("Runs on this phone."),
-                RadioGroup(context).apply {
-                    speechModels.forEachIndexed { i, m ->
-                        addView(radio(1000 + i, m.label, "~${m.approxMb} MB" + if (m == models.recommended) " · best for this phone" else "", m == models.selected))
-                    }
-                    setOnCheckedChangeListener { _, id -> models.selected = speechModels[id - 1000]; refresh() }
+            addView(ui.overline("Dictation"))
+            addView(ui.group(
+                ui.listRow(R.drawable.ic_wave, "Voice", speechSum) { sheet("Voice", speechSheet) },
+                ui.listRow(R.drawable.ic_sparkle, "Cleanup", cleanupSum) { sheet("Cleanup", cleanupSheet) },
+                ui.listRow(R.drawable.ic_lines, "Writing style", styleSum) { sheet("Writing style", styleSheet) },
+                ui.listRow(R.drawable.ic_timer, "Hands-free", talkSum) { sheet("Hands-free", talkSheet) },
+                ui.listRow(R.drawable.ic_chat, "Voice commands", TextView(context).apply { text = "Edit text by saying what to change" }) {
+                    sheet("Voice commands", commandsSheet)
                 },
-                speechBar, speechAction,
             ))
-            addView(ui.card(
-                ui.title("Talking", 18f),
-                ui.hint("Hold the mic to talk, or tap once for hands-free. Hands-free stops after you pause for:"),
-                ui.space(10),
-                MaterialButtonToggleGroup(context).apply {
-                    isSingleSelection = true; isSelectionRequired = true
-                    val current = Prefs.pauseMs(context)
-                    val ids = Prefs.PAUSES.map { (ms, label) ->
-                        val b = MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                            id = View.generateViewId(); text = label.substringAfter("· "); isAllCaps = false
-                        }
-                        addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                        if (ms == current) check(b.id)
-                        b.id to ms
-                    }.toMap()
-                    addOnButtonCheckedListener { _, id, checked -> if (checked) ids[id]?.let { Prefs.setPauseMs(context, it) } }
-                },
-                switch("Vibrate when the mic starts and stops", Prefs.haptics(context)) { Prefs.setHaptics(context, it) },
-            ))
-
-            addView(ui.overline("Cleanup"))
-            addView(ui.card(
-                ui.title("Cleanup model", 18f),
-                ui.hint("Removes fillers, fixes punctuation, applies your words. Used when the ChatGPT plan is off or unreachable."),
-                RadioGroup(context).apply {
-                    cleanupModels.forEachIndexed { i, m ->
-                        addView(radio(2000 + i, m.label, "~${m.approxMb} MB" + if (m == models.recommendedCleanup) " · best for this phone" else "", m == models.selectedCleanup))
-                    }
-                    addView(radio(2999, "Off", "Basic rules only", models.selectedCleanup == null))
-                    setOnCheckedChangeListener { _, id ->
-                        models.selectedCleanup = if (id == 2999) null else cleanupModels[id - 2000]; refresh()
-                    }
-                },
-                cleanupBar, cleanupAction,
-            ))
-            stylesInfo = ui.hint("")
-            stylesReset = ui.text("Reset all apps to defaults") {
-                Prefs.resetStyleOverrides(this@SettingsActivity); refresh(); toast("Styles reset")
-            }
-            addView(ui.card(
-                ui.title("Writing styles", 18f),
-                ui.hint("Casual for messaging, Polished for email and work, Verbatim for code, links and search (no rewrite). " +
-                    "Tap the style chip on the keyboard to change it for that app."),
-                ui.space(8), stylesInfo, stylesReset,
-            ))
-            addView(ui.card(
-                ui.title("Voice commands", 18f),
-                ui.space(4),
-                example("Select text, then say", "\"make this shorter\" · \"more formal\" · \"turn it into bullets\""),
-                example("Right after dictating", "\"make that friendlier\" · \"scratch that\""),
-                ui.space(6),
-                ui.hint("The undo key puts back the original."),
-            ))
-
             addView(ui.overline("Your words"))
-            val (dictBox, dict) = ui.field(Dictionary.text(context), "Words and fixes", multiline = 4)
-            addView(ui.card(
-                ui.title("Personal dictionary", 18f),
-                ui.hint("One per line. Names and jargon are spelled exactly as written. Fix a repeat mishearing with " +
-                    "what it hears -> what you want, e.g. hear say -> Hearsay"),
-                dictBox,
-                ui.tonal("Save dictionary") {
-                    Dictionary.save(this@SettingsActivity, dict.text.toString())
-                    val d = Dictionary.load(this@SettingsActivity)
-                    toast("Saved ${d.terms.size} words, ${d.fixes.size} fixes")
-                }.withTopMargin(),
+            addView(ui.group(
+                ui.listRow(R.drawable.ic_book, "Dictionary", dictSum) { sheet("Dictionary", dictSheet) },
+                ui.listRow(R.drawable.ic_bolt, "Snippets", snipSum) { sheet("Snippets", snipSheet) },
             ))
-            val (snipBox, snips) = ui.field(Snippets.text(context), "Snippets", multiline = 3)
-            addView(ui.card(
-                ui.title("Snippets", 18f),
-                ui.hint("One per line: what you say = what gets typed, e.g. my email = you@example.com. Use \\n for a new line."),
-                snipBox,
-                ui.tonal("Save snippets") {
-                    Snippets.save(this@SettingsActivity, snips.text.toString())
-                    toast("Saved ${Snippets.load(this@SettingsActivity).entries.size} snippets")
-                }.withTopMargin(),
-            ))
-
-            addView(ui.overline("Storage"))
-            storageBox = ui.column()
-            addView(ui.card(ui.hint("Models on this phone."), ui.space(4), storageBox))
-
-            if (BuildConfig.CLOUD) {
-                addView(ui.overline("Advanced"))
-                addView(advancedCloudCard())
-            }
+            addView(ui.overline("More"))
+            val more = mutableListOf<View>(ui.listRow(R.drawable.ic_storage, "Storage", storageSum) { sheet("Storage", storageSheet) })
+            if (BuildConfig.CLOUD) more += ui.listRow(R.drawable.ic_key, "Your own API key", keySum) { sheet("Your own API key", advancedCloud()) }
+            addView(ui.group(*more.toTypedArray()))
 
             addView(ui.space(24))
             addView(ui.row().apply {
                 gravity = Gravity.CENTER
                 addView(ui.icon(R.drawable.ic_lock, ui.onSurfaceVariant, 16))
-                addView(ui.hint("  Audio never leaves this phone unless you turn on cloud speech."))
+                addView(ui.hint("  Audio stays on this phone unless you turn on cloud speech."))
             })
             addView(ui.hint("Version ${packageManager.getPackageInfo(packageName, 0).versionName}").apply {
                 gravity = Gravity.CENTER; textSize = 12f; setPadding(0, ui.dp(6), 0, 0)
@@ -211,6 +230,23 @@ class SettingsActivity : AppCompatActivity() {
         val frame = android.widget.FrameLayout(this).apply { addView(scroll) }
         Ui.edgeToEdgeScroll(this, frame, scroll)
         setContentView(frame)
+    }
+
+    /** Opens [body] in a bottom sheet under [title]. Views are reused, so detach from the last sheet first. */
+    private fun sheet(title: String, body: View) {
+        (body.parent as? ViewGroup)?.removeView(body)
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        dialog.setContentView(ScrollView(this).apply {
+            addView(ui.column(ui.dp(24), 0).apply {
+                setPadding(ui.dp(24), ui.dp(4), ui.dp(24), ui.dp(32))
+                addView(ui.title(title, 22f).apply { setPadding(0, 0, 0, ui.dp(8)) })
+                addView(body)
+            })
+        })
+        dialog.behavior.state = com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+        dialog.behavior.skipCollapsed = true
+        dialog.setOnDismissListener { (body.parent as? ViewGroup)?.removeView(body) }
+        dialog.show()
     }
 
     override fun onResume() { super.onResume(); refresh() }
@@ -242,6 +278,33 @@ class SettingsActivity : AppCompatActivity() {
         stylesReset.visibility = if (n == 0) View.GONE else View.VISIBLE
         refreshStorage()
         refreshPlan()
+        refreshSummaries()
+    }
+
+    private fun refreshSummaries() {
+        val sp = models.selected
+        speechSum.text = "${sp.tier} \u00b7 " + if (models.isReady(sp)) "on this phone" else "tap to download"
+        val c = models.selectedCleanup
+        cleanupSum.text = when {
+            BuildConfig.CLOUD && ChatGptPlan.account(this) != null && Prefs.chatGptCleanup(this) ->
+                "ChatGPT" + (c?.let { " \u00b7 ${it.tier} on this phone when offline" } ?: "")
+            c == null -> "Off \u00b7 punctuation only"
+            models.isReady(c) -> "${c.tier} \u00b7 on this phone"
+            else -> "${c.tier} \u00b7 tap to download"
+        }
+        val n = Prefs.styleOverrides(this)
+        styleSum.text = if (n == 0) "Casual, Polished or Verbatim, picked per app" else "Custom in $n app${if (n == 1) "" else "s"}"
+        val pause = Prefs.PAUSES.firstOrNull { it.first == Prefs.pauseMs(this) }?.second?.substringAfter("· ") ?: "1.5 s"
+        talkSum.text = "Tap the mic once \u00b7 stops after a $pause pause"
+        val d = Dictionary.load(this)
+        dictSum.text = if (d.terms.isEmpty() && d.fixes.isEmpty()) "Teach Hearsay names and jargon"
+            else listOfNotNull(d.terms.size.takeIf { it > 0 }?.let { "$it word${if (it == 1) "" else "s"}" },
+                d.fixes.size.takeIf { it > 0 }?.let { "$it fix${if (it == 1) "" else "es"}" }).joinToString(" \u00b7 ")
+        val sn = Snippets.load(this).entries.size
+        snipSum.text = if (sn == 0) "Say a phrase, get your email, address\u2026" else "$sn snippet${if (sn == 1) "" else "s"}"
+        val bytes = ModelManager.Model.entries.sumOf { models.bytesOnDisk(it) }
+        storageSum.text = if (bytes == 0L) "Nothing downloaded yet" else "%.1f GB used by models".format(bytes / 1e9)
+        keySum.text = if (Prefs.cloudSpeech(this) || Prefs.cloudCleanup(this)) "On" else "Off \u00b7 for OpenAI-compatible services"
     }
 
     private fun refreshStatus() {
@@ -258,16 +321,16 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
         val cleanup = when {
-            BuildConfig.CLOUD && ChatGptPlan.account(this) != null && Prefs.chatGptCleanup(this) -> "${Prefs.chatGptModel(this)} via ChatGPT"
-            models.selectedCleanup?.let { models.isReady(it) } == true -> models.selectedCleanup!!.shortName
-            else -> "basic rules"
+            BuildConfig.CLOUD && ChatGptPlan.account(this) != null && Prefs.chatGptCleanup(this) -> "ChatGPT cleanup"
+            models.selectedCleanup?.let { models.isReady(it) } == true -> "${models.selectedCleanup!!.tier} cleanup"
+            else -> "basic cleanup"
         }
         statusBox.addView(ui.row().apply {
             addView(ui.icon(R.drawable.ic_check, ui.primary, 28))
             addView(ui.column().apply {
                 setPadding(ui.dp(14), 0, 0, 0)
                 addView(ui.title("Ready to dictate", 18f))
-                addView(ui.hint("${models.selected.shortName} on-device · cleanup: $cleanup"))
+                addView(ui.hint("${models.selected.tier} voice \u00b7 $cleanup"))
             })
         })
         if (!currentOk()) statusBox.addView(ui.tonal("Switch to Hearsay keyboard") {
@@ -282,7 +345,7 @@ class SettingsActivity : AppCompatActivity() {
         val ready = models.isReady(m)
         button.visibility = if (ready) View.GONE else View.VISIBLE
         bar.visibility = View.GONE  // only while downloading; an empty track reads as a full bar
-        button.text = "Download ${m.shortName} (~${m.approxMb} MB)"
+        button.text = "Download ${m.tier} \u00b7 ${m.size}"
         button.isEnabled = true
         bar.setProgressCompat(0, false)
     }
@@ -290,7 +353,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun download(m: ModelManager.Model, button: MaterialButton, bar: LinearProgressIndicator) {
         if (m in downloading || models.isReady(m)) return
         downloading += m
-        button.text = "Downloading… keep this screen open"; button.isEnabled = false
+        button.text = "Downloading\u2026"; button.isEnabled = false
         bar.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -325,13 +388,19 @@ class SettingsActivity : AppCompatActivity() {
         }
         val on = Prefs.chatGptCleanup(this)
         box.addView(ui.body(account.email.ifEmpty { "Your ChatGPT account" }).apply { setTypeface(typeface, Typeface.BOLD) })
-        box.addView(ui.hint(if (on) "Cleanup and commands use ${Prefs.chatGptModel(this)}" else "Plan not in use · on-device cleanup"))
-        box.addView(switch("Use my ChatGPT plan", on) { Prefs.setChatGptCleanup(this, it); refreshPlan(); refreshStatus() })
-        val (modelBox, model) = ui.field(Prefs.chatGptModel(this), "Model")
-        box.addView(modelBox)
+        box.addView(ui.hint(if (on) "Cleanup and commands use ChatGPT (${Prefs.chatGptModel(this)})" else "Paused \u00b7 cleanup runs on this phone"))
+        box.addView(switch("Use ChatGPT for cleanup", on) { Prefs.setChatGptCleanup(this, it); refresh() })
         box.addView(ui.row().apply {
-            addView(ui.text("Save model") { Prefs.setChatGptModel(this@SettingsActivity, model.text.toString()); toast("Model saved"); refreshPlan(); refreshStatus() })
-            addView(ui.text("Manage usage") { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ChatGptPlan.USAGE_URL))) })
+            addView(ui.text("Model") {
+                val (modelBox, model) = ui.field(Prefs.chatGptModel(this@SettingsActivity), "Model")
+                MaterialAlertDialogBuilder(this@SettingsActivity)
+                    .setTitle("ChatGPT model")
+                    .setView(ui.column(ui.dp(24), ui.dp(8)).apply { addView(modelBox) })
+                    .setPositiveButton("Save") { _, _ -> Prefs.setChatGptModel(this@SettingsActivity, model.text.toString().trim()); refresh() }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            })
+            addView(ui.text("Usage") { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ChatGptPlan.USAGE_URL))) })
             addView(ui.text("Sign out") {
                 lifecycleScope.launch {
                     val revoked = withContext(Dispatchers.IO) { ChatGptPlan.signOut(this@SettingsActivity) }
@@ -369,42 +438,27 @@ class SettingsActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ advanced
 
-    private fun advancedCloudCard(): View {
-        val details = ui.column().apply { visibility = View.GONE }
+    private fun advancedCloud(): View {
+        val details = ui.column()
         val (urlBox, url) = ui.field(Prefs.cloudUrl(this), "Base URL (https)")
         val (keyBox, key) = ui.field(Prefs.cloudKey(this), "API key", secret = true)
         val (asrBox, asrModel) = ui.field(Prefs.cloudSpeechModel(this), "Speech model")
         val (llmBox, llmModel) = ui.field(Prefs.cloudCleanupModel(this), "Cleanup model")
         var speech = Prefs.cloudSpeech(this); var cleanup = Prefs.cloudCleanup(this)
-        details.addView(ui.hint("For any OpenAI-compatible service. When on, your audio or text goes to that service. " +
-            "The ChatGPT plan, when signed in, takes priority for cleanup."))
+        details.addView(ui.hint("For developers with an OpenAI-compatible service. When on, your audio or text goes there. " +
+            "ChatGPT, when signed in, comes first for cleanup."))
         listOf(urlBox, keyBox, asrBox, llmBox).forEach { details.addView(it) }
         details.addView(switch("Send audio for transcription", speech) { speech = it })
         details.addView(switch("Use for cleanup and commands", cleanup) { cleanup = it })
-        details.addView(ui.tonal("Save") {
+        details.addView(ui.filled("Save") {
             val u = url.text.toString().trim()
-            if ((speech || cleanup) && !u.startsWith("https://")) { toast("The address must start with https://"); return@tonal }
-            if ((speech || cleanup) && key.text.isNullOrBlank()) { toast("Add your API key first"); return@tonal }
+            if ((speech || cleanup) && !u.startsWith("https://")) { toast("The address must start with https://"); return@filled }
+            if ((speech || cleanup) && key.text.isNullOrBlank()) { toast("Add your API key first"); return@filled }
             Prefs.saveCloud(this, u, key.text.toString(), asrModel.text.toString(), llmModel.text.toString(), speech, cleanup)
-            toast(if (speech || cleanup) "Own-key cloud mode on" else "Saved · fully on-device")
+            toast(if (speech || cleanup) "Own-key cloud on" else "Saved \u00b7 fully on-device")
+            refresh()
         }.withTopMargin())
-
-        val toggle = ui.text("Show") {}
-        toggle.setOnClickListener {
-            val open = details.visibility != View.VISIBLE
-            details.visibility = if (open) View.VISIBLE else View.GONE
-            toggle.text = if (open) "Hide" else "Show"
-        }
-        return ui.card(
-            ui.row().apply {
-                addView(ui.column().apply {
-                    addView(ui.title("Your own API key", 18f))
-                    addView(ui.hint(if (Prefs.cloudSpeech(context) || Prefs.cloudCleanup(context)) "On" else "Off · optional"))
-                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(toggle)
-            },
-            details,
-        )
+        return details
     }
 
     // ------------------------------------------------------------------ storage
@@ -454,10 +508,43 @@ class SettingsActivity : AppCompatActivity() {
         setOnCheckedChangeListener { _, checked -> change(checked) }
     }
 
-    private fun example(lead: String, says: String) = ui.column().apply {
-        setPadding(0, ui.dp(6), 0, ui.dp(6))
-        addView(ui.hint(lead).apply { textSize = 13f })
-        addView(ui.body(says).apply { setTextColor(ui.primary) })
+    /** A title + line pair; [quote] colors the second line as something you'd say. */
+    private fun example(lead: String, says: String, quote: Boolean = false) = ui.column().apply {
+        setPadding(0, ui.dp(8), 0, ui.dp(8))
+        if (quote) {
+            addView(ui.hint(lead).apply { textSize = 13f })
+            addView(ui.body(says).apply { setTextColor(ui.primary) })
+        } else {
+            addView(ui.body(lead, 16f).apply { setTypeface(typeface, Typeface.BOLD) })
+            addView(ui.hint(says))
+        }
+    }
+
+    /** A model choice in plain words: tier (+ Recommended), what it's good at, then size and the model's real name. */
+    private fun option(id: Int, m: ModelManager.Model, recommended: Boolean, checked: Boolean) = MaterialRadioButton(this).apply {
+        this.id = id
+        text = android.text.SpannableStringBuilder().apply {
+            append(m.tier)
+            setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
+            if (recommended) {
+                val s0 = length
+                append("  Recommended")
+                setSpan(android.text.style.ForegroundColorSpan(ui.primary), s0, length, 0)
+                setSpan(android.text.style.RelativeSizeSpan(0.8f), s0, length, 0)
+            }
+            append("\n")
+            val b0 = length
+            append(m.blurb)
+            setSpan(android.text.style.ForegroundColorSpan(ui.onSurfaceVariant), b0, length, 0)
+            setSpan(android.text.style.RelativeSizeSpan(0.9f), b0, length, 0)
+            append("\n")
+            val d0 = length
+            append("${m.size} \u00b7 ${m.shortName}")
+            setSpan(android.text.style.ForegroundColorSpan(ui.onSurfaceVariant), d0, length, 0)
+            setSpan(android.text.style.RelativeSizeSpan(0.78f), d0, length, 0)
+        }
+        isChecked = checked
+        setPadding(ui.dp(8), ui.dp(12), 0, ui.dp(12))
     }
 
     private fun <T : View> T.withTopMargin(dp: Int = 12): T = apply {

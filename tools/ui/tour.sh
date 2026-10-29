@@ -9,7 +9,7 @@ n=0
 unstick() { python3 -c 'import sys; sys.path.insert(0, "tools/ui"); import ui; ui.unstick()'; }
 shot() { sleep ${2:-1.5}; unstick; n=$((n+1)); adb exec-out screencap -p > "$OUT/$(printf %02d $n)-$1.png"; echo "shot $1"; }
 start() { adb shell am force-stop $P; adb shell am start -n $P/.SettingsActivity >/dev/null; sleep 3; }
-scroll_shots() { for i in 1 2 3 4 5 6 7; do $UI up; shot "$1-scroll$i" 0.5; done; }
+scroll_shots() { for i in 1 2 3; do $UI up; shot "$1-scroll$i" 0.5; done; }
 
 adb install -r "$1" || exit 1
 adb shell settings put global window_animation_scale 0
@@ -30,27 +30,29 @@ for mode in light dark; do
   $UI tapnoscroll "Not now"; shot $mode-setup-try
   $UI tapnoscroll "Done"; shot $mode-settings-unset
   scroll_shots $mode-settings
-  $UI tap "Show"; shot $mode-advanced-open
+  start
+  $UI tap "Voice"; shot $mode-sheet-voice; adb shell input keyevent BACK; sleep 1
+  $UI tap "Cleanup"; shot $mode-sheet-cleanup; adb shell input keyevent BACK; sleep 1
+  $UI tap "Writing style"; shot $mode-sheet-style; adb shell input keyevent BACK; sleep 1
+  $UI tap "Dictionary"; shot $mode-sheet-dictionary; adb shell input keyevent BACK; sleep 1
 done
 
-# Make it usable: mic, keyboard, small speech model, cleanup off. Then the keyboard states.
+# Make it usable: mic, keyboard, the light voice model, cleanup off. Then the keyboard states.
 adb shell cmd uimode night no; sleep 1
 adb shell pm grant $P android.permission.RECORD_AUDIO
 adb shell ime enable $P/.ime.OfflineFlowIME
-adb shell ime set $P/.ime.OfflineFlowIME
 start
-$UI tap "Download Whisper"
+$UI tap "Cleanup"; $UI tapnoscroll "Off"; adb shell input keyevent BACK; sleep 1
+$UI tap "Voice"; $UI tapnoscroll "Light"; $UI tapnoscroll "Download Light"; sleep 3
 for i in $(seq 1 80); do sleep 3; python3 - <<'PY' && break
-import sys; sys.path.insert(0, "tools/ui"); import ui; sys.exit(0 if ui.find("Ready to dictate") else 1)
+import sys; sys.path.insert(0, "tools/ui"); import ui; sys.exit(1 if ui.find("Downloading") else 0)
 PY
 done
-$UI tap "Basic rules only"
-start; shot settings-ready
-# force-stop resets the system IME to the default, so pick Hearsay again before opening the keyboard.
-adb shell ime set $P/.ime.OfflineFlowIME; sleep 1
+adb shell input keyevent BACK; sleep 1
+start; adb shell ime set $P/.ime.OfflineFlowIME; sleep 2; shot settings-ready
 $UI tapnoscroll "Try it"; shot keyboard-idle 2.5
-$UI hold "Microphone" 4000; shot keyboard-listening 1.5; sleep 4; shot keyboard-after 2
-$UI tapnoscroll "Writing style"; shot keyboard-style-casual 1
+python3 tools/ui/ui.py holdat 0.5 0.855 4000; shot keyboard-listening 1.5; sleep 4; shot keyboard-after 2
+python3 tools/ui/ui.py tapat 0.12 0.70; shot keyboard-style-tap 1
 adb shell cmd uimode night yes; sleep 2; start; adb shell ime set $P/.ime.OfflineFlowIME; sleep 1
 $UI tapnoscroll "Try it"; shot dark-keyboard-idle 2.5
 adb logcat -d -b crash > "$OUT/crash-log.txt" 2>&1 || true
