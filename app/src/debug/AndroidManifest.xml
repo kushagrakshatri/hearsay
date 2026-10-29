@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Debug builds only: stand-in chat and mail screens for recording the launch video. -->
+        <activity
+            android:name="dev.offlineflow.demo.DemoActivity"
+            android:exported="true"
+            android:label="Demo"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Material3.Light.NoActionBar" />
+    </application>
+</manifest>

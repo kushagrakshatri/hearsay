@@ -33,6 +33,7 @@ class Recorder(
     @SuppressLint("MissingPermission")
     fun start() {
         if (running) return
+        demoClip()?.let { startDemo(it); return }
         val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
         val rec = AudioRecord(
             MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE,
@@ -64,6 +65,39 @@ class Recorder(
         }
     }
 
+    /** Debug builds only: a scripted clip (16 kHz s16le) waiting in [demoDir], consumed once. */
+    private fun demoClip(): FloatArray? {
+        val f = demoDir?.let { java.io.File(it, "next.pcm") }?.takeIf { it.exists() } ?: return null
+        val b = f.readBytes(); f.delete()
+        val bb = java.nio.ByteBuffer.wrap(b).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        return FloatArray(b.size / 2) { bb.getShort(it * 2) / 32768f }
+    }
+
+    /** Feeds a clip through the same path as the mic, in real time, then silence until stopped. */
+    private fun startDemo(clip: FloatArray) {
+        synchronized(chunks) { chunks.clear() }
+        running = true
+        worker = thread(name = "offlineflow-demo-mic") {
+            var i = 0
+            var next = android.os.SystemClock.elapsedRealtime()
+            while (running) {
+                val c = FloatArray(1600)
+                if (i < clip.size) { val n = minOf(1600, clip.size - i); clip.copyInto(c, 0, i, i + n); i += n }
+                synchronized(chunks) { chunks.add(c) }
+                onLevel(rms(c))
+                gate?.let { g ->
+                    runCatching { g.accept(c) }
+                    val silentTooLong = if (g.heardSpeech) g.trailingSilence >= endSilenceMs * SAMPLE_RATE / 1000L
+                        else synchronized(chunks) { chunks.size } * 100 >= noSpeechMs
+                    if (!endFired && silentTooLong) { endFired = true; onSpeechEnd() }
+                }
+                next += 100
+                val wait = next - android.os.SystemClock.elapsedRealtime()
+                if (wait > 0) Thread.sleep(wait)
+            }
+        }
+    }
+
     /** Stops recording and returns everything captured since [start]. */
     fun stop(): FloatArray {
         running = false
@@ -87,7 +121,11 @@ class Recorder(
         return sqrt(s / x.size).toFloat()
     }
 
-    companion object { const val SAMPLE_RATE = 16_000 }
+    companion object {
+        const val SAMPLE_RATE = 16_000
+        /** Set only in debug builds (launch-video recording); null in release, so the mic is always real. */
+        @Volatile var demoDir: java.io.File? = null
+    }
 }
 
 /** Energy-based trim of leading/trailing silence; the fallback when the VAD is unavailable. */

@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write   # publish each main build as a GitHub Release
@@ -94,3 +95,44 @@ jobs:
           cd shots && git init -q -b ui-screens && git add -A
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Screens for ${{ github.sha }}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ui-screens
+
+  demo:
+    # Launch-video footage. Runs on demand, or when a main commit message contains [demo].
+    needs: build
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[demo]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: hearsay-debug-apk
+          path: apk
+      - name: Fetch models (pinned)
+        run: |
+          mkdir -p models && cd models
+          P=https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main
+          for f in encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt; do curl -fsSL -o $f $P/$f; done
+          curl -fsSL -o Qwen3.5-0.8B-Q4_K_M.gguf https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf
+          ls -l
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          ram-size: 6144M
+          cores: 4
+          disk-size: 8G
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
+          script: bash tools/demo/record.sh apk/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hearsay-demo-footage
+          path: footage/

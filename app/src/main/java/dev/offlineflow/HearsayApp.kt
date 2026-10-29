@@ -8,5 +8,6 @@ class HearsayApp : Application() {
     override fun onCreate() {
         super.onCreate()
         DynamicColors.applyToActivitiesIfAvailable(this)
+        if (BuildConfig.DEBUG) dev.offlineflow.audio.Recorder.demoDir = getExternalFilesDir("demo")
     }
 }

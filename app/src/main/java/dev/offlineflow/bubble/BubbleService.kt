@@ -305,6 +305,16 @@ class BubbleService : AccessibilityService() {
         }
         root?.visibility = View.VISIBLE
         prepGate()
+        reportMicSpot()
+    }
+
+    /** Debug builds only: where the mic sits on screen, so the launch-video script can press it. */
+    private fun reportMicSpot() {
+        val dir = dev.offlineflow.audio.Recorder.demoDir ?: return
+        mic.postDelayed({
+            val loc = IntArray(2); mic.getLocationOnScreen(loc)
+            runCatching { java.io.File(dir, "bubble.txt").writeText("${loc[0] + mic.width / 2} ${loc[1] + mic.height / 2}") }
+        }, 400)
     }
 
     private fun prepGate() {

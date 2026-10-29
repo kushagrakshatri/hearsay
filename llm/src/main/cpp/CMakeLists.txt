@@ -20,6 +20,9 @@ set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 add_compile_options(-O3 -DNDEBUG)
 if (ANDROID_ABI STREQUAL "arm64-v8a")
     add_compile_options(-march=armv8.2-a+fp16+dotprod)
+elseif (ANDROID_ABI STREQUAL "x86_64")
+    # Debug-only ABI (emulator). CI hosts have AVX2; without it inference crawls.
+    add_compile_options(-mavx2 -mfma -mf16c)
 endif()
 
 add_subdirectory(${LLAMA_DIR} llama)
