@@ -400,6 +400,12 @@ class BubbleService : AccessibilityService() {
 
         /** Whether the user switched the floating mic on in Accessibility settings. */
         fun enabled(c: Context): Boolean {
+            val am = c.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+            val bound = runCatching {
+                am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                    .any { it.resolveInfo?.serviceInfo?.let { s -> s.packageName == c.packageName && s.name == BubbleService::class.java.name } == true }
+            }.getOrDefault(false)
+            if (bound) return true
             val list = Settings.Secure.getString(c.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
             return list.split(':').any {
                 it.equals("${c.packageName}/${BubbleService::class.java.name}", true) ||
