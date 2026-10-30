@@ -60,7 +60,9 @@ enum class Style(val label: String) {
         fun default(pkg: String?, inputType: Int): Style {
             val cls = inputType and InputType.TYPE_MASK_CLASS
             val variation = inputType and InputType.TYPE_MASK_VARIATION
-            if (cls != InputType.TYPE_CLASS_TEXT) return VERBATIM // numbers, phone, dates
+            // TYPE_NULL (0) means the app didn't say: many apps (Compose, Flutter, React Native) leave it
+            // unset for ordinary text boxes, so treat it as text rather than skipping cleanup.
+            if (cls != InputType.TYPE_CLASS_TEXT && cls != InputType.TYPE_NULL) return VERBATIM // numbers, phone, dates
             when (variation) {
                 InputType.TYPE_TEXT_VARIATION_URI, InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
                 InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_PASSWORD,

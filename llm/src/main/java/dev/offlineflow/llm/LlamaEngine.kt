@@ -9,11 +9,16 @@ import java.io.File
  */
 class LlamaEngine private constructor(private var handle: Long) : AutoCloseable {
 
+    /** How many prefixes have been cached; each keeps a state snapshot in memory. */
+    var prefixCount = 0
+        private set
+
     /** Decodes and caches [prefix]; returns its id for [complete]. */
     fun addPrefix(prefix: String): Int {
         check(handle != 0L) { "LlamaEngine is closed" }
         val id = nativeAddPrefix(handle, prefix)
         check(id >= 0) { "Failed to evaluate prompt prefix" }
+        prefixCount++
         return id
     }
 

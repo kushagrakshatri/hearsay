@@ -338,11 +338,12 @@ class BubbleService : AccessibilityService() {
         val r = root ?: return
         if (r.visibility != View.VISIBLE) return
         r.visibility = View.GONE
-        // Hidden: free the cleanup LLM after a minute and the speech model after five.
+        // Hidden: free the models after a while (low memory frees them sooner via onTrimMemory).
+        // A one-minute timeout meant reloading the cleanup model between most messages.
         idleJob?.cancel()
         idleJob = scope.launch {
-            delay(60_000); Brain.releaseLlm()
-            delay(240_000); Brain.releaseAsr()
+            delay(10 * 60_000L); Brain.releaseLlm()
+            delay(5 * 60_000L); Brain.releaseAsr()
         }
     }
 

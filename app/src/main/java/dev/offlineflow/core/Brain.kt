@@ -49,6 +49,10 @@ object Brain {
         }
         // The dictionary is part of the cached prompt, so a dictionary edit reloads the prefix.
         cleaner?.let { if (cleanerModel == want && cleanerDictKey == dictionary.key) return it }
+        // Only the dictionary changed (e.g. a word was just learned): keep the loaded weights.
+        cleaner?.takeIf { cleanerModel == want }?.withDictionary(dictionary)?.let {
+            cleaner = it; cleanerDictKey = dictionary.key; return it
+        }
         cleaner?.close(); cleaner = null; cleanerModel = null
         return LlmCleaner.load(want, models.file(want), dictionary).also {
             cleaner = it; cleanerModel = want; cleanerDictKey = dictionary.key

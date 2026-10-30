@@ -51,6 +51,13 @@ class LlmCleaner private constructor(
 
     override fun close() = llm.close()
 
+    /**
+     * The same loaded model with a new dictionary, so learning a word doesn't reload the
+     * weights. Null once enough prompt snapshots have piled up that a fresh load is better.
+     */
+    fun withDictionary(dictionary: Dictionary): LlmCleaner? =
+        if (llm.prefixCount < 12) LlmCleaner(llm, format, dictionary.spellings.take(MAX_DICTIONARY)) else null
+
     companion object {
         /**
          * Shared by the local model and opt-in cloud cleanup: rules pre-pass, skip very short
