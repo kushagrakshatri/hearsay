@@ -101,7 +101,11 @@ jobs:
     needs: build
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[demo]')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        scene: [chat, mail, names, plane]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -113,7 +117,7 @@ jobs:
           mkdir -p models && cd models
           P=https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main
           for f in encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt; do curl -fsSL -o $f $P/$f; done
-          curl -fsSL -o Qwen3.5-0.8B-Q4_K_M.gguf https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf
+          curl -fsSL -o Qwen3.5-2B-Q4_K_M.gguf https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf
           ls -l
       - name: Enable KVM
         run: |
@@ -130,9 +134,9 @@ jobs:
           disk-size: 8G
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-boot-anim -camera-back none
-          script: bash tools/demo/record.sh apk/app-debug.apk
+          script: bash tools/demo/record.sh apk/app-debug.apk ${{ matrix.scene }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hearsay-demo-footage
+          name: hearsay-demo-footage-${{ matrix.scene }}
           path: footage/

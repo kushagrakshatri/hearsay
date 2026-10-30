@@ -34,14 +34,14 @@ push_model() { # dir file
   adb shell run-as $P cp /data/local/tmp/$2 files/models/$1/$2 && adb shell rm /data/local/tmp/$2
 }
 for f in encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt; do push_model parakeet-tdt-0.6b-v2-int8 $f; done
-push_model llm Qwen3.5-0.8B-Q4_K_M.gguf
+push_model llm Qwen3.5-2B-Q4_K_M.gguf
 adb shell run-as $P mkdir -p shared_prefs
 adb shell "run-as $P sh -c 'cat > shared_prefs/hearsay.xml'" <<'XML'
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
 <map>
     <boolean name="setup_done" value="true" />
     <string name="model">PARAKEET_V2</string>
-    <string name="cleanup">QWEN35_0_8B</string>
+    <string name="cleanup">QWEN35_2B</string>
     <int name="bubble_x" value="42" />
     <int name="bubble_dy" value="-470" />
 </map>
@@ -85,7 +85,7 @@ say() { # clip: press the mic for the clip's length while it plays into the demo
   # The emulator thinks ~10x slower than a phone: film the first seconds of thinking, pause the camera
   # through the rest, and start a new segment once the text lands. The edit marks the cut.
   [ -n "${SEG:-}" ] && { sleep 6; stopseg; }
-  waitfield "$before" 400
+  waitfield "$before" 1500
   log "text $clip after $(echo "$(now) - $t1" | bc) s: $(fieldtext)"
   [ -n "${SEG:-}" ] && { K=$((K+1)); startseg; sleep 1.5; }
 }
@@ -95,28 +95,32 @@ rec() { bar; SEG=$1; K=1; log "== $1"; startseg; sleep 1; }
 stop() { sleep 1; stopseg; SEG=; }
 send() { adb shell input tap $(adb shell cat $DEMO/send.txt); }
 
-# Warm up: first load of both models is slow, and isn't the point.
-chat Maya "warming up"; field Message; say plane; adb shell input keyevent BACK
-
-chat Maya "dinner this week?" "that new place on Santana Row finally opened"
-rec chat; field Message; say chat; sleep 2.5; send; sleep 2.5; stop
-
-adb shell am start -f 0x10008000 -n $P/$N.demo.DemoActivity --es scene mail >/dev/null; sleep 2.5
-rec mail; field "Compose email"; say mail; sleep 3
-adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_A; sleep 1.5
-say edit; sleep 3.5; stop
-
-chat Siobhan "did you get a chance to finish the deck?" "Aoife wants to see it before Monday too"
-rec names; field Message; say names; sleep 2.5; send; sleep 2.5; stop
-
-chat Maya "text me when you land"
-rec plane
-adb shell cmd statusbar expand-settings; sleep 2
-adb shell cmd connectivity airplane-mode enable
-adb shell am broadcast -a com.android.systemui.demo -e command network -e airplane show -e wifi hide >/dev/null; sleep 2.5
-adb shell cmd statusbar collapse; sleep 1.5
-field Message; say plane; sleep 2.5; send; sleep 2.5; stop
-adb shell cmd connectivity airplane-mode disable
+scene_chat() {
+  chat Maya "dinner this week?" "that new place on Santana Row finally opened"
+  rec chat; field Message; say chat; sleep 2.5; send; sleep 2.5; stop
+}
+scene_mail() {
+  adb shell am start -f 0x10008000 -n $P/$N.demo.DemoActivity --es scene mail >/dev/null; sleep 2.5
+  rec mail; field "Compose email"; say mail; sleep 3
+  adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_A; sleep 1.5
+  say edit; sleep 3.5; stop
+}
+scene_names() {
+  chat Siobhan "did you get a chance to finish the deck?" "need it before Monday"
+  rec names; field Message; say names; sleep 2.5; send; sleep 2.5; stop
+}
+scene_plane() {
+  chat Maya "text me when you land"
+  rec plane
+  adb shell cmd statusbar expand-settings; sleep 2
+  adb shell cmd connectivity airplane-mode enable
+  adb shell am broadcast -a com.android.systemui.demo -e command network -e airplane show -e wifi hide >/dev/null; sleep 2.5
+  adb shell cmd statusbar collapse; sleep 1.5
+  field Message; say plane; sleep 2.5; send; sleep 2.5; stop
+  adb shell cmd connectivity airplane-mode disable
+}
+# One scene per emulator (CI runs them in parallel), or all of them.
+for sc in ${2:-chat mail names plane}; do scene_$sc; done
 
 adb logcat -d -s HearsayBubble:* > $OUT/bubble-log.txt 2>&1
 adb logcat -d > $OUT/full-log.txt 2>&1 || true
