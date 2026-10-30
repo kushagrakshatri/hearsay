@@ -3,11 +3,16 @@
 // prefix tokenized with add_special=true (BOS when the model wants one), state snapshot per
 // prefix, suffix tokenized without specials, greedy sampling, stop on any end-of-generation token.
 // Optional repetition penalty (argv[3]) to test models that loop under pure greedy.
+// Optional sampling (argv[4..6] = temperature top_k seed): when temperature > 0 the chain is
+// top-k -> penalties -> temp -> dist(seed) instead of greedy (for vendor-recommended settings).
 //
 // Protocol on stdin/stdout (byte-counted so text can hold newlines):
 //   P <nbytes>\n<prefix bytes>                 -> "P <id> <ntokens> <ms>\n"
 //   C <prefixId> <maxTokens> <nbytes>\n<bytes> -> "C <promptTokens> <prefillMs> <genTokens> <decodeMs> <nbytes>\n<out bytes>"
 //   T <nbytes>\n<bytes>                        -> "T <ntokens>\n"  (token count with add_special=true)
+//   S <nbytes>\n<stops separated by \x1f>      -> "S <nstops>\n"  stop strings for later C calls: generation
+//                                                 ends at the first stop, which is cut from the output
+//                                                 (for plain-completion prompts with no end-of-turn token)
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -38,8 +43,11 @@ static bool read_bytes(size_t n, std::string &out) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 3) { std::fprintf(stderr, "usage: %s model.gguf threads [repeat_penalty]\n", argv[0]); return 2; }
+    if (argc < 3) { std::fprintf(stderr, "usage: %s model.gguf threads [repeat_penalty [temp top_k seed]]\n", argv[0]); return 2; }
     float rep = argc > 3 ? std::atof(argv[3]) : 1.0f;
+    float temp = argc > 4 ? std::atof(argv[4]) : 0.0f;
+    int top_k = argc > 5 ? std::atoi(argv[5]) : 50;
+    uint32_t seed = argc > 6 ? (uint32_t) std::strtoul(argv[6], nullptr, 10) : 42;
     llama_log_set([](ggml_log_level, const char *, void *) {}, nullptr);
     llama_backend_init();
     auto mp = llama_model_default_params();
@@ -53,13 +61,19 @@ int main(int argc, char **argv) {
     llama_context *ctx = llama_init_from_model(model, cp);
     int n_ctx = (int) llama_n_ctx(ctx), n_batch = 512;
     llama_sampler *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    if (rep != 1.0f) {
+    if (rep != 1.0f || temp > 0.0f) {
         // top-k first: penalties scan the candidate list (slow on the full vocabulary).
-        llama_sampler_chain_add(smpl, llama_sampler_init_top_k(50));
-        llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, rep, 0.0f, 0.0f));
+        llama_sampler_chain_add(smpl, llama_sampler_init_top_k(temp > 0.0f ? top_k : 50));
+        if (rep != 1.0f) llama_sampler_chain_add(smpl, llama_sampler_init_penalties(llama_vocab_n_tokens(vocab), 64, rep, 0.0f, 0.0f));
     }
-    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+    if (temp > 0.0f) {
+        llama_sampler_chain_add(smpl, llama_sampler_init_temp(temp));
+        llama_sampler_chain_add(smpl, llama_sampler_init_dist(seed));
+    } else {
+        llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+    }
     std::vector<Prefix> prefixes;
+    std::vector<std::string> stops;
 
     auto decode_all = [&](std::vector<llama_token> &t) {
         for (size_t i = 0; i < t.size(); i += n_batch) {
@@ -84,6 +98,18 @@ int main(int argc, char **argv) {
             p.state.resize(llama_state_seq_get_data(ctx, p.state.data(), p.state.size(), 0));
             prefixes.push_back(std::move(p));
             std::printf("P %zu %zu %.1f\n", prefixes.size() - 1, toks.size(), ms_since(t0));
+        } else if (line[0] == 'S') {
+            size_t n = std::strtoul(line + 2, nullptr, 10);
+            read_bytes(n, body);
+            stops.clear();
+            size_t a = 0;
+            while (a <= body.size()) {
+                size_t b = body.find('\x1f', a);
+                if (b == std::string::npos) b = body.size();
+                if (b > a) stops.push_back(body.substr(a, b - a));
+                a = b + 1;
+            }
+            std::printf("S %zu\n", stops.size());
         } else if (line[0] == 'T') {
             size_t n = std::strtoul(line + 2, nullptr, 10);
             read_bytes(n, body);
@@ -112,6 +138,12 @@ int main(int argc, char **argv) {
                     int k = llama_token_to_piece(vocab, tok, piece, sizeof piece, 0, true);
                     if (k > 0) out.append(piece, k);
                     gen++;
+                    bool stopped = false;
+                    for (auto &st : stops) {
+                        size_t at = out.find(st);
+                        if (at != std::string::npos) { out.resize(at); stopped = true; break; }
+                    }
+                    if (stopped) break;
                     if (llama_decode(ctx, llama_batch_get_one(&tok, 1)) != 0) break;
                 }
                 dec = ms_since(t1);
