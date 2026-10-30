@@ -86,7 +86,8 @@ class DemoActivity : Activity() {
         }
         watch(input)
         val send = text("➤", 20f, Color.WHITE).apply {
-            post { spot("send.txt", this) }
+            // Rewritten on every layout: the keyboard opening moves the button up.
+            viewTreeObserver.addOnGlobalLayoutListener { spot("send.txt", this) }
             gravity = Gravity.CENTER; background = round(brand, 22); contentDescription = "Send"
             setOnClickListener {
                 val t = input.text.toString().trim()
@@ -166,8 +167,8 @@ class DemoActivity : Activity() {
             override fun afterTextChanged(s: android.text.Editable?) { write() }
         })
         // Focus it and bring up the keyboard, the way a real compose screen opens.
+        field.viewTreeObserver.addOnGlobalLayoutListener { spot("fieldpos.txt", field) }
         field.post {
-            spot("fieldpos.txt", field)
             field.requestFocus()
             getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(field, 0)
         }

@@ -95,7 +95,8 @@ say() { # clip: press the mic for the clip's length while it plays into the demo
 }
 startseg() { adb shell rm -f /sdcard/seg.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/seg.mp4 & REC=$!; sleep 0.5; log "-- ${SEG}_$K"; }
 stopseg() { sleep 0.5; adb shell pkill -INT screenrecord; wait $REC 2>/dev/null; sleep 2; adb pull /sdcard/seg.mp4 $OUT/${SEG}_$K.mp4 >/dev/null; }
-rec() { bar; SEG=$1; K=1; log "== $1"; startseg; sleep 1; }
+# Let the models finish warming up for this screen first: on the emulator that starves screenrecord.
+rec() { sleep ${WARM:-150}; bar; SEG=$1; K=1; log "== $1"; startseg; sleep 1; }
 stop() { sleep 1; stopseg; SEG=; }
 send() { adb shell input tap $(adb shell cat $DEMO/send.txt); }
 
