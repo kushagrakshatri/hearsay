@@ -13,6 +13,15 @@
 //   S <nbytes>\n<stops separated by \x1f>      -> "S <nstops>\n"  stop strings for later C calls: generation
 //                                                 ends at the first stop, which is cut from the output
 //                                                 (for plain-completion prompts with no end-of-turn token)
+//   Q\n                                        -> "Q <steps> <drafted> <accepted> <fallback>\n" speculative stats of the last C
+//   X <draft_max> <ngram_min> <use_prefix>\n   -> "X <on>\n" change the speculative settings for later C calls (draft_max 0 =
+//                                                 plain decoding; capped at the HEARSAY_SPEC draft_max the context was built for),
+//                                                 for paired A/B timing in one process (tools/eval/spec_ab.py)
+//
+// Speculative decoding (prompt lookup, llm/src/main/cpp/ngram_spec.h, same code as the app): set
+// HEARSAY_SPEC=draft_max,ngram_min[,use_prefix[,adaptive]] in the environment. Greedy only (ignored with a
+// repetition penalty or sampling). The context is created with n_rs_seq = draft_max so hybrid
+// models can roll back rejected drafts. Build with -Illm/src/main/cpp.
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -21,11 +30,12 @@
 #include <string>
 #include <vector>
 #include "llama.h"
+#include "ngram_spec.h"
 
 using clk = std::chrono::steady_clock;
 static double ms_since(clk::time_point t) { return std::chrono::duration<double, std::milli>(clk::now() - t).count(); }
 
-struct Prefix { std::vector<uint8_t> state; int n_tokens; };
+struct Prefix { std::vector<uint8_t> state; int n_tokens; std::vector<llama_token> tokens; };
 
 static std::vector<llama_token> tokenize(const llama_vocab *v, const std::string &s, bool add_special) {
     int n = -llama_tokenize(v, s.c_str(), (int32_t) s.size(), nullptr, 0, add_special, true);
@@ -48,6 +58,17 @@ int main(int argc, char **argv) {
     float temp = argc > 4 ? std::atof(argv[4]) : 0.0f;
     int top_k = argc > 5 ? std::atoi(argv[5]) : 50;
     uint32_t seed = argc > 6 ? (uint32_t) std::strtoul(argv[6], nullptr, 10) : 42;
+    hearsay_spec::Config spec;
+    bool use_spec = false;
+    if (const char *e = std::getenv("HEARSAY_SPEC")) {
+        int up = 1, ad = 0;
+        if (std::sscanf(e, "%d,%d,%d,%d", &spec.draft_max, &spec.ngram_min, &up, &ad) >= 2 && spec.draft_max > 0 && spec.ngram_min > 0) {
+            use_spec = rep == 1.0f && temp <= 0.0f;
+            spec.use_prefix = up != 0;
+            spec.adaptive = ad != 0;
+            spec.ngram_max = std::max(spec.ngram_min, 4);
+        }
+    }
     llama_log_set([](ggml_log_level, const char *, void *) {}, nullptr);
     llama_backend_init();
     auto mp = llama_model_default_params();
@@ -58,6 +79,7 @@ int main(int argc, char **argv) {
     auto cp = llama_context_default_params();
     cp.n_ctx = 2048; cp.n_batch = 512; cp.n_ubatch = 512; cp.n_seq_max = 1;
     cp.n_threads = cp.n_threads_batch = std::atoi(argv[2]);
+    cp.n_rs_seq = use_spec ? (uint32_t) spec.draft_max : 0; // recurrent snapshots to roll back rejected drafts
     llama_context *ctx = llama_init_from_model(model, cp);
     int n_ctx = (int) llama_n_ctx(ctx), n_batch = 512;
     llama_sampler *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
@@ -74,6 +96,7 @@ int main(int argc, char **argv) {
     }
     std::vector<Prefix> prefixes;
     std::vector<std::string> stops;
+    hearsay_spec::Stats last_stats; int last_fallback = 0;
 
     auto decode_all = [&](std::vector<llama_token> &t) {
         for (size_t i = 0; i < t.size(); i += n_batch) {
@@ -93,7 +116,7 @@ int main(int argc, char **argv) {
             llama_memory_seq_rm(llama_get_memory(ctx), 0, -1, -1);
             auto toks = tokenize(vocab, body, true);
             if (toks.empty() || (int) toks.size() >= n_ctx - 256 || !decode_all(toks)) { std::printf("P -1 %zu 0\n", toks.size()); std::fflush(stdout); continue; }
-            Prefix p; p.n_tokens = (int) toks.size();
+            Prefix p; p.n_tokens = (int) toks.size(); p.tokens = toks;
             p.state.resize(llama_state_seq_get_size(ctx, 0));
             p.state.resize(llama_state_seq_get_data(ctx, p.state.data(), p.state.size(), 0));
             prefixes.push_back(std::move(p));
@@ -132,24 +155,51 @@ int main(int argc, char **argv) {
                 int budget = std::min(max_tokens, n_ctx - pos - 1);
                 llama_sampler_reset(smpl);
                 char piece[256];
-                for (int i = 0; i < budget; ++i) {
-                    llama_token tok = llama_sampler_sample(smpl, ctx, -1);
-                    if (llama_vocab_is_eog(vocab, tok)) break;
+                // Appends a token; false when a stop string ends generation.
+                auto emit = [&](llama_token tok) {
                     int k = llama_token_to_piece(vocab, tok, piece, sizeof piece, 0, true);
                     if (k > 0) out.append(piece, k);
                     gen++;
-                    bool stopped = false;
                     for (auto &st : stops) {
                         size_t at = out.find(st);
-                        if (at != std::string::npos) { out.resize(at); stopped = true; break; }
+                        if (at != std::string::npos) { out.resize(at); return false; }
                     }
-                    if (stopped) break;
-                    if (llama_decode(ctx, llama_batch_get_one(&tok, 1)) != 0) break;
+                    return true;
+                };
+                auto plain = [&]() {
+                    for (int i = 0; i < budget; ++i) {
+                        llama_token tok = llama_sampler_sample(smpl, ctx, -1);
+                        if (llama_vocab_is_eog(vocab, tok)) break;
+                        if (!emit(tok)) break;
+                        if (llama_decode(ctx, llama_batch_get_one(&tok, 1)) != 0) break;
+                    }
+                };
+                last_stats = {}; last_fallback = 0;
+                if (use_spec) {
+                    int rc = hearsay_spec::generate(ctx, smpl, vocab, pos, budget, toks, &pre.tokens, spec, last_stats, emit);
+                    if (rc != hearsay_spec::SPEC_OK) {
+                        // Same fallback as the app: back to the prefix, prompt again, plain decode.
+                        last_fallback = 1; out.clear(); gen = 0;
+                        llama_memory_seq_rm(llama_get_memory(ctx), 0, -1, -1);
+                        llama_state_seq_set_data(ctx, pre.state.data(), pre.state.size(), 0);
+                        if (decode_all(toks)) { llama_sampler_reset(smpl); plain(); }
+                    }
+                } else {
+                    plain();
                 }
                 dec = ms_since(t1);
             }
             std::printf("C %zu %.1f %d %.1f %zu\n", toks.size(), prefill, gen, dec, out.size());
             std::fwrite(out.data(), 1, out.size(), stdout);
+        } else if (line[0] == 'X') {
+            int d = 0, g = 2, up = 1;
+            std::sscanf(line + 2, "%d %d %d", &d, &g, &up);
+            int cap = (int) llama_n_rs_seq(ctx) > 0 ? (int) llama_n_rs_seq(ctx) : (cp.n_rs_seq > 0 ? (int) cp.n_rs_seq : 0);
+            use_spec = d > 0 && cap > 0 && rep == 1.0f && temp <= 0.0f;
+            if (use_spec) { spec.draft_max = std::min(d, cap); spec.ngram_min = std::max(1, g); spec.ngram_max = std::max(spec.ngram_min, 4); spec.use_prefix = up != 0; spec.adaptive = false; }
+            std::printf("X %d\n", use_spec ? 1 : 0);
+        } else if (line[0] == 'Q') {
+            std::printf("Q %d %d %d %d\n", last_stats.steps, last_stats.drafted, last_stats.accepted, last_fallback);
         }
         std::fflush(stdout);
     }

@@ -67,6 +67,20 @@ object Prefs {
     fun screenContext(c: Context): Boolean = p(c).getBoolean("screen_context", true)
     fun setScreenContext(c: Context, on: Boolean) = p(c).edit().putBoolean("screen_context", on).apply()
 
+    /** llama.cpp cleanup: draft tokens from the transcript and verify them in one pass (same text, faster). */
+    fun fastDecoding(c: Context): Boolean = p(c).getBoolean("fast_decoding", true)
+    fun setFastDecoding(c: Context, on: Boolean) = p(c).edit().putBoolean("fast_decoding", on).apply().also { applySpeculation(c) }
+
+    /** Gemma on the processor: use the model's multi-token prediction (GPU uses it automatically, except PowerVR). */
+    fun mtpOnCpu(c: Context): Boolean = p(c).getBoolean("mtp_cpu", true)
+    fun setMtpOnCpu(c: Context, on: Boolean) = p(c).edit().putBoolean("mtp_cpu", on).apply().also { applySpeculation(c) }
+
+    /** Pushes the speculative decoding settings to the LLM module (process-wide). */
+    fun applySpeculation(c: Context) {
+        dev.offlineflow.llm.Speculation.draftFromTranscript = fastDecoding(c)
+        dev.offlineflow.llm.Speculation.mtpOnCpu = mtpOnCpu(c)
+    }
+
     fun setupDone(c: Context): Boolean = p(c).getBoolean("setup_done", false)
     fun setSetupDone(c: Context) = p(c).edit().putBoolean("setup_done", true).apply()
 

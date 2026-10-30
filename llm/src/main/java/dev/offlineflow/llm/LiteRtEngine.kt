@@ -8,7 +8,10 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.ModelInfo
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.SpeculativeDecodingConfig
+import com.google.ai.edge.litertlm.SpeculativeDecodingMode
 import com.google.ai.edge.litertlm.ThinkingConfig
 import java.io.File
 
@@ -21,7 +24,12 @@ import java.io.File
  * new turn is evaluated. The chat template comes from the model file, so prompts here are plain
  * text. If cloning isn't supported, each call opens a fresh conversation instead (slower).
  */
-class LiteRtEngine private constructor(private val engine: Engine, override val backend: String) : TextEngine {
+class LiteRtEngine private constructor(
+    private val engine: Engine,
+    override val backend: String,
+    /** The model's multi-token-prediction drafter is on (speculative decoding). */
+    val mtp: Boolean,
+) : TextEngine {
     private class Prompt(val system: String, val examples: List<String>, var base: Conversation?)
 
     private val prompts = ArrayList<Prompt>()
@@ -62,7 +70,10 @@ class LiteRtEngine private constructor(private val engine: Engine, override val 
             }
         }
         try {
-            return conv.sendMessage(Message.user(user), maxOutputToken = maxTokens).toString()
+            val t0 = System.nanoTime()
+            val out = conv.sendMessage(Message.user(user), maxOutputToken = maxTokens).toString()
+            Log.i(TAG, "complete: ${out.length} chars in ${(System.nanoTime() - t0) / 1_000_000} ms ($backend, MTP ${if (mtp) "on" else "off"})")
+            return out
         } finally {
             runCatching { conv.close() }
         }
@@ -91,6 +102,15 @@ class LiteRtEngine private constructor(private val engine: Engine, override val 
 
     companion object {
         private const val TAG = "hearsay-litert"
+
+        /** Whether the .litertlm file carries an MTP drafter section; null when it can't be read. */
+        private fun hasDrafter(model: File): Boolean? = try {
+            ModelInfo.from(model.absolutePath).use { info ->
+                (info as? ModelInfo.Llm)?.hasSpeculativeDecodingSupport()
+            }.also { Log.i(TAG, "${model.name}: MTP drafter in model: ${it ?: "?"}") }
+        } catch (t: Throwable) {
+            Log.w(TAG, "couldn't read model info for ${model.name}", t); null
+        }
         /** Bumped with the LiteRT-LM version so a newer runtime gets to try the GPU again. */
         private const val RUNTIME = "0.19.0"
 
@@ -102,6 +122,7 @@ class LiteRtEngine private constructor(private val engine: Engine, override val 
         fun load(model: File, cacheDir: File, stateDir: File, threads: Int): LiteRtEngine {
             require(model.exists()) { "Model not found: ${model.path}" }
             cacheDir.mkdirs(); stateDir.mkdirs()
+            val drafter = hasDrafter(model)
             var first: Throwable? = null
             for (gpu in listOf(true, false)) {
                 val name = if (gpu) "GPU" else "CPU"
@@ -114,26 +135,42 @@ class LiteRtEngine private constructor(private val engine: Engine, override val 
                 val unfinished = runCatching { trying.readText().trim().toInt() }.getOrDefault(0)
                 if (unfinished >= 2) { bad.writeText("crashed while starting"); trying.delete(); continue }
                 trying.writeText((unfinished + 1).toString())
-                var engine: Engine? = null
-                try {
-                    engine = Engine(
-                        EngineConfig(
-                            modelPath = model.absolutePath,
-                            backend = if (gpu) Backend.GPU() else Backend.CPU(threadCount = threads),
-                            maxNumTokens = 2048,
-                            cacheDir = cacheDir.absolutePath,
+                // MTP: on for GPUs except PowerVR (it slows decode there), on the CPU per the setting.
+                // An MTP start that fails is retried once without it before giving up on this backend.
+                val wantMtp = drafter != false && (if (gpu) !Speculation.powerVrGpu else Speculation.mtpOnCpu)
+                val why = when {
+                    drafter == false -> "no drafter in model"
+                    gpu && Speculation.powerVrGpu -> "PowerVR GPU"
+                    !gpu && !Speculation.mtpOnCpu -> "turned off for CPU"
+                    else -> ""
+                }
+                for (mtp in if (wantMtp) listOf(true, false) else listOf(false)) {
+                    var engine: Engine? = null
+                    try {
+                        engine = Engine(
+                            EngineConfig(
+                                modelPath = model.absolutePath,
+                                backend = if (gpu) Backend.GPU() else Backend.CPU(threadCount = threads),
+                                maxNumTokens = 2048,
+                                cacheDir = cacheDir.absolutePath,
+                                speculativeDecodingConfig = SpeculativeDecodingConfig(
+                                    if (mtp) SpeculativeDecodingMode.ON else SpeculativeDecodingMode.OFF
+                                ),
+                            )
                         )
-                    )
-                    engine.initialize()
-                    trying.delete()
-                    Log.i(TAG, "${model.name} loaded on $name")
-                    return LiteRtEngine(engine, "LiteRT-LM $name")
-                } catch (t: Throwable) {
-                    trying.delete()
-                    runCatching { engine?.close() }
-                    Log.w(TAG, "${model.name} failed to start on $name", t)
-                    if (gpu) bad.writeText(t.toString().take(500)) // no usable GPU here: go straight to CPU next time
-                    if (first == null) first = t
+                        engine.initialize()
+                        trying.delete()
+                        Log.i(TAG, "${model.name} loaded on $name, MTP ${if (mtp) "on" else "off"}" +
+                            (if (!mtp && why.isNotEmpty()) " ($why)" else if (!mtp && wantMtp) " (MTP start failed)" else ""))
+                        return LiteRtEngine(engine, "LiteRT-LM $name", mtp)
+                    } catch (t: Throwable) {
+                        runCatching { engine?.close() }
+                        if (mtp) { Log.w(TAG, "${model.name} failed to start on $name with MTP; retrying without", t); continue }
+                        trying.delete()
+                        Log.w(TAG, "${model.name} failed to start on $name", t)
+                        if (gpu) bad.writeText(t.toString().take(500)) // no usable GPU here: go straight to CPU next time
+                        if (first == null) first = t
+                    }
                 }
             }
             throw IllegalStateException("LiteRT-LM couldn't start ${model.name}", first)

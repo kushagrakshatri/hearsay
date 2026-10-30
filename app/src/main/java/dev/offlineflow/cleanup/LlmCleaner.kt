@@ -284,7 +284,8 @@ class LlmCleaner private constructor(
      * KV cache, and the dictionary changing makes old ones useless.
      */
     class PrefixCache(private val dir: File, model: File, format: Format) {
-        private val modelId = "v1|${model.name}|${model.length()}|${model.lastModified()}|$format"
+        // v2: contexts are built with recurrent rollback snapshots (speculative decoding); older files are not reused.
+        private val modelId = "v2|${model.name}|${model.length()}|${model.lastModified()}|$format"
 
         fun fileFor(prefix: String): File {
             val md = MessageDigest.getInstance("SHA-256")

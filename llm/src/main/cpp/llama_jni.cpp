@@ -11,6 +11,10 @@
 // derives from the model file and the prefix text, so after the process is killed the prefix
 // is read back instead of decoded again. A file is only used when its saved tokens match the
 // prefix's tokens exactly.
+//
+// Generation can use prompt-lookup speculative decoding (ngram_spec.h): drafts copied from the
+// transcript are verified in one batched decode, greedy-exact, rolled back with n_rs_seq
+// snapshots on hybrid models. Any error falls back to plain decoding for that call.
 #include <jni.h>
 #include <android/log.h>
 #include <algorithm>
@@ -18,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "llama.h"
+#include "ngram_spec.h"
 
 #define TAG "hearsay-llm"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -30,10 +35,15 @@ struct Llm {
     llama_context *ctx = nullptr;
     const llama_vocab *vocab = nullptr;
     llama_sampler *sampler = nullptr;
-    struct Prefix { std::vector<uint8_t> state; int n_tokens; };
+    struct Prefix { std::vector<uint8_t> state; int n_tokens; std::vector<llama_token> tokens; };
     std::vector<Prefix> prefixes;  // sequence 0 state right after each prefix
     int n_ctx = 0;
     int n_batch = 0;
+    // Speculative decoding: draft length the context was built for (0 = unavailable here),
+    // and whether it is in use (pref; turned off for this model after an error).
+    hearsay_spec::Config spec;
+    int spec_capacity = 0;
+    bool spec_broken = false;
 };
 
 std::vector<llama_token> tokenize(const llama_vocab *vocab, const std::string &s, bool add_special) {
@@ -91,7 +101,7 @@ void free_llm(Llm *l) {
 } // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpath, jint threads) {
+Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpath, jint threads, jint spec_draft) {
     static bool backend = false;
     if (!backend) { llama_backend_init(); backend = true; }
 
@@ -111,15 +121,36 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpa
     cp.n_seq_max = 1;
     cp.n_threads = threads;
     cp.n_threads_batch = threads;
+    // Hybrid/recurrent models keep this many per-token state snapshots so rejected drafts can be
+    // rolled back (llama.cpp clamps it to 0 for models that can't, and attention KV needs none).
+    cp.n_rs_seq = spec_draft > 0 ? (uint32_t) spec_draft : 0;
     l->ctx = llama_init_from_model(l->model, cp);
+    if (!l->ctx && cp.n_rs_seq > 0) {
+        LOGE("context init with n_rs_seq=%u failed, retrying without speculative decoding", cp.n_rs_seq);
+        cp.n_rs_seq = 0;
+        spec_draft = 0;
+        l->ctx = llama_init_from_model(l->model, cp);
+    }
     if (!l->ctx) { LOGE("context init failed"); free_llm(l); return 0; }
+    if (spec_draft > 0) {
+        bool recurrent = llama_model_is_recurrent(l->model) || llama_model_is_hybrid(l->model);
+        if (recurrent && llama_n_rs_seq(l->ctx) < (uint32_t) spec_draft) {
+            LOGI("speculative decoding unavailable: model state can't be rolled back");
+        } else {
+            l->spec_capacity = spec_draft;
+            l->spec.draft_max = spec_draft;
+            l->spec.ngram_min = 3; // a 3-token match before drafting (tools/eval/RESULTS.md)
+            l->spec.ngram_max = 4;
+            l->spec.use_prefix = true;
+        }
+    }
     l->n_ctx = (int) llama_n_ctx(l->ctx);
     l->n_batch = (int) cp.n_batch;
 
     l->sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(l->sampler, llama_sampler_init_greedy());
 
-    LOGI("llm loaded: threads=%d", threads);
+    LOGI("llm loaded: threads=%d spec_draft=%d", threads, l->spec_capacity);
     return reinterpret_cast<jlong>(l);
 }
 
@@ -169,6 +200,7 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeAddPrefix(JNIEnv *env, jobject, jlong
     }
     Llm::Prefix p;
     p.n_tokens = (int) toks.size();
+    p.tokens = toks;
     p.state.resize(llama_state_seq_get_size(l->ctx, 0));
     size_t n = llama_state_seq_get_data(l->ctx, p.state.data(), p.state.size(), 0);
     if (n == 0) { LOGE("snapshot failed"); return -1; }
@@ -181,7 +213,7 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeAddPrefix(JNIEnv *env, jobject, jlong
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_dev_offlineflow_llm_LlamaEngine_nativeComplete(JNIEnv *env, jobject, jlong handle,
-                                                     jint prefix, jstring jsuffix, jint max_tokens) {
+                                                     jint prefix, jstring jsuffix, jint max_tokens, jboolean jspec) {
     auto *l = reinterpret_cast<Llm *>(handle);
     if (!l || prefix < 0 || prefix >= (jint) l->prefixes.size()) return env->NewStringUTF("");
     const auto &pre = l->prefixes[prefix];
@@ -198,12 +230,37 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeComplete(JNIEnv *env, jobject, jlong 
     std::string out;
     llama_sampler_reset(l->sampler);
     char piece[256];
+    // special=true so the caller can see and strip any reasoning-channel markers.
+    auto emit = [&](llama_token tok) {
+        int n = llama_token_to_piece(l->vocab, tok, piece, sizeof(piece), 0, true);
+        if (n > 0) out.append(piece, n);
+        return true;
+    };
+    bool spec = jspec && l->spec_capacity > 0 && !l->spec_broken;
+    if (spec) {
+        hearsay_spec::Stats st;
+        int rc = hearsay_spec::SPEC_ERROR;
+        try {
+            rc = hearsay_spec::generate(l->ctx, l->sampler, l->vocab, pos, budget, toks, &pre.tokens, l->spec, st, emit);
+        } catch (...) {
+            rc = hearsay_spec::SPEC_ERROR;
+        }
+        if (rc == hearsay_spec::SPEC_OK) {
+            LOGI("spec: %d tokens in %d steps, accepted %d/%d drafts (%.0f%%)", st.emitted, st.steps, st.accepted,
+                 st.drafted, st.drafted ? 100.0 * st.accepted / st.drafted : 0.0);
+            return to_jstring(env, out);
+        }
+        // Back to the prefix and decode normally; don't try drafts with this model again.
+        LOGE("speculative decoding failed after %d tokens; plain decoding from now on", st.emitted);
+        l->spec_broken = true;
+        out.clear();
+        if (!restore_prefix(*l, pre) || !decode_all(*l, toks)) { LOGE("fallback prompt decode failed"); return env->NewStringUTF(""); }
+        llama_sampler_reset(l->sampler);
+    }
     for (int i = 0; i < budget; ++i) {
         llama_token tok = llama_sampler_sample(l->sampler, l->ctx, -1);
         if (llama_vocab_is_eog(l->vocab, tok)) break;
-        // special=true so the caller can see and strip any reasoning-channel markers.
-        int n = llama_token_to_piece(l->vocab, tok, piece, sizeof(piece), 0, true);
-        if (n > 0) out.append(piece, n);
+        emit(tok);
         if (llama_decode(l->ctx, llama_batch_get_one(&tok, 1)) != 0) break;
     }
     return to_jstring(env, out);

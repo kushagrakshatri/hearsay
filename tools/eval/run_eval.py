@@ -14,6 +14,8 @@ Build hearsay_llm (from the repo root, after building third_party/llama.cpp's `l
 Usage: run_eval.py --bin ./hearsay_llm --model lfm=/path/LFM2.5-1.2B-Instruct-Q4_K_M.gguf [--model ...]
        [--threads 2] [--rep lfm=1.05] [--out results/] [--only id1,id2] [--format chat|plain|single]
        [--sample lfm=0.1,50,1234]   (temperature,top_k,seed; default greedy)
+       [--spec qwen2b=8,2[,1[,0]]]   (prompt-lookup speculative decoding: draft_max,ngram_min[,use_prefix[,adaptive]];
+                                     greedy only; passed to hearsay_llm as HEARSAY_SPEC)
 Format names: qwen (ChatML + empty think), lfm (ChatML, BOS from tokenizer), minicpm (<s> + ChatML + empty think), gemma4.
 Prompt formats (--format, experiment; the app uses chat):
   chat   the app's prompt: system prompt + 4 few-shots as fake past user/assistant turns, transcript = user turn.
@@ -152,10 +154,13 @@ def looks_sane(inp, out):
 
 # ---------------- engine ----------------
 class Engine:
-    def __init__(self, bin, model, threads, rep, sample=None):
+    def __init__(self, bin, model, threads, rep, sample=None, spec=None):
         args = [bin, model, str(threads)] + ([str(rep)] if (rep and rep != 1.0) or sample else [])
         if sample: args += [str(x) for x in sample]
-        self.p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        env = dict(os.environ)
+        env.pop("HEARSAY_SPEC", None)
+        if spec: env["HEARSAY_SPEC"] = spec
+        self.p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
     def _send(self, head, body):
         b = body.encode(); self.p.stdin.write(f"{head} {len(b)}\n".encode() + b); self.p.stdin.flush()
     def prefix(self, text):
@@ -170,6 +175,10 @@ class Engine:
         _, pt, pms, gt, dms, nb = self.p.stdout.readline().decode().split()
         out = self.p.stdout.read(int(nb)).decode("utf-8", "replace")
         return out, int(pt), float(pms), int(gt), float(dms)
+    def spec_stats(self):
+        self.p.stdin.write(b"Q\n"); self.p.stdin.flush()
+        _, steps, drafted, accepted, fb = self.p.stdout.readline().decode().split()
+        return dict(spec_steps=int(steps), drafted=int(drafted), accepted=int(accepted), spec_fallback=int(fb))
     def close(self): self.p.stdin.close(); self.p.wait()
 
 # ---------------- metrics ----------------
@@ -229,9 +238,9 @@ def clean_output(out):
         out = out.replace("</transcript>", "").replace("<transcript>", "").strip()
     return strip_wrapping(out)
 
-def run_model(name, fmt, path, items, bin, threads, rep, sample=None):
+def run_model(name, fmt, path, items, bin, threads, rep, sample=None, spec=None):
     prefix_fn, turn_fn = build_prompt_fns(fmt)
-    eng = Engine(bin, path, threads, rep, sample)
+    eng = Engine(bin, path, threads, rep, sample, spec)
     if PROMPT_FORMAT == "plain": eng.stops(PLAIN_STOPS)
     pids, pre_info = {}, {}
     for st in ("casual", "polished"):
@@ -252,13 +261,14 @@ def run_model(name, fmt, path, items, bin, threads, rep, sample=None):
             cleaned = clean_output(out)
             sane = looks_sane(inp, cleaned)
             row.update(model_out=cleaned, final=cleaned if sane else inp, skipped=False, fallback=not sane,
-                       hit_cap=gt >= cap, prompt_tokens=pt, prefill_ms=pms, gen_tokens=gt, decode_ms=dms)
+                       hit_cap=gt >= cap, prompt_tokens=pt, prefill_ms=pms, gen_tokens=gt, decode_ms=dms, raw_out=out)
+            if spec: row.update(eng.spec_stats())
         row.update(score(it, row["final"]))
         row["raw_score"] = score(it, row["model_out"]) if row["model_out"] is not None else None
         rows.append(row)
         print(f"  [{name}] {it['id']}: {row['final']!r}", file=sys.stderr)
     eng.close()
-    return dict(model=name, format=fmt, prompt_format=PROMPT_FORMAT, sample=sample, file=os.path.basename(path), rep=rep,
+    return dict(model=name, format=fmt, prompt_format=PROMPT_FORMAT, sample=sample, spec=spec, file=os.path.basename(path), rep=rep,
                 threads=threads, prefix=pre_info, rows=rows)
 
 def summarize(res):
@@ -285,7 +295,16 @@ def summarize(res):
         prefill_tps=round(tot_pf / max(tot_pms, 1e-9) * 1000, 1), decode_tps=round(tot_g / max(tot_d, 1e-9) * 1000, 1),
         mean_ms=round(sum(r["prefill_ms"] + r["decode_ms"] for r in ran) / max(1, len(ran))),
         p90_ms=round(sorted(r["prefill_ms"] + r["decode_ms"] for r in ran)[int(len(ran) * 0.9) - 1]) if ran else 0,
+        **spec_summary(res),
     )
+
+def spec_summary(res):
+    if not res.get("spec"): return {}
+    ran = [r for r in res["rows"] if not r["skipped"]]
+    d = sum(r.get("drafted", 0) for r in ran); a = sum(r.get("accepted", 0) for r in ran)
+    steps = sum(r.get("spec_steps", 0) for r in ran); g = sum(r["gen_tokens"] for r in ran)
+    return dict(spec=res["spec"], drafted=d, accepted=a, acceptance=round(a / max(d, 1), 3),
+                tokens_per_step=round(g / max(steps, 1), 2), spec_fallbacks=sum(r.get("spec_fallback", 0) for r in ran))
 
 def main():
     ap = argparse.ArgumentParser()
@@ -299,10 +318,12 @@ def main():
     ap.add_argument("--wrap", action="store_true", help="experiment: wrap transcripts in <transcript> tags")
     ap.add_argument("--format", choices=["chat", "plain", "single"], default="chat", help="prompt format (experiment; app = chat)")
     ap.add_argument("--sample", action="append", default=[], help="name=temp,top_k,seed (default greedy)")
+    ap.add_argument("--spec", action="append", default=[], help="name=draft_max,ngram_min[,use_prefix[,adaptive]] (speculative decoding)")
     ap.add_argument("--rescore", action="store_true", help="re-score saved results in --out with the current set")
     a = ap.parse_args()
     global WRAP, PROMPT_FORMAT; WRAP = a.wrap; PROMPT_FORMAT = a.format
     samples = {k: tuple(v.split(",")) for k, v in (x.split("=", 1) for x in a.sample)}
+    specs = dict(x.split("=", 1) for x in a.spec)
     items = [json.loads(l) for l in open(a.set) if l.strip()]
     if a.only: items = [i for i in items if i["id"] in a.only.split(",")]
     reps = dict(r.split("=") for r in a.rep)
@@ -320,7 +341,7 @@ def main():
     for spec in a.model:
         name, path = spec.split("=", 1)
         fmt = next(f for f in FORMATS if name.startswith(f))
-        res = run_model(name, fmt, path, items, a.bin, a.threads, float(reps.get(name, 1.0)), samples.get(name))
+        res = run_model(name, fmt, path, items, a.bin, a.threads, float(reps.get(name, 1.0)), samples.get(name), specs.get(name))
         res["summary"] = summarize(res)
         json.dump(res, open(os.path.join(a.out, f"{name}.json"), "w"), indent=1, ensure_ascii=False)
         print(json.dumps(res["summary"]))

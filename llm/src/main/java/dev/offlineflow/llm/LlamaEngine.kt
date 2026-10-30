@@ -27,10 +27,14 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
         return id
     }
 
-    /** Greedy completion after restoring cached prefix [prefixId]. Blocking; off the main thread. */
-    fun complete(prefixId: Int, suffix: String, maxTokens: Int): String {
+    /**
+     * Greedy completion after restoring cached prefix [prefixId]. Blocking; off the main thread.
+     * [speculative]: prompt-lookup drafts from the suffix and prefix (same output, fewer decode
+     * passes); falls back to plain decoding on any error.
+     */
+    fun complete(prefixId: Int, suffix: String, maxTokens: Int, speculative: Boolean = Speculation.draftFromTranscript): String {
         check(handle != 0L) { "LlamaEngine is closed" }
-        return nativeComplete(handle, prefixId, suffix, maxTokens)
+        return nativeComplete(handle, prefixId, suffix, maxTokens, speculative)
     }
 
     override fun close() {
@@ -39,19 +43,20 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
     }
 
     private external fun nativeAddPrefix(handle: Long, prefix: String, cache: String): Int
-    private external fun nativeComplete(handle: Long, prefix: Int, suffix: String, maxTokens: Int): String
+    private external fun nativeComplete(handle: Long, prefix: Int, suffix: String, maxTokens: Int, speculative: Boolean): String
     private external fun nativeFree(handle: Long)
 
     companion object {
         init { System.loadLibrary("hearsayllm") }
 
-        fun load(model: File, threads: Int): LlamaEngine {
+        /** [specDraft]: draft length speculative decoding is set up for (0 = never use it). */
+        fun load(model: File, threads: Int, specDraft: Int = Speculation.LLAMA_DRAFT): LlamaEngine {
             require(model.exists()) { "Model not found: ${model.path}" }
-            val h = nativeInit(model.absolutePath, threads)
+            val h = nativeInit(model.absolutePath, threads, specDraft)
             check(h != 0L) { "Failed to load ${model.name}" }
             return LlamaEngine(h)
         }
 
-        @JvmStatic private external fun nativeInit(path: String, threads: Int): Long
+        @JvmStatic private external fun nativeInit(path: String, threads: Int, specDraft: Int): Long
     }
 }

@@ -113,6 +113,17 @@ class SettingsActivity : AppCompatActivity() {
                 }
             })
             addView(cleanupBar); addView(cleanupAction)
+            addView(ui.space(8))
+            addView(switch("Faster cleanup", Prefs.fastDecoding(context)) { Prefs.setFastDecoding(context, it) })
+            addView(ui.hint("Guesses the next few words from what you said and checks them all at once. Same text, less waiting. " +
+                "Light, Balanced and Fast models."))
+            addView(switch("Multi-token prediction on the processor", Prefs.mtpOnCpu(context)) {
+                Prefs.setMtpOnCpu(context, it)
+                // Applies when the model loads: reload it now if Gemma is running on the processor.
+                if (dev.offlineflow.core.Brain.cleanerBackend == "LiteRT-LM CPU") lifecycleScope.launch { dev.offlineflow.core.Brain.releaseLlm() }
+            })
+            addView(ui.hint("Best model without a graphics chip: lets Gemma write several words per step. " +
+                "On the graphics chip it's used automatically, except on Pixel 10 (PowerVR) where it's slower."))
         }
         stylesInfo = ui.hint("")
         stylesReset = ui.text("Reset all apps") {
