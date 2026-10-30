@@ -1,6 +1,7 @@
 package dev.offlineflow.cleanup
 
 import dev.offlineflow.llm.LlamaEngine
+import dev.offlineflow.llm.RunStats
 import dev.offlineflow.llm.TextEngine
 
 /**
@@ -22,6 +23,8 @@ internal class LlamaText(
 
     override fun complete(handle: Int, note: String?, user: String, maxTokens: Int): String =
         llm.complete(handle, note?.let(format::note).orEmpty() + format.turn(user), maxTokens)
+
+    override val lastRun: RunStats? get() = llm.lastRun
 
     override fun close() = llm.close()
 }

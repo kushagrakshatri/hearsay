@@ -1,6 +1,7 @@
 package dev.offlineflow.llm
 
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * A small instruction-tuned LLM (GGUF) running on-device through llama.cpp.
@@ -34,7 +35,35 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
      */
     fun complete(prefixId: Int, suffix: String, maxTokens: Int, speculative: Boolean = Speculation.draftFromTranscript): String {
         check(handle != 0L) { "LlamaEngine is closed" }
-        return nativeComplete(handle, prefixId, suffix, maxTokens, speculative)
+        val t0 = System.nanoTime()
+        val out = nativeComplete(handle, prefixId, suffix, maxTokens, speculative)
+        val ms = (System.nanoTime() - t0) / 1_000_000
+        lastRun = runCatching { stats(nativeLastRun(handle), ms) }.getOrNull()
+        return out
+    }
+
+    /** What the last [complete] did, for the app's "Last cleanup" readout. */
+    var lastRun: RunStats? = null
+        private set
+
+    /** [a]: mode, tokens, drafted, accepted, generation ms (see llama_jni.cpp). */
+    private fun stats(a: IntArray, ms: Long): RunStats {
+        val (mode, tokens, drafted, accepted) = a
+        val genMs = a[4]
+        val speedup = when (mode) {
+            1 -> if (drafted > 0) "Faster cleanup on, ${(100.0 * accepted / drafted).roundToInt()}% guesses accepted"
+                 else "Faster cleanup on, no guesses this time"
+            2, 3 -> "Faster cleanup fell back to normal"
+            4 -> "Faster cleanup not available for this model"
+            else -> "Faster cleanup off"
+        }
+        return RunStats(
+            engine = "llama.cpp processor",
+            speedup = speedup,
+            ms = ms,
+            tokens = tokens,
+            tokensPerSec = if (tokens > 0 && genMs > 0) tokens * 1000.0 / genMs else null,
+        )
     }
 
     override fun close() {
@@ -45,6 +74,7 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
     private external fun nativeAddPrefix(handle: Long, prefix: String, cache: String): Int
     private external fun nativeComplete(handle: Long, prefix: Int, suffix: String, maxTokens: Int, speculative: Boolean): String
     private external fun nativeFree(handle: Long)
+    private external fun nativeLastRun(handle: Long): IntArray
 
     companion object {
         init { System.loadLibrary("hearsayllm") }

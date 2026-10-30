@@ -66,6 +66,8 @@ class SettingsActivity : AppCompatActivity() {
     private val keySum by lazy { TextView(this) }
     private val bubbleSum by lazy { TextView(this) }
     private val bubbleBox by lazy { ui.column() }
+    /** Settings → Cleanup: what the last on-device cleanup actually ran (model, chip, speed-up, timing). */
+    private val lastCleanupView by lazy { ui.hint("").apply { textSize = 13f; setTextIsSelectable(true) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,15 +116,16 @@ class SettingsActivity : AppCompatActivity() {
             })
             addView(cleanupBar); addView(cleanupAction)
             addView(ui.space(8))
+            addView(lastCleanupView)
+            addView(ui.space(8))
             addView(switch("Faster cleanup", Prefs.fastDecoding(context)) { Prefs.setFastDecoding(context, it) })
-            addView(ui.hint("Guesses the next few words from what you said and checks them all at once. Same text, less waiting. " +
-                "Light, Balanced and Fast models."))
-            addView(switch("Multi-token prediction on the processor", Prefs.mtpOnCpu(context)) {
+            addView(ui.hint("Same model, guesses words from what you said to finish sooner. Qwen/Fast models only."))
+            addView(switch("Best (Gemma): multi-token prediction on the processor", Prefs.mtpOnCpu(context)) {
                 Prefs.setMtpOnCpu(context, it)
                 // Applies when the model loads: reload it now if Gemma is running on the processor.
                 if (dev.offlineflow.core.Brain.cleanerBackend == "LiteRT-LM CPU") lifecycleScope.launch { dev.offlineflow.core.Brain.releaseLlm() }
             })
-            addView(ui.hint("Best model without a graphics chip: lets Gemma write several words per step. " +
+            addView(ui.hint("For the Best (Gemma) model only, when it runs on the processor: lets Gemma write several words per step. " +
                 "On the graphics chip it's used automatically, except on Pixel 10 (PowerVR) where it's slower."))
         }
         stylesInfo = ui.hint("")
@@ -320,6 +323,14 @@ class SettingsActivity : AppCompatActivity() {
         refreshStorage()
         refreshPlan()
         refreshSummaries()
+        refreshLastCleanup()
+    }
+
+    private fun refreshLastCleanup() {
+        val last = Prefs.lastCleanup(this)
+        val gpu = Prefs.gpuRenderer(this)
+        lastCleanupView.text = (if (last.isEmpty()) "Last cleanup: none yet. Dictate something to see what ran."
+            else "Last cleanup: $last") + if (gpu.isNotEmpty()) "\nGraphics chip: $gpu" else ""
     }
 
     private fun refreshSummaries() {

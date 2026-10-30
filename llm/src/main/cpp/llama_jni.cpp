@@ -18,6 +18,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -44,6 +45,10 @@ struct Llm {
     hearsay_spec::Config spec;
     int spec_capacity = 0;
     bool spec_broken = false;
+    // The last completion, for the app's "Last cleanup" readout (LlamaEngine.lastRun).
+    // mode: 0 speculation off, 1 on, 2 failed this call (fell back), 3 off since an earlier
+    // failure, 4 unavailable for this model.
+    int last[5] = {0, 0, 0, 0, 0};  // mode, tokens, drafted, accepted, generation ms
 };
 
 std::vector<llama_token> tokenize(const llama_vocab *vocab, const std::string &s, bool add_special) {
@@ -237,6 +242,13 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeComplete(JNIEnv *env, jobject, jlong 
         return true;
     };
     bool spec = jspec && l->spec_capacity > 0 && !l->spec_broken;
+    int mode = !jspec ? 0 : l->spec_capacity == 0 ? 4 : l->spec_broken ? 3 : 1;
+    int tokens = 0;
+    auto t0 = std::chrono::steady_clock::now();
+    auto record = [&](int m, int drafted, int accepted) {
+        int ms = (int) std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+        l->last[0] = m; l->last[1] = tokens; l->last[2] = drafted; l->last[3] = accepted; l->last[4] = ms;
+    };
     if (spec) {
         hearsay_spec::Stats st;
         int rc = hearsay_spec::SPEC_ERROR;
@@ -248,22 +260,36 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeComplete(JNIEnv *env, jobject, jlong 
         if (rc == hearsay_spec::SPEC_OK) {
             LOGI("spec: %d tokens in %d steps, accepted %d/%d drafts (%.0f%%)", st.emitted, st.steps, st.accepted,
                  st.drafted, st.drafted ? 100.0 * st.accepted / st.drafted : 0.0);
+            tokens = st.emitted;
+            record(1, st.drafted, st.accepted);
             return to_jstring(env, out);
         }
         // Back to the prefix and decode normally; don't try drafts with this model again.
         LOGE("speculative decoding failed after %d tokens; plain decoding from now on", st.emitted);
         l->spec_broken = true;
+        mode = 2;
         out.clear();
         if (!restore_prefix(*l, pre) || !decode_all(*l, toks)) { LOGE("fallback prompt decode failed"); return env->NewStringUTF(""); }
         llama_sampler_reset(l->sampler);
+        t0 = std::chrono::steady_clock::now();
     }
     for (int i = 0; i < budget; ++i) {
         llama_token tok = llama_sampler_sample(l->sampler, l->ctx, -1);
         if (llama_vocab_is_eog(l->vocab, tok)) break;
         emit(tok);
+        ++tokens;
         if (llama_decode(l->ctx, llama_batch_get_one(&tok, 1)) != 0) break;
     }
+    record(mode, 0, 0);
     return to_jstring(env, out);
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_dev_offlineflow_llm_LlamaEngine_nativeLastRun(JNIEnv *env, jobject, jlong handle) {
+    auto *l = reinterpret_cast<Llm *>(handle);
+    jintArray a = env->NewIntArray(5);
+    if (l && a) env->SetIntArrayRegion(a, 0, 5, l->last);
+    return a;
 }
 
 extern "C" JNIEXPORT void JNICALL

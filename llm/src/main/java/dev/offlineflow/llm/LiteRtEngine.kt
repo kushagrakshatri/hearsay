@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.ModelInfo
 import com.google.ai.edge.litertlm.SamplerConfig
@@ -29,7 +30,13 @@ class LiteRtEngine private constructor(
     override val backend: String,
     /** The model's multi-token-prediction drafter is on (speculative decoding). */
     val mtp: Boolean,
+    /** MTP state in plain words: "MTP on", "MTP off (PowerVR GPU)", … */
+    val mtpStatus: String,
 ) : TextEngine {
+    private var last: RunStats? = null
+    override val lastRun: RunStats? get() = last
+    private var benchmark = true
+
     private class Prompt(val system: String, val examples: List<String>, var base: Conversation?)
 
     private val prompts = ArrayList<Prompt>()
@@ -72,10 +79,30 @@ class LiteRtEngine private constructor(
         try {
             val t0 = System.nanoTime()
             val out = conv.sendMessage(Message.user(user), maxOutputToken = maxTokens).toString()
-            Log.i(TAG, "complete: ${out.length} chars in ${(System.nanoTime() - t0) / 1_000_000} ms ($backend, MTP ${if (mtp) "on" else "off"})")
+            val ms = (System.nanoTime() - t0) / 1_000_000
+            Log.i(TAG, "complete: ${out.length} chars in $ms ms ($backend, MTP ${if (mtp) "on" else "off"})")
+            last = stats(conv, out, ms)
             return out
         } finally {
             runCatching { conv.close() }
+        }
+    }
+
+    /**
+     * Token counts from LiteRT-LM's benchmark info when the runtime reports them; otherwise an
+     * estimate from the text (~4 characters a token) over the whole call, marked approximate.
+     */
+    @OptIn(ExperimentalApi::class)
+    private fun stats(conv: Conversation, out: String, ms: Long): RunStats {
+        val engineName = if (backend.endsWith("GPU")) "LiteRT-LM graphics chip" else "LiteRT-LM processor"
+        // Benchmark info is off unless the runtime collects it: after one failure, don't ask again.
+        val bench = if (!benchmark) null else runCatching { conv.getBenchmarkInfo() }.onFailure { benchmark = false }.getOrNull()
+        val n = bench?.lastDecodeTokenCount ?: 0
+        val tps = bench?.lastDecodeTokensPerSecond ?: 0.0
+        return if (n > 0 && tps > 0.0) RunStats(engineName, mtpStatus, ms, n, tps)
+        else {
+            val est = (out.length + 3) / 4
+            RunStats(engineName, mtpStatus, ms, est, if (est > 0 && ms > 0) est * 1000.0 / ms else null, approx = true)
         }
     }
 
@@ -141,7 +168,7 @@ class LiteRtEngine private constructor(
                 val why = when {
                     drafter == false -> "no drafter in model"
                     gpu && Speculation.powerVrGpu -> "PowerVR GPU"
-                    !gpu && !Speculation.mtpOnCpu -> "turned off for CPU"
+                    !gpu && !Speculation.mtpOnCpu -> "turned off for processor"
                     else -> ""
                 }
                 for (mtp in if (wantMtp) listOf(true, false) else listOf(false)) {
@@ -162,7 +189,13 @@ class LiteRtEngine private constructor(
                         trying.delete()
                         Log.i(TAG, "${model.name} loaded on $name, MTP ${if (mtp) "on" else "off"}" +
                             (if (!mtp && why.isNotEmpty()) " ($why)" else if (!mtp && wantMtp) " (MTP start failed)" else ""))
-                        return LiteRtEngine(engine, "LiteRT-LM $name", mtp)
+                        val status = when {
+                            mtp -> "MTP on"
+                            why.isNotEmpty() -> "MTP off ($why)"
+                            wantMtp -> "MTP off (didn't start)"
+                            else -> "MTP off"
+                        }
+                        return LiteRtEngine(engine, "LiteRT-LM $name", mtp, status)
                     } catch (t: Throwable) {
                         runCatching { engine?.close() }
                         if (mtp) { Log.w(TAG, "${model.name} failed to start on $name with MTP; retrying without", t); continue }

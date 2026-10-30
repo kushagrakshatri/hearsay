@@ -81,6 +81,19 @@ object Prefs {
         dev.offlineflow.llm.Speculation.mtpOnCpu = mtpOnCpu(c)
     }
 
+    /** The "Last cleanup" readout (see CleanupStatus), updated after each on-device cleanup. */
+    fun lastCleanup(c: Context): String = p(c).getString("last_cleanup", null) ?: ""
+    /** The GPU's GL renderer, once Hearsay has looked it up (when Gemma loads on the graphics chip). */
+    fun gpuRenderer(c: Context): String = p(c).getString("gpu_renderer", null) ?: ""
+
+    /** Saves [status] (null = this dictation didn't run the model; keep the last one) and the GPU name once known. */
+    fun recordCleanup(c: Context, status: String?) {
+        val e = p(c).edit()
+        if (status != null) e.putString("last_cleanup", status)
+        dev.offlineflow.llm.Speculation.detectedRenderer?.let { e.putString("gpu_renderer", it) }
+        e.apply()
+    }
+
     fun setupDone(c: Context): Boolean = p(c).getBoolean("setup_done", false)
     fun setSetupDone(c: Context) = p(c).edit().putBoolean("setup_done", true).apply()
 

@@ -20,4 +20,7 @@ interface TextEngine : AutoCloseable {
      * for this call only (e.g. names to spell exactly). Blocking; call off the main thread.
      */
     fun complete(handle: Int, note: String?, user: String, maxTokens: Int): String
+
+    /** What the last [complete] did (chip, speed-up, timing); null before the first call. */
+    val lastRun: RunStats? get() = null
 }

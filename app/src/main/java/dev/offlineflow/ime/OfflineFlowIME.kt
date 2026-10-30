@@ -460,7 +460,7 @@ class OfflineFlowIME : InputMethodService() {
             val ctx = this@OfflineFlowIME
             suspend fun local() = withContext(llmDispatcher) {
                 when (val c = cleanerForSelected(saved)) {
-                    is LlmCleaner -> fixWords(c.clean(heard, s, names))
+                    is LlmCleaner -> fixWords(c.clean(heard, s, names)).also { Prefs.recordCleanup(ctx, c.lastStatus) }
                     else -> fixWords(rulesFor(heard, s))
                 }
             }

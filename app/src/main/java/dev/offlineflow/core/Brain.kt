@@ -123,7 +123,7 @@ object Brain {
         var note: String? = null
         suspend fun local() = withContext(llm) {
             when (val c = cleaner(models, saved)) {
-                is LlmCleaner -> fix(c.clean(heard, style, names))
+                is LlmCleaner -> fix(c.clean(heard, style, names)).also { dev.offlineflow.Prefs.recordCleanup(ctx, c.lastStatus) }
                 else -> fix(rules(heard, style))
             }
         }

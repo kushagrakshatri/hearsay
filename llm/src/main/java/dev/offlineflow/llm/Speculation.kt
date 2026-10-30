@@ -44,8 +44,13 @@ object Speculation {
         val r = glRenderer
         val pvr = (r?.contains("PowerVR", ignoreCase = true) == true) || (tensorGen != null && tensorGen >= 5)
         Log.i(TAG, "gpu: renderer=${r ?: "?"} soc=${soc.ifBlank { "?" }} powerVR=$pvr")
+        detectedRenderer = r
         pvr
     }
+
+    /** The GL renderer once [powerVrGpu] has looked it up (when Gemma loads on the GPU); null before. */
+    @Volatile var detectedRenderer: String? = null
+        private set
 
     private fun queryRenderer(): String? {
         val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)

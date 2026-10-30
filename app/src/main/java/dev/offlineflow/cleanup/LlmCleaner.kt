@@ -19,9 +19,18 @@ class LlmCleaner private constructor(
     private val llm: TextEngine,
     /** Every spelling the dictionary had when this cleaner's prompts were built. */
     private val known: List<String>,
+    /** The model's short name, e.g. "Qwen3.5 2B", for the "Last cleanup" readout. */
+    val modelName: String = "",
 ) : Cleaner, AutoCloseable {
     /** Runtime and processor the model runs on, e.g. "LiteRT-LM GPU". */
     val backend: String get() = llm.backend
+
+    /**
+     * The "Last cleanup" readout for the most recent [clean] that ran the model; null when the
+     * last one didn't (very short or verbatim input) or the engine reported nothing.
+     */
+    var lastStatus: String? = null
+        private set
 
     private val dictionary = known.take(MAX_DICTIONARY)
     private val knownSet = known.toHashSet()
@@ -37,9 +46,13 @@ class LlmCleaner private constructor(
      * Of [names] (seen on screen) and newly learned words, only the few that sound like something
      * in the transcript ride in a short note after the cached prompt, for this call only.
      */
-    fun clean(raw: String, style: Style, names: List<String> = emptyList()): String = cleanWith(raw, style) { input, words ->
-        val note = namesNote(hints(learned + names, input))
-        llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
+    fun clean(raw: String, style: Style, names: List<String> = emptyList()): String {
+        lastStatus = null
+        return cleanWith(raw, style) { input, words ->
+            val note = namesNote(hints(learned + names, input))
+            llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
+                .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
+        }
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
@@ -85,7 +98,7 @@ class LlmCleaner private constructor(
      * weights. Null once enough prompt snapshots have piled up that a fresh load is better.
      */
     fun withDictionary(dictionary: Dictionary): LlmCleaner? =
-        if (llm.preparedCount < 12) LlmCleaner(llm, dictionary.spellings) else null
+        if (llm.preparedCount < 12) LlmCleaner(llm, dictionary.spellings, modelName) else null
 
     companion object {
         /**
@@ -258,7 +271,7 @@ class LlmCleaner private constructor(
                     LlamaText(LlamaEngine.load(file, threads), format, prefixDir?.let { PrefixCache(it, file, format) })
                 }
             }
-            return LlmCleaner(engine, dictionary.spellings)
+            return LlmCleaner(engine, dictionary.spellings, model.shortName)
         }
 
         /** Drops any reasoning block and end-of-turn markers a model printed (any chat format). */
