@@ -42,6 +42,8 @@ adb shell "run-as $P sh -c 'cat > shared_prefs/hearsay.xml'" <<'XML'
     <boolean name="setup_done" value="true" />
     <string name="model">PARAKEET_V2</string>
     <string name="cleanup">QWEN35_0_8B</string>
+    <int name="bubble_x" value="42" />
+    <int name="bubble_dy" value="-470" />
 </map>
 XML
 adb shell run-as $P ls -lR files/models | tee $OUT/models.txt
@@ -53,7 +55,7 @@ adb shell settings put secure enabled_accessibility_services $P/$N.bubble.Bubble
 adb shell settings put secure accessibility_enabled 1; sleep 3
 # The service binds only to a running app; re-toggle until it shows as bound.
 for i in 1 2 3; do
-  adb shell dumpsys accessibility | grep -q "BubbleService" && adb shell dumpsys accessibility | grep -iA2 "Bound services" | grep -q Bubble && break
+  adb shell dumpsys accessibility | grep -i "Bound services" | grep -qi "floating mic" && break
   adb shell settings put secure enabled_accessibility_services null; sleep 1
   adb shell settings put secure enabled_accessibility_services $P/$N.bubble.BubbleService; sleep 3
 done

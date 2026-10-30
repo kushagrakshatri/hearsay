@@ -99,6 +99,8 @@ class BubbleService : AccessibilityService() {
     private var lastEditable: AccessibilityNodeInfo? = null
     // Undo to what you actually said: the raw words for the last cleaned insert.
     private var lastRaw: String? = null
+    // Set in onDestroy: a check still queued on the main thread must not put up a bubble nobody owns.
+    private var destroyed = false
     private var undoable = false
     // A voice-activity gate made ahead of time, so pressing the mic doesn't stall on loading it.
     @Volatile private var spareGate: SpeechGate? = null
@@ -268,6 +270,7 @@ class BubbleService : AccessibilityService() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun show() {
+        if (destroyed) return
         idleJob?.cancel(); idleJob = null
         if (root == null) {
             val t = DynamicColors.wrapContextIfAvailable(ContextThemeWrapper(this, R.style.Theme_Hearsay))
@@ -605,10 +608,12 @@ class BubbleService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        destroyed = true
+        main.removeCallbacksAndMessages(null)
         snap?.cancel()
         spareGate?.close(); spareGate = null
         recorder?.stop(); recorder = null
-        root?.let { runCatching { wm.removeView(it) } }; root = null
+        root?.let { runCatching { wm.removeViewImmediate(it) } }; root = null
         scope.cancel()
         super.onDestroy()
     }
