@@ -109,5 +109,6 @@ field Message; say plane; sleep 2.5; send; sleep 2.5; stop plane
 adb shell cmd connectivity airplane-mode disable
 
 adb logcat -d -s HearsayBubble:* > $OUT/bubble-log.txt 2>&1
+adb logcat -d > $OUT/full-log.txt 2>&1 || true
 adb logcat -d -b crash > $OUT/crash-log.txt 2>&1 || true
 ls -l $OUT

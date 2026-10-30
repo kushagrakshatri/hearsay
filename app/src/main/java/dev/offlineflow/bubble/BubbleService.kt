@@ -113,6 +113,7 @@ class BubbleService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Log.i(TAG, "connected ${System.identityHashCode(this)}")
         models = ModelManager(this)
         wm = getSystemService(WindowManager::class.java)
         check()
@@ -498,6 +499,7 @@ class BubbleService : AccessibilityService() {
         val names = target()?.let { n -> scope.async(Dispatchers.Default) { runCatching { screenNames(n) }.getOrDefault(emptyList()) } }
         scope.launch {
             try {
+                Log.i(TAG, "transcribe ${audio.size} samples on ${System.identityHashCode(this@BubbleService)}")
                 val raw = try { Brain.transcribe(this@BubbleService, models, audio) } catch (t: Throwable) {
                     Log.e(TAG, "transcription failed", t); say("Couldn't write that down"); return@launch
                 }
@@ -607,7 +609,13 @@ class BubbleService : AccessibilityService() {
         }
     }
 
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        Log.i(TAG, "unbind ${System.identityHashCode(this)}")
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
+        Log.i(TAG, "destroy ${System.identityHashCode(this)}", Throwable("where"))
         destroyed = true
         main.removeCallbacksAndMessages(null)
         snap?.cancel()
