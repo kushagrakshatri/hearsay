@@ -1,0 +1,584 @@
+{
+ "model": "gemma-4-E2B-it.litertlm",
+ "summary": {
+  "mtp_off": {
+   "mean_ms": 2199,
+   "p90_ms": 2332,
+   "decode_tps": 22.8,
+   "mean_decode_ms": 616
+  },
+  "mtp_on": {
+   "mean_ms": 2033,
+   "p90_ms": 2307,
+   "decode_tps": 30.5,
+   "mean_decode_ms": 437
+  },
+  "identical_outputs": "15/15"
+ },
+ "runs": [
+  {
+   "mtp": false,
+   "load_s": 0.2783699035644531,
+   "rows": [
+    {
+     "id": "demo_chat",
+     "out": "Hey, are we still on for dinner Friday, around seven?",
+     "ms": 2331.5577507019043,
+     "prefill_tokens": 406,
+     "prefill_tps": 242.55004606192648,
+     "decode_tokens": 14,
+     "decode_tps": 21.36647437114444
+    },
+    {
+     "id": "demo_mail",
+     "out": "Hi team, quick update. The launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "ms": 3181.084632873535,
+     "prefill_tokens": 448,
+     "prefill_tps": 284.96282765184145,
+     "decode_tokens": 37,
+     "decode_tps": 23.026932253287228
+    },
+    {
+     "id": "demo_names",
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight",
+     "ms": 2313.8320446014404,
+     "prefill_tokens": 408,
+     "prefill_tps": 256.0985195538382,
+     "decode_tokens": 16,
+     "decode_tps": 22.27110057572368
+    },
+    {
+     "id": "demo_plane",
+     "out": "Just landed, give me twenty minutes and I'll come grab you",
+     "ms": 2279.7303199768066,
+     "prefill_tokens": 408,
+     "prefill_tps": 254.23024911972885,
+     "decode_tokens": 15,
+     "decode_tps": 22.316220589865733
+    },
+    {
+     "id": "fill_1",
+     "out": "I think I'm gonna be a little late today",
+     "ms": 2064.0103816986084,
+     "prefill_tokens": 407,
+     "prefill_tps": 262.42870368250567,
+     "decode_tokens": 12,
+     "decode_tps": 23.486728412114374
+    },
+    {
+     "id": "fill_2",
+     "out": "The build is failing because of the new dependency.",
+     "ms": 2025.5780220031738,
+     "prefill_tokens": 427,
+     "prefill_tps": 275.17148351749364,
+     "decode_tokens": 11,
+     "decode_tps": 23.310596615351383
+    },
+    {
+     "id": "fill_3",
+     "out": "You know what, let's just order pizza tonight",
+     "ms": 2123.755693435669,
+     "prefill_tokens": 408,
+     "prefill_tps": 259.67576218596093,
+     "decode_tokens": 12,
+     "decode_tps": 21.781949011332582
+    },
+    {
+     "id": "fill_4",
+     "out": "Can we push the review to next week?",
+     "ms": 2052.4227619171143,
+     "prefill_tokens": 426,
+     "prefill_tps": 267.34283015268886,
+     "decode_tokens": 10,
+     "decode_tps": 21.866303046956936
+    },
+    {
+     "id": "rep_1",
+     "out": "I need to call mom later, she wanted to talk about the trip",
+     "ms": 2469.3524837493896,
+     "prefill_tokens": 411,
+     "prefill_tps": 225.16050077354217,
+     "decode_tokens": 15,
+     "decode_tps": 23.355243671119386
+    },
+    {
+     "id": "rep_2",
+     "out": "The numbers for Q3 look really good this time.",
+     "ms": 2083.263874053955,
+     "prefill_tokens": 426,
+     "prefill_tps": 273.755159732913,
+     "decode_tokens": 12,
+     "decode_tps": 22.843970023244005
+    },
+    {
+     "id": "corr_1",
+     "out": "Let's meet Wednesday at the usual spot",
+     "ms": 2037.5730991363525,
+     "prefill_tokens": 407,
+     "prefill_tps": 253.85786139072604,
+     "decode_tokens": 10,
+     "decode_tps": 23.119016955910112
+    },
+    {
+     "id": "corr_2",
+     "out": "Please send it to Sarah by the end of the day.",
+     "ms": 2157.4835777282715,
+     "prefill_tokens": 429,
+     "prefill_tps": 268.4839234042127,
+     "decode_tokens": 13,
+     "decode_tps": 23.305325137001073
+    },
+    {
+     "id": "corr_3",
+     "out": "Grab three bags of ice for the party",
+     "ms": 2003.9632320404053,
+     "prefill_tokens": 404,
+     "prefill_tps": 249.91708413057654,
+     "decode_tokens": 9,
+     "decode_tps": 23.33872208002616
+    },
+    {
+     "id": "corr_4",
+     "out": "The meeting is at 4 PM in conference room B.",
+     "ms": 2189.6767616271973,
+     "prefill_tokens": 431,
+     "prefill_tps": 267.81510539494064,
+     "decode_tokens": 13,
+     "decode_tps": 22.481647133303092
+    },
+    {
+     "id": "corr_5",
+     "out": "I'll be there at 6:30",
+     "ms": 2126.5525817871094,
+     "prefill_tokens": 411,
+     "prefill_tps": 256.83637758762933,
+     "decode_tokens": 12,
+     "decode_tps": 22.90251492039205
+    }
+   ]
+  },
+  {
+   "mtp": true,
+   "load_s": 0.2970619201660156,
+   "rows": [
+    {
+     "id": "demo_chat",
+     "out": "Hey, are we still on for dinner Friday, around seven?",
+     "ms": 2084.352970123291,
+     "prefill_tokens": 406,
+     "prefill_tps": 250.82229572162544,
+     "decode_tokens": 14,
+     "decode_tps": 30.200609511721225
+    },
+    {
+     "id": "demo_mail",
+     "out": "Hi team, quick update. The launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "ms": 2502.464532852173,
+     "prefill_tokens": 448,
+     "prefill_tps": 284.40891824930185,
+     "decode_tokens": 37,
+     "decode_tps": 39.97373755692906
+    },
+    {
+     "id": "demo_names",
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight",
+     "ms": 1985.6491088867188,
+     "prefill_tokens": 408,
+     "prefill_tps": 263.8984713966934,
+     "decode_tokens": 15,
+     "decode_tps": 34.245583315157305
+    },
+    {
+     "id": "demo_plane",
+     "out": "Just landed, give me twenty minutes and I'll come grab you",
+     "ms": 2042.9089069366455,
+     "prefill_tokens": 408,
+     "prefill_tps": 255.07069108842416,
+     "decode_tokens": 14,
+     "decode_tps": 31.694180282695925
+    },
+    {
+     "id": "fill_1",
+     "out": "I think I'm gonna be a little late today",
+     "ms": 1928.20405960083,
+     "prefill_tokens": 407,
+     "prefill_tps": 260.88643719281964,
+     "decode_tokens": 11,
+     "decode_tps": 30.17955203766601
+    },
+    {
+     "id": "fill_2",
+     "out": "The build is failing because of the new dependency.",
+     "ms": 1910.3567600250244,
+     "prefill_tokens": 427,
+     "prefill_tps": 272.07102796613697,
+     "decode_tokens": 10,
+     "decode_tps": 29.472180335131526
+    },
+    {
+     "id": "fill_3",
+     "out": "You know what, let's just order pizza tonight",
+     "ms": 1908.076286315918,
+     "prefill_tokens": 408,
+     "prefill_tps": 261.3178223579621,
+     "decode_tokens": 11,
+     "decode_tps": 31.880992960073915
+    },
+    {
+     "id": "fill_4",
+     "out": "Can we push the review to next week?",
+     "ms": 1975.6615161895752,
+     "prefill_tokens": 426,
+     "prefill_tps": 269.7766532766339,
+     "decode_tokens": 9,
+     "decode_tps": 22.79663396149264
+    },
+    {
+     "id": "rep_1",
+     "out": "I need to call mom later, she wanted to talk about the trip",
+     "ms": 2044.4238185882568,
+     "prefill_tokens": 411,
+     "prefill_tps": 256.88679559943694,
+     "decode_tokens": 14,
+     "decode_tps": 31.623925745124914
+    },
+    {
+     "id": "rep_2",
+     "out": "The numbers for Q3 look really good this time.",
+     "ms": 1927.2255897521973,
+     "prefill_tokens": 426,
+     "prefill_tps": 269.4454976361951,
+     "decode_tokens": 11,
+     "decode_tps": 31.95271769294337
+    },
+    {
+     "id": "corr_1",
+     "out": "Let's meet Wednesday at the usual spot",
+     "ms": 1949.2199420928955,
+     "prefill_tokens": 407,
+     "prefill_tps": 254.01802783044482,
+     "decode_tokens": 10,
+     "decode_tps": 28.962019216687843
+    },
+    {
+     "id": "corr_2",
+     "out": "Please send it to Sarah by the end of the day.",
+     "ms": 2026.3609886169434,
+     "prefill_tokens": 429,
+     "prefill_tps": 271.8448791121411,
+     "decode_tokens": 12,
+     "decode_tps": 26.878656660647707
+    },
+    {
+     "id": "corr_3",
+     "out": "Grab three bags of ice for the party",
+     "ms": 2307.4951171875,
+     "prefill_tokens": 404,
+     "prefill_tps": 238.477131928139,
+     "decode_tokens": 8,
+     "decode_tps": 13.134023454794907
+    },
+    {
+     "id": "corr_4",
+     "out": "The meeting is at 4 PM in conference room B.",
+     "ms": 2308.0408573150635,
+     "prefill_tokens": 431,
+     "prefill_tps": 231.660091870179,
+     "decode_tokens": 12,
+     "decode_tps": 26.989871214140884
+    },
+    {
+     "id": "corr_5",
+     "out": "I'll be there at 6:30",
+     "ms": 1964.7674560546875,
+     "prefill_tokens": 411,
+     "prefill_tps": 254.06999751695724,
+     "decode_tokens": 12,
+     "decode_tps": 34.738513539700406
+    }
+   ]
+  },
+  {
+   "mtp": true,
+   "load_s": 0.2243342399597168,
+   "rows": [
+    {
+     "id": "demo_chat",
+     "out": "Hey, are we still on for dinner Friday, around seven?",
+     "ms": 2080.2745819091797,
+     "prefill_tokens": 406,
+     "prefill_tps": 250.60997789627402,
+     "decode_tokens": 14,
+     "decode_tps": 30.55046546612808
+    },
+    {
+     "id": "demo_mail",
+     "out": "Hi team, quick update. The launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "ms": 2522.883415222168,
+     "prefill_tokens": 448,
+     "prefill_tps": 283.9216138789494,
+     "decode_tokens": 37,
+     "decode_tps": 39.22899706612799
+    },
+    {
+     "id": "demo_names",
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight",
+     "ms": 2029.6337604522705,
+     "prefill_tokens": 408,
+     "prefill_tps": 258.24732354530994,
+     "decode_tokens": 15,
+     "decode_tps": 33.48161701638989
+    },
+    {
+     "id": "demo_plane",
+     "out": "Just landed, give me twenty minutes and I'll come grab you",
+     "ms": 2071.6052055358887,
+     "prefill_tokens": 408,
+     "prefill_tps": 252.957339758959,
+     "decode_tokens": 14,
+     "decode_tps": 30.642496904035326
+    },
+    {
+     "id": "fill_1",
+     "out": "I think I'm gonna be a little late today",
+     "ms": 1909.8362922668457,
+     "prefill_tokens": 407,
+     "prefill_tps": 260.9522517616289,
+     "decode_tokens": 11,
+     "decode_tps": 31.59145062972818
+    },
+    {
+     "id": "fill_2",
+     "out": "The build is failing because of the new dependency.",
+     "ms": 1902.8356075286865,
+     "prefill_tokens": 427,
+     "prefill_tps": 274.08865151074275,
+     "decode_tokens": 10,
+     "decode_tps": 29.14065895638051
+    },
+    {
+     "id": "fill_3",
+     "out": "You know what, let's just order pizza tonight",
+     "ms": 1948.2135772705078,
+     "prefill_tokens": 408,
+     "prefill_tps": 257.12794960979375,
+     "decode_tokens": 11,
+     "decode_tps": 30.582691322710435
+    },
+    {
+     "id": "fill_4",
+     "out": "Can we push the review to next week?",
+     "ms": 1966.1037921905518,
+     "prefill_tokens": 426,
+     "prefill_tps": 264.75424590159696,
+     "decode_tokens": 9,
+     "decode_tps": 25.35739222797675
+    },
+    {
+     "id": "rep_1",
+     "out": "I need to call mom later, she wanted to talk about the trip",
+     "ms": 2049.0193367004395,
+     "prefill_tokens": 411,
+     "prefill_tps": 256.9918127373219,
+     "decode_tokens": 14,
+     "decode_tps": 31.253511345952177
+    },
+    {
+     "id": "rep_2",
+     "out": "The numbers for Q3 look really good this time.",
+     "ms": 1886.2152099609375,
+     "prefill_tokens": 426,
+     "prefill_tps": 276.04329959211157,
+     "decode_tokens": 11,
+     "decode_tps": 32.22735978096224
+    },
+    {
+     "id": "corr_1",
+     "out": "Let's meet Wednesday at the usual spot",
+     "ms": 1899.5826244354248,
+     "prefill_tokens": 407,
+     "prefill_tps": 261.42227681233214,
+     "decode_tokens": 10,
+     "decode_tps": 29.316596738423662
+    },
+    {
+     "id": "corr_2",
+     "out": "Please send it to Sarah by the end of the day.",
+     "ms": 2011.8107795715332,
+     "prefill_tokens": 429,
+     "prefill_tps": 273.9230557032495,
+     "decode_tokens": 12,
+     "decode_tps": 27.021658906703003
+    },
+    {
+     "id": "corr_3",
+     "out": "Grab three bags of ice for the party",
+     "ms": 1927.1132946014404,
+     "prefill_tokens": 404,
+     "prefill_tps": 255.0983384046599,
+     "decode_tokens": 8,
+     "decode_tps": 23.401778191136387
+    },
+    {
+     "id": "corr_4",
+     "out": "The meeting is at 4 PM in conference room B.",
+     "ms": 2008.0523490905762,
+     "prefill_tokens": 431,
+     "prefill_tps": 276.4882038998915,
+     "decode_tokens": 12,
+     "decode_tps": 26.81068382961529
+    },
+    {
+     "id": "corr_5",
+     "out": "I'll be there at 6:30",
+     "ms": 1912.6694202423096,
+     "prefill_tokens": 411,
+     "prefill_tps": 262.67929585175585,
+     "decode_tokens": 12,
+     "decode_tps": 34.65271054931341
+    }
+   ]
+  },
+  {
+   "mtp": false,
+   "load_s": 0.22632455825805664,
+   "rows": [
+    {
+     "id": "demo_chat",
+     "out": "Hey, are we still on for dinner Friday, around seven?",
+     "ms": 2243.14022064209,
+     "prefill_tokens": 406,
+     "prefill_tps": 251.5668550343098,
+     "decode_tokens": 14,
+     "decode_tps": 22.31237160554938
+    },
+    {
+     "id": "demo_mail",
+     "out": "Hi team, quick update. The launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "ms": 3182.769298553467,
+     "prefill_tokens": 448,
+     "prefill_tps": 289.39424377369204,
+     "decode_tokens": 37,
+     "decode_tps": 22.656767732976007
+    },
+    {
+     "id": "demo_names",
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight",
+     "ms": 2255.0132274627686,
+     "prefill_tokens": 408,
+     "prefill_tps": 263.01378883051456,
+     "decode_tokens": 16,
+     "decode_tps": 22.785221143850713
+    },
+    {
+     "id": "demo_plane",
+     "out": "Just landed, give me twenty minutes and I'll come grab you",
+     "ms": 2214.3213748931885,
+     "prefill_tokens": 408,
+     "prefill_tps": 261.38486157298297,
+     "decode_tokens": 15,
+     "decode_tps": 23.013433828109783
+    },
+    {
+     "id": "fill_1",
+     "out": "I think I'm gonna be a little late today",
+     "ms": 2081.0670852661133,
+     "prefill_tokens": 407,
+     "prefill_tps": 263.7665831128228,
+     "decode_tokens": 12,
+     "decode_tps": 22.37038584460147
+    },
+    {
+     "id": "fill_2",
+     "out": "The build is failing because of the new dependency.",
+     "ms": 2054.849147796631,
+     "prefill_tokens": 427,
+     "prefill_tps": 272.3753925986696,
+     "decode_tokens": 11,
+     "decode_tps": 22.65324221254744
+    },
+    {
+     "id": "fill_3",
+     "out": "You know what, let's just order pizza tonight",
+     "ms": 2105.3922176361084,
+     "prefill_tokens": 408,
+     "prefill_tps": 256.64635056881383,
+     "decode_tokens": 12,
+     "decode_tps": 23.373221996081107
+    },
+    {
+     "id": "fill_4",
+     "out": "Can we push the review to next week?",
+     "ms": 1995.4206943511963,
+     "prefill_tokens": 426,
+     "prefill_tps": 272.93432311611616,
+     "decode_tokens": 10,
+     "decode_tps": 23.103433111246574
+    },
+    {
+     "id": "rep_1",
+     "out": "I need to call mom later, she wanted to talk about the trip",
+     "ms": 2196.3117122650146,
+     "prefill_tokens": 411,
+     "prefill_tps": 265.59823094155985,
+     "decode_tokens": 15,
+     "decode_tps": 23.178706518432822
+    },
+    {
+     "id": "rep_2",
+     "out": "The numbers for Q3 look really good this time.",
+     "ms": 2067.7289962768555,
+     "prefill_tokens": 426,
+     "prefill_tps": 276.41182393648586,
+     "decode_tokens": 12,
+     "decode_tps": 22.864426374603596
+    },
+    {
+     "id": "corr_1",
+     "out": "Let's meet Wednesday at the usual spot",
+     "ms": 1964.3409252166748,
+     "prefill_tokens": 407,
+     "prefill_tps": 264.28606746800443,
+     "decode_tokens": 10,
+     "decode_tps": 23.663022487848167
+    },
+    {
+     "id": "corr_2",
+     "out": "Please send it to Sarah by the end of the day.",
+     "ms": 2082.5517177581787,
+     "prefill_tokens": 429,
+     "prefill_tps": 281.7294803032419,
+     "decode_tokens": 13,
+     "decode_tps": 23.292832765077502
+    },
+    {
+     "id": "corr_3",
+     "out": "Grab three bags of ice for the party",
+     "ms": 1933.3977699279785,
+     "prefill_tokens": 404,
+     "prefill_tps": 261.3228194107343,
+     "decode_tokens": 9,
+     "decode_tps": 23.331203704265143
+    },
+    {
+     "id": "corr_4",
+     "out": "The meeting is at 4 PM in conference room B.",
+     "ms": 2095.676898956299,
+     "prefill_tokens": 431,
+     "prefill_tps": 282.07111373645074,
+     "decode_tokens": 13,
+     "decode_tps": 22.96720895079622
+    },
+    {
+     "id": "corr_5",
+     "out": "I'll be there at 6:30",
+     "ms": 2046.6883182525635,
+     "prefill_tokens": 411,
+     "prefill_tps": 267.88449556809803,
+     "decode_tokens": 12,
+     "decode_tps": 23.49118662945553
+    }
+   ]
+  }
+ ]
+}

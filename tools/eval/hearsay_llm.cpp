@@ -14,7 +14,7 @@
 //                                                 ends at the first stop, which is cut from the output
 //                                                 (for plain-completion prompts with no end-of-turn token)
 //   Q\n                                        -> "Q <steps> <drafted> <accepted> <fallback>\n" speculative stats of the last C
-//   X <draft_max> <ngram_min> <use_prefix>\n   -> "X <on>\n" change the speculative settings for later C calls (draft_max 0 =
+//   X <draft_max> <ngram_min> <use_prefix> [pad_to]\n -> "X <on>\n" change the speculative settings for later C calls (draft_max 0 =
 //                                                 plain decoding; capped at the HEARSAY_SPEC draft_max the context was built for),
 //                                                 for paired A/B timing in one process (tools/eval/spec_ab.py)
 //
@@ -192,11 +192,11 @@ int main(int argc, char **argv) {
             std::printf("C %zu %.1f %d %.1f %zu\n", toks.size(), prefill, gen, dec, out.size());
             std::fwrite(out.data(), 1, out.size(), stdout);
         } else if (line[0] == 'X') {
-            int d = 0, g = 2, up = 1;
-            std::sscanf(line + 2, "%d %d %d", &d, &g, &up);
+            int d = 0, g = 2, up = 1, pad = 4;
+            std::sscanf(line + 2, "%d %d %d %d", &d, &g, &up, &pad);
             int cap = (int) llama_n_rs_seq(ctx) > 0 ? (int) llama_n_rs_seq(ctx) : (cp.n_rs_seq > 0 ? (int) cp.n_rs_seq : 0);
             use_spec = d > 0 && cap > 0 && rep == 1.0f && temp <= 0.0f;
-            if (use_spec) { spec.draft_max = std::min(d, cap); spec.ngram_min = std::max(1, g); spec.ngram_max = std::max(spec.ngram_min, 4); spec.use_prefix = up != 0; spec.adaptive = false; }
+            if (use_spec) { spec.draft_max = std::min(d, cap); spec.ngram_min = std::max(1, g); spec.ngram_max = std::max(spec.ngram_min, 4); spec.use_prefix = up != 0; spec.adaptive = false; spec.pad_to = pad; }
             std::printf("X %d\n", use_spec ? 1 : 0);
         } else if (line[0] == 'Q') {
             std::printf("Q %d %d %d %d\n", last_stats.steps, last_stats.drafted, last_stats.accepted, last_fallback);

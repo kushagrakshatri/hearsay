@@ -140,3 +140,94 @@ plain: everything before `Raw: <transcript>\nClean:` is a fixed string per style
 the chat prefix (this harness already does). The app would additionally need stop strings in the JNI generate loop
 (no end-of-turn token in plain mode), a prefix-cache key that includes the format, and a place for the names note
 (the header or the suffix).
+
+## Speculative decoding (Oct 30, 2026; in the app)
+Cleanup output mostly copies the transcript, so the llama.cpp path now drafts tokens by **prompt lookup**: after each
+emitted token, the last n output tokens (n = 4 down to the minimum) are looked up in the user turn, then in the output so
+far, then in the cached prefix; the tokens that followed are the draft. The pending token + draft are decoded in one
+batch with logits at every position and drafts are accepted while they equal the greedy pick
+(`llm/src/main/cpp/ngram_spec.h`, shared by the app's JNI and `hearsay_llm`). Rejected positions are trimmed with
+`llama_memory_seq_rm`; Qwen3.5 and LFM2 are hybrid (recurrent + attention), so the context is created with
+`n_rs_seq` = draft length and the vendored llama.cpp keeps per-token recurrent snapshots to roll back to (an
+`llm_arch_supports_rs_rollback` arch; plain attention models need nothing). llama.cpp's own `common/ngram-*` and
+`common/speculative` live in the `common` library, which the JNI build doesn't compile, and are built around its
+server loop, so it's a ~150-line hand implementation.
+
+**Measurement.** `spec_ab.py` (new): one `hearsay_llm` process per model, every item generated with plain greedy and
+with each draft setting back to back (order rotated per item), so the timings are paired; the shared 2-vCPU box drifted
+by up to ~18% between separate runs (two plain-greedy runs of Qwen3.5 0.8B: 30.8 and 36.3 tok/s), which made the first,
+unpaired sweep (`results/2026-10-30-spec/`, `run_eval.py --spec`) unusable for timing (its acceptance rates are fine).
+Settings are `draft_max,ngram_min`; all search the prefix too. 45 items, app chat format, cap words×2+32, 2 threads.
+Per-item outputs and timings: `results/2026-10-30-spec-ab/` and `results/2026-10-30-spec-ab-pad/`.
+
+| Model | Setting | Decode tok/s | Accepted drafts | Tokens per verify | Mean ms / dictation | p90 ms | Mean decode ms | Output = plain greedy |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3.5 0.8B | plain greedy | 34.0 |  |  | 844 | 1195 | 599 | 45/45 |
+| Qwen3.5 0.8B | draft 2, match 3 | 32.2 | 81% | 1.5 | 896 | 1236 | 631 | 43/45 |
+| Qwen3.5 0.8B | draft 3, match 2 | 47.6 | 68% | 1.78 | 679 | 1269 | 433 | 41/45 |
+| Qwen3.5 0.8B | **draft 3, match 3 (app)** | 43.6 | 73% | 1.6 | 709 | 1162 | 467 | 45/45 |
+| Qwen3.5 0.8B | draft 4, match 2 | 40.0 | 60% | 1.87 | 757 | 1262 | 516 | 42/45 |
+| Qwen3.5 0.8B | draft 4, match 3 | 40.7 | 69% | 1.68 | 743 | 1193 | 499 | 43/45 |
+| Qwen3.5 0.8B | draft 6, match 3 | 34.3 | 58% | 1.75 | 848 | 1488 | 593 | 45/45 |
+| Qwen3.5 0.8B | draft 8, match 3 | 37.5 | 49% | 1.79 | 795 | 1200 | 543 | 44/45 |
+| Qwen3.5 2B | plain greedy | 16.9 |  |  | 1648 | 2553 | 1131 | 45/45 |
+| Qwen3.5 2B | draft 2, match 3 | 15.7 | 86% | 1.77 | 1732 | 2780 | 1215 | 42/45 |
+| Qwen3.5 2B | draft 3, match 2 | 27.0 | 78% | 2.27 | 1237 | 1782 | 709 | 43/45 |
+| Qwen3.5 2B | **draft 3, match 3 (app)** | 25.6 | 78% | 1.91 | 1270 | 1768 | 748 | 43/45 |
+| Qwen3.5 2B | draft 4, match 2 | 22.3 | 70% | 2.43 | 1386 | 2422 | 856 | 44/45 |
+| Qwen3.5 2B | draft 4, match 3 | 22.1 | 74% | 2.05 | 1397 | 2064 | 866 | 43/45 |
+| Qwen3.5 2B | draft 6, match 3 | 17.9 | 64% | 2.2 | 1587 | 2284 | 1070 | 43/45 |
+| Qwen3.5 2B | draft 8, match 3 | 19.7 | 54% | 2.26 | 1489 | 2169 | 970 | 43/45 |
+
+- **Best: 3 draft tokens, 3-token match (the app default).** Qwen3.5 0.8B decode 34.0 → 43.6 tok/s (+28%), 73% of drafts accepted, mean 844 → 709 ms per dictation (−16%), p90 1195 → 1162 ms, output identical on 45/45; Qwen3.5 2B 16.9 → 25.6 tok/s (+51%), 78% accepted, mean 1648 → 1270 ms (−23%), p90 2553 → 1768 ms (−31%), identical on 43/45. Draft 3 / match 2 was a few percent faster again (47.6 and 27.0 tok/s) but changed 4 of 45 outputs on the 0.8B.
+  Longer drafts lose: acceptance falls (8 drafts: 49–54% accepted) and each verify pass costs more on a CPU. 2 drafts are
+  *slower* than none despite 81–86% acceptance.
+- **Why 3:** ggml's repacked CPU matmuls (Q4_K/Q6_K `8x4` dotprod on phones, `8x8` i8mm here) process activations in
+  groups of 4 rows and do leftovers one row at a time. Measured on Qwen3.5 0.8B (`n_rs_seq` 8, 400-token context): a decode
+  batch of 1 / 2 / 3 / 4 / 5 / 8 tokens takes 31 / 56 / 80 / 50 / 77 / 91 ms. Pending token + 3 drafts = a batch of 4.
+  The verifier also pads a short draft (repeating its last token) to a multiple of 4 (`pad_to`); at draft 3 it rarely
+  triggers and was neutral (the second paired run, `results/2026-10-30-spec-ab-pad/`, drafted exactly the same tokens with and without padding, so its 45.6 vs 42.6 and 22.8 vs 20.4 tok/s for identical work is the noise floor of a paired run: treat differences under ~10% in the table as noise).
+- **Outputs are not byte-identical on every item.** Rollback is correct (verified: forcing a wrong extra draft and a
+  rollback after every step reproduces plain greedy), but a token computed in a batch of 4 gets slightly different logits
+  than the same token decoded alone (different matmul kernel), up to ~0.1–0.2 logit here. Where plain greedy's top two
+  tokens are that close, the pick can flip and the text diverges from there: with draft 3 / match 3 the 0.8B matched plain greedy on 45/45 and the 2B on 43/45 ("the ones from the rooftop" → "specifically the ones from the rooftop", and the poem written for the ignored instruction, which the sanity check replaces anyway). Pure-attention
+  MiniCPM5 shows the same effect (one flip in 6 items at a 0.18 gap), so it's ggml CPU numerics, not the hybrid
+  rollback. Quality metrics are unchanged in every setting (Qwen3.5 2B near 42/45, violations 3; 0.8B near 34, violations
+  4; same fallbacks). Diverging items seen: "Friday, like around seven" vs "Friday, around seven" (top-2 gap 0.001),
+  "this plan" vs "that plan", the list item rendered inline, and the ignored-instruction items (poem, compound
+  interest) that the sanity check replaces with the rules text anyway.
+- `n_rs_seq` (recurrent snapshots) costs nothing measurable when no draft is made (same-process plain greedy with
+  `n_rs_seq` 8 runs at the baseline's speed). Adaptive draft length (halve after a miss, double after a full accept) was
+  no better than fixed 8 and worse than fixed 3; searching the prefix or not made no difference (the transcript match
+  comes first).
+- Not measured on a phone yet. Phone decode is more memory-bandwidth bound (4 fast cores), so a 4-token verify batch
+  probably costs closer to one token than on this 2-vCPU box, which would make the gain larger; the phone build uses the
+  same 4-row repacked kernels (`q4_K_8x4` with dotprod), so draft 3 should stay the sweet spot.
+
+**App:** `LlamaEngine` builds its context with `n_rs_seq` = 3 and uses drafts 3 / match 3 / pad 4 on every completion while
+Settings → Cleanup → "Faster cleanup" is on (default). Any llama.cpp error mid-generation restores the prefix, decodes
+the prompt again and finishes with plain greedy, and drafts stay off for that model until it reloads. The prefix KV
+files keep working (the cache key moved to `v2`, so files written by contexts without snapshots are decoded again once).
+Logcat `hearsay-llm`: `llm loaded: threads=4 spec_draft=3`, then per dictation a line like
+`spec: 24 tokens in 13 steps, accepted 11/36 drafts (31%)` (a failure logs `speculative decoding failed after N tokens; plain decoding from now on`).
+
+### Gemma 4 E2B (LiteRT-LM) multi-token prediction
+The pinned `gemma-4-E2B-it.litertlm` (SHA-256 1819…a63c) carries a `tf_lite_mtp_drafter` section (read from its header).
+LiteRT-LM 0.19.0's Kotlin API: `EngineConfig(speculativeDecodingConfig = SpeculativeDecodingConfig(SpeculativeDecodingMode.ON|OFF|ADAPTIVE))`
+(the older `ExperimentalFlags.enableSpeculativeDecoding` is deprecated) and a per-conversation
+`ConversationConfig.speculativeDecodingConfig`; `ModelInfo.from(path)` → `ModelInfo.Llm.hasSpeculativeDecodingSupport()`
+reports the drafter. The app sets it on the engine: on for the GPU unless the GPU is PowerVR (MTP cuts decode ~65% on
+Tensor G5/G6, LiteRT-LM #2227), on for the CPU while "Multi-token prediction on the processor" is on (default; Google
+recommends it for rewrite tasks on E2B CPU). PowerVR = GL renderer string contains "PowerVR" (read once through a 1×1
+EGL pbuffer) or `Build.SOC_MODEL` is Tensor G5 or newer. An MTP start that throws is retried without MTP on the same
+backend. Logcat `hearsay-litert`: `gemma-4-E2B-it.litertlm: MTP drafter in model: true`, `gpu: renderer=… soc=… powerVR=false`,
+`gemma-4-E2B-it.litertlm loaded on GPU, MTP on` (or `MTP off (PowerVR GPU)`), and per dictation
+`complete: 54 chars in 412 ms (LiteRT-LM GPU, MTP on)`.
+
+**Measured on this sandbox's CPU** with Google's Python package of the same runtime (`litert-lm-api` 0.19.0, aarch64
+wheel), `litert_mtp.py`: the same .litertlm, app system prompt + 4 few-shots as conversation messages, greedy, thinking
+off, 2 threads, 15 items, passes off/on/on/off, LiteRT-LM's own benchmark counters. **MTP on: decode 22.8 → 30.5 tok/s
+(+34%), mean decode 616 → 437 ms per dictation, outputs identical 15/15.** Wall time per call 2199 → 2033 ms is
+dominated by prefilling the ~417-token prompt (≈265 tok/s), which the app skips by cloning a prefilled conversation.
+Results: `results/2026-10-30-spec-ab/gemma4-e2b-litert-mtp.json`. GPU (and the PowerVR regression) can't be measured
+here.

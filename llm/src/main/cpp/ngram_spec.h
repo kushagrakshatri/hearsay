@@ -25,6 +25,11 @@ struct Config {
     int ngram_max = 4;    // longest suffix tried first
     bool use_prefix = true; // also search the cached prefix (system prompt + few-shots)
     bool adaptive = false;  // shrink the draft after a rejection, grow it back after full acceptance
+    // Pad a non-empty draft so the verify batch is a multiple of this many tokens (0 = off). ggml's
+    // repacked CPU matmuls (Q4_K/Q6_K 8x4 dotprod, 8x8 i8mm) work in groups of 4 rows: a batch of 4
+    // costs ~1.6x one token while 2 or 3 cost ~1.8x / 2.6x (Qwen3.5 0.8B, desktop ARM). Padding
+    // tokens repeat the last draft token; they are verified like any draft token.
+    int pad_to = 4;
 };
 
 struct Stats {
@@ -91,6 +96,10 @@ int generate(llama_context *ctx, llama_sampler *smpl, const llama_vocab *vocab, 
         while (true) {
             int room = std::min(budget - (int) gen.size() - 1, n_ctx - pos - 2);
             make_draft(user, cfg.use_prefix ? prefix : nullptr, gen, cfg, std::min(cfg.adaptive ? want_len : dmax, room), draft);
+            if (cfg.pad_to > 1 && !draft.empty()) {
+                int target = ((int) draft.size() + 1 + cfg.pad_to - 1) / cfg.pad_to * cfg.pad_to - 1;
+                while ((int) draft.size() < std::min({target, dmax, room})) draft.push_back(draft.back());
+            }
             batch.n_tokens = 0;
             auto add = [&](llama_token t, int p) {
                 int i = batch.n_tokens++;

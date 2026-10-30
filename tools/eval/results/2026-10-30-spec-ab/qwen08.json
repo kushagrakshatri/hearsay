@@ -1,0 +1,4283 @@
+{
+ "model": "qwen08",
+ "file": "Qwen3.5-0.8B-Q4_K_M.gguf",
+ "threads": 2,
+ "cfgs": [
+  "2,3",
+  "3,2",
+  "3,3",
+  "4,2",
+  "4,3",
+  "6,3",
+  "8,3"
+ ],
+ "summary": {
+  "base": {
+   "decode_tps": 34.0,
+   "mean_ms": 844,
+   "p90_ms": 1195,
+   "mean_decode_ms": 599,
+   "acceptance": null,
+   "tokens_per_step": null,
+   "identical": "45/45",
+   "spec_fallbacks": 0
+  },
+  "2,3": {
+   "decode_tps": 32.2,
+   "mean_ms": 896,
+   "p90_ms": 1236,
+   "mean_decode_ms": 631,
+   "acceptance": 0.812,
+   "tokens_per_step": 1.5,
+   "identical": "43/45",
+   "spec_fallbacks": 0
+  },
+  "3,2": {
+   "decode_tps": 47.6,
+   "mean_ms": 679,
+   "p90_ms": 1269,
+   "mean_decode_ms": 433,
+   "acceptance": 0.678,
+   "tokens_per_step": 1.78,
+   "identical": "41/45",
+   "spec_fallbacks": 0
+  },
+  "3,3": {
+   "decode_tps": 43.6,
+   "mean_ms": 709,
+   "p90_ms": 1162,
+   "mean_decode_ms": 467,
+   "acceptance": 0.727,
+   "tokens_per_step": 1.6,
+   "identical": "45/45",
+   "spec_fallbacks": 0
+  },
+  "4,2": {
+   "decode_tps": 40.0,
+   "mean_ms": 757,
+   "p90_ms": 1262,
+   "mean_decode_ms": 516,
+   "acceptance": 0.603,
+   "tokens_per_step": 1.87,
+   "identical": "42/45",
+   "spec_fallbacks": 0
+  },
+  "4,3": {
+   "decode_tps": 40.7,
+   "mean_ms": 743,
+   "p90_ms": 1193,
+   "mean_decode_ms": 499,
+   "acceptance": 0.688,
+   "tokens_per_step": 1.68,
+   "identical": "43/45",
+   "spec_fallbacks": 0
+  },
+  "6,3": {
+   "decode_tps": 34.3,
+   "mean_ms": 848,
+   "p90_ms": 1488,
+   "mean_decode_ms": 593,
+   "acceptance": 0.583,
+   "tokens_per_step": 1.75,
+   "identical": "45/45",
+   "spec_fallbacks": 0
+  },
+  "8,3": {
+   "decode_tps": 37.5,
+   "mean_ms": 795,
+   "p90_ms": 1200,
+   "mean_decode_ms": 543,
+   "acceptance": 0.493,
+   "tokens_per_step": 1.79,
+   "identical": "44/45",
+   "spec_fallbacks": 0
+  }
+ },
+ "rows": [
+  {
+   "id": "demo_chat",
+   "runs": {
+    "base": {
+     "out": "Hey, are we still on for dinner Friday, like around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 242.9,
+     "gen_tokens": 14,
+     "decode_ms": 489.2,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Hey, are we still on for dinner Friday, like around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 217.8,
+     "gen_tokens": 14,
+     "decode_ms": 457.9,
+     "spec_steps": 9,
+     "drafted": 8,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Hey, are we still on for dinner Friday, around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.8,
+     "gen_tokens": 13,
+     "decode_ms": 236.6,
+     "spec_steps": 6,
+     "drafted": 9,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hey, are we still on for dinner Friday, like around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.6,
+     "gen_tokens": 14,
+     "decode_ms": 293.1,
+     "spec_steps": 8,
+     "drafted": 9,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hey, are we still on for dinner Friday, like around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 207.6,
+     "gen_tokens": 14,
+     "decode_ms": 355.9,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hey, are we still on for dinner Friday, around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.0,
+     "gen_tokens": 13,
+     "decode_ms": 387.2,
+     "spec_steps": 8,
+     "drafted": 12,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hey, are we still on for dinner Friday, like around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 212.1,
+     "gen_tokens": 14,
+     "decode_ms": 389.3,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hey, are we still on for dinner Friday, like around seven?",
+     "prompt_tokens": 26,
+     "prefill_ms": 207.8,
+     "gen_tokens": 14,
+     "decode_ms": 398.2,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 8,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "demo_mail",
+   "runs": {
+    "2,3": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 370.1,
+     "gen_tokens": 36,
+     "decode_ms": 1043.4,
+     "spec_steps": 16,
+     "drafted": 22,
+     "accepted": 21,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 340.3,
+     "gen_tokens": 36,
+     "decode_ms": 541.6,
+     "spec_steps": 12,
+     "drafted": 30,
+     "accepted": 25,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 333.2,
+     "gen_tokens": 36,
+     "decode_ms": 528.5,
+     "spec_steps": 13,
+     "drafted": 24,
+     "accepted": 23,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 332.9,
+     "gen_tokens": 36,
+     "decode_ms": 648.5,
+     "spec_steps": 10,
+     "drafted": 32,
+     "accepted": 27,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 339.5,
+     "gen_tokens": 36,
+     "decode_ms": 678.3,
+     "spec_steps": 12,
+     "drafted": 28,
+     "accepted": 25,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 726.3,
+     "gen_tokens": 36,
+     "decode_ms": 761.8,
+     "spec_steps": 10,
+     "drafted": 30,
+     "accepted": 26,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 369.9,
+     "gen_tokens": 36,
+     "decode_ms": 790.7,
+     "spec_steps": 10,
+     "drafted": 40,
+     "accepted": 27,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Hi team, quick update: the launch is moving to Monday. Three things: the beta is closed, the website is done, and we still need the press kit. Thanks.",
+     "prompt_tokens": 48,
+     "prefill_ms": 340.5,
+     "gen_tokens": 36,
+     "decode_ms": 1049.0,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "demo_names",
+   "runs": {
+    "3,2": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 222.5,
+     "gen_tokens": 15,
+     "decode_ms": 220.7,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.8,
+     "gen_tokens": 15,
+     "decode_ms": 249.5,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.8,
+     "gen_tokens": 15,
+     "decode_ms": 250.1,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.1,
+     "gen_tokens": 15,
+     "decode_ms": 284.4,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 219.3,
+     "gen_tokens": 15,
+     "decode_ms": 300.5,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 219.1,
+     "gen_tokens": 15,
+     "decode_ms": 285.5,
+     "spec_steps": 4,
+     "drafted": 16,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.9,
+     "gen_tokens": 15,
+     "decode_ms": 437.5,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Hey Siobhan, yeah, I'll send the deck over tonight.",
+     "prompt_tokens": 27,
+     "prefill_ms": 220.1,
+     "gen_tokens": 15,
+     "decode_ms": 439.1,
+     "spec_steps": 7,
+     "drafted": 10,
+     "accepted": 9,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "demo_plane",
+   "runs": {
+    "3,3": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 218.9,
+     "gen_tokens": 15,
+     "decode_ms": 292.3,
+     "spec_steps": 8,
+     "drafted": 9,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 225.9,
+     "gen_tokens": 15,
+     "decode_ms": 404.1,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 266.8,
+     "gen_tokens": 15,
+     "decode_ms": 298.5,
+     "spec_steps": 7,
+     "drafted": 8,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 219.9,
+     "gen_tokens": 15,
+     "decode_ms": 378.8,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.1,
+     "gen_tokens": 15,
+     "decode_ms": 369.9,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.1,
+     "gen_tokens": 15,
+     "decode_ms": 427.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.1,
+     "gen_tokens": 15,
+     "decode_ms": 443.5,
+     "spec_steps": 9,
+     "drafted": 8,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Just landed, give me like twenty minutes and I'll come grab you.",
+     "prompt_tokens": 27,
+     "prefill_ms": 214.2,
+     "gen_tokens": 15,
+     "decode_ms": 277.4,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 9,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "fill_1",
+   "runs": {
+    "4,2": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.6,
+     "gen_tokens": 12,
+     "decode_ms": 274.0,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.3,
+     "gen_tokens": 12,
+     "decode_ms": 290.1,
+     "spec_steps": 7,
+     "drafted": 8,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.4,
+     "gen_tokens": 12,
+     "decode_ms": 375.3,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.3,
+     "gen_tokens": 12,
+     "decode_ms": 368.8,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.0,
+     "gen_tokens": 12,
+     "decode_ms": 349.1,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 206.5,
+     "gen_tokens": 12,
+     "decode_ms": 376.3,
+     "spec_steps": 8,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.3,
+     "gen_tokens": 12,
+     "decode_ms": 249.3,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "So I think I'm gonna be a little late today.",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.9,
+     "gen_tokens": 12,
+     "decode_ms": 242.8,
+     "spec_steps": 7,
+     "drafted": 6,
+     "accepted": 6,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "fill_2",
+   "runs": {
+    "4,3": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 222.1,
+     "gen_tokens": 10,
+     "decode_ms": 301.1,
+     "spec_steps": 7,
+     "drafted": 8,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 217.2,
+     "gen_tokens": 10,
+     "decode_ms": 387.0,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 229.1,
+     "gen_tokens": 10,
+     "decode_ms": 405.9,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 248.8,
+     "gen_tokens": 10,
+     "decode_ms": 311.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 220.9,
+     "gen_tokens": 10,
+     "decode_ms": 300.8,
+     "spec_steps": 7,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.0,
+     "gen_tokens": 10,
+     "decode_ms": 184.2,
+     "spec_steps": 5,
+     "drafted": 6,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.0,
+     "gen_tokens": 10,
+     "decode_ms": 244.7,
+     "spec_steps": 7,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "The build is failing because of the new dependency.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.2,
+     "gen_tokens": 10,
+     "decode_ms": 234.5,
+     "spec_steps": 5,
+     "drafted": 8,
+     "accepted": 6,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "fill_3",
+   "runs": {
+    "6,3": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 209.0,
+     "gen_tokens": 7,
+     "decode_ms": 203.8,
+     "spec_steps": 4,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.8,
+     "gen_tokens": 7,
+     "decode_ms": 198.1,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 206.1,
+     "gen_tokens": 7,
+     "decode_ms": 208.2,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 207.5,
+     "gen_tokens": 7,
+     "decode_ms": 242.4,
+     "spec_steps": 5,
+     "drafted": 4,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 206.4,
+     "gen_tokens": 7,
+     "decode_ms": 154.9,
+     "spec_steps": 4,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.9,
+     "gen_tokens": 7,
+     "decode_ms": 137.9,
+     "spec_steps": 4,
+     "drafted": 3,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.2,
+     "gen_tokens": 7,
+     "decode_ms": 133.1,
+     "spec_steps": 3,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Let's just order pizza tonight.",
+     "prompt_tokens": 26,
+     "prefill_ms": 207.5,
+     "gen_tokens": 7,
+     "decode_ms": 162.7,
+     "spec_steps": 4,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "fill_4",
+   "runs": {
+    "8,3": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 208.0,
+     "gen_tokens": 9,
+     "decode_ms": 522.6,
+     "spec_steps": 9,
+     "drafted": 24,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 207.5,
+     "gen_tokens": 9,
+     "decode_ms": 277.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 248.6,
+     "gen_tokens": 9,
+     "decode_ms": 457.3,
+     "spec_steps": 9,
+     "drafted": 6,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 210.6,
+     "gen_tokens": 9,
+     "decode_ms": 252.4,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.4,
+     "gen_tokens": 9,
+     "decode_ms": 319.4,
+     "spec_steps": 9,
+     "drafted": 9,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.7,
+     "gen_tokens": 9,
+     "decode_ms": 348.1,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.5,
+     "gen_tokens": 9,
+     "decode_ms": 393.6,
+     "spec_steps": 9,
+     "drafted": 12,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Can we push the review to next week?",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.7,
+     "gen_tokens": 9,
+     "decode_ms": 523.0,
+     "spec_steps": 9,
+     "drafted": 18,
+     "accepted": 1,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "rep_1",
+   "runs": {
+    "base": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 247.2,
+     "gen_tokens": 15,
+     "decode_ms": 422.4,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 242.0,
+     "gen_tokens": 15,
+     "decode_ms": 460.5,
+     "spec_steps": 8,
+     "drafted": 10,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 323.0,
+     "gen_tokens": 15,
+     "decode_ms": 266.2,
+     "spec_steps": 6,
+     "drafted": 15,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 241.6,
+     "gen_tokens": 15,
+     "decode_ms": 325.6,
+     "spec_steps": 8,
+     "drafted": 15,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 243.5,
+     "gen_tokens": 15,
+     "decode_ms": 322.0,
+     "spec_steps": 5,
+     "drafted": 16,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 245.0,
+     "gen_tokens": 15,
+     "decode_ms": 375.7,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 242.8,
+     "gen_tokens": 15,
+     "decode_ms": 440.6,
+     "spec_steps": 6,
+     "drafted": 18,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "I need to call mom later, she wanted to talk about the trip.",
+     "prompt_tokens": 31,
+     "prefill_ms": 244.0,
+     "gen_tokens": 15,
+     "decode_ms": 423.8,
+     "spec_steps": 6,
+     "drafted": 24,
+     "accepted": 10,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "rep_2",
+   "runs": {
+    "2,3": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.6,
+     "gen_tokens": 11,
+     "decode_ms": 374.3,
+     "spec_steps": 8,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.9,
+     "gen_tokens": 11,
+     "decode_ms": 250.3,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.9,
+     "gen_tokens": 11,
+     "decode_ms": 241.7,
+     "spec_steps": 7,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 208.5,
+     "gen_tokens": 11,
+     "decode_ms": 274.3,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 207.3,
+     "gen_tokens": 11,
+     "decode_ms": 290.7,
+     "spec_steps": 7,
+     "drafted": 8,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 205.5,
+     "gen_tokens": 11,
+     "decode_ms": 392.3,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 224.6,
+     "gen_tokens": 11,
+     "decode_ms": 412.4,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "The numbers for Q3 look really good this time.",
+     "prompt_tokens": 26,
+     "prefill_ms": 208.7,
+     "gen_tokens": 11,
+     "decode_ms": 341.2,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "corr_1",
+   "runs": {
+    "3,2": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 212.2,
+     "gen_tokens": 9,
+     "decode_ms": 201.7,
+     "spec_steps": 5,
+     "drafted": 9,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.1,
+     "gen_tokens": 9,
+     "decode_ms": 211.4,
+     "spec_steps": 6,
+     "drafted": 6,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.1,
+     "gen_tokens": 9,
+     "decode_ms": 203.8,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.3,
+     "gen_tokens": 9,
+     "decode_ms": 260.4,
+     "spec_steps": 6,
+     "drafted": 8,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 201.8,
+     "gen_tokens": 9,
+     "decode_ms": 350.7,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.1,
+     "gen_tokens": 9,
+     "decode_ms": 342.3,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.5,
+     "gen_tokens": 9,
+     "decode_ms": 262.2,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Let's meet Wednesday at the usual spot.",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.3,
+     "gen_tokens": 9,
+     "decode_ms": 346.5,
+     "spec_steps": 7,
+     "drafted": 6,
+     "accepted": 3,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "corr_2",
+   "runs": {
+    "3,3": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 221.2,
+     "gen_tokens": 12,
+     "decode_ms": 342.9,
+     "spec_steps": 11,
+     "drafted": 3,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 219.2,
+     "gen_tokens": 12,
+     "decode_ms": 420.2,
+     "spec_steps": 10,
+     "drafted": 12,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.6,
+     "gen_tokens": 12,
+     "decode_ms": 361.5,
+     "spec_steps": 11,
+     "drafted": 4,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.0,
+     "gen_tokens": 12,
+     "decode_ms": 409.0,
+     "spec_steps": 11,
+     "drafted": 6,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.0,
+     "gen_tokens": 12,
+     "decode_ms": 397.3,
+     "spec_steps": 11,
+     "drafted": 8,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 217.7,
+     "gen_tokens": 12,
+     "decode_ms": 345.6,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 217.5,
+     "gen_tokens": 12,
+     "decode_ms": 363.9,
+     "spec_steps": 11,
+     "drafted": 2,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Please send it to Sarah by the end of the day.",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.0,
+     "gen_tokens": 12,
+     "decode_ms": 344.6,
+     "spec_steps": 10,
+     "drafted": 9,
+     "accepted": 3,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "corr_3",
+   "runs": {
+    "4,2": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 178.8,
+     "gen_tokens": 12,
+     "decode_ms": 253.8,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 179.9,
+     "gen_tokens": 12,
+     "decode_ms": 207.6,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 178.9,
+     "gen_tokens": 12,
+     "decode_ms": 294.9,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 177.6,
+     "gen_tokens": 12,
+     "decode_ms": 282.8,
+     "spec_steps": 4,
+     "drafted": 16,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 179.1,
+     "gen_tokens": 12,
+     "decode_ms": 340.8,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 176.8,
+     "gen_tokens": 12,
+     "decode_ms": 364.8,
+     "spec_steps": 6,
+     "drafted": 8,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 177.8,
+     "gen_tokens": 12,
+     "decode_ms": 173.7,
+     "spec_steps": 4,
+     "drafted": 9,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Grab two, actually three bags of ice for the party.",
+     "prompt_tokens": 24,
+     "prefill_ms": 178.5,
+     "gen_tokens": 12,
+     "decode_ms": 201.4,
+     "spec_steps": 5,
+     "drafted": 9,
+     "accepted": 8,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "corr_4",
+   "runs": {
+    "4,3": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 245.8,
+     "gen_tokens": 12,
+     "decode_ms": 307.4,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 244.6,
+     "gen_tokens": 12,
+     "decode_ms": 323.2,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 242.9,
+     "gen_tokens": 12,
+     "decode_ms": 311.1,
+     "spec_steps": 5,
+     "drafted": 16,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 242.3,
+     "gen_tokens": 12,
+     "decode_ms": 341.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 243.2,
+     "gen_tokens": 12,
+     "decode_ms": 324.0,
+     "spec_steps": 6,
+     "drafted": 6,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 258.3,
+     "gen_tokens": 12,
+     "decode_ms": 185.3,
+     "spec_steps": 4,
+     "drafted": 9,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 246.2,
+     "gen_tokens": 12,
+     "decode_ms": 235.7,
+     "spec_steps": 6,
+     "drafted": 9,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "The meeting is at 4 PM in conference room B.",
+     "prompt_tokens": 31,
+     "prefill_ms": 243.4,
+     "gen_tokens": 12,
+     "decode_ms": 250.5,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 9,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "corr_5",
+   "runs": {
+    "6,3": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.7,
+     "gen_tokens": 11,
+     "decode_ms": 301.8,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 230.5,
+     "gen_tokens": 11,
+     "decode_ms": 286.7,
+     "spec_steps": 4,
+     "drafted": 16,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.3,
+     "gen_tokens": 11,
+     "decode_ms": 328.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 246.2,
+     "gen_tokens": 11,
+     "decode_ms": 386.9,
+     "spec_steps": 6,
+     "drafted": 8,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 272.1,
+     "gen_tokens": 11,
+     "decode_ms": 181.4,
+     "spec_steps": 4,
+     "drafted": 9,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 241.8,
+     "gen_tokens": 11,
+     "decode_ms": 204.9,
+     "spec_steps": 5,
+     "drafted": 9,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.7,
+     "gen_tokens": 11,
+     "decode_ms": 251.5,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "I'll be there at 6:30.",
+     "prompt_tokens": 30,
+     "prefill_ms": 230.9,
+     "gen_tokens": 11,
+     "decode_ms": 204.4,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 8,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "q_1",
+   "runs": {
+    "8,3": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 163.4,
+     "gen_tokens": 7,
+     "decode_ms": 173.1,
+     "spec_steps": 3,
+     "drafted": 8,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 163.1,
+     "gen_tokens": 7,
+     "decode_ms": 201.1,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 162.9,
+     "gen_tokens": 7,
+     "decode_ms": 209.7,
+     "spec_steps": 4,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 162.6,
+     "gen_tokens": 7,
+     "decode_ms": 125.9,
+     "spec_steps": 3,
+     "drafted": 6,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 163.0,
+     "gen_tokens": 7,
+     "decode_ms": 152.1,
+     "spec_steps": 4,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 162.7,
+     "gen_tokens": 7,
+     "decode_ms": 270.9,
+     "spec_steps": 3,
+     "drafted": 8,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 163.8,
+     "gen_tokens": 7,
+     "decode_ms": 151.2,
+     "spec_steps": 3,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "What time is the meeting tomorrow?",
+     "prompt_tokens": 19,
+     "prefill_ms": 180.2,
+     "gen_tokens": 7,
+     "decode_ms": 178.2,
+     "spec_steps": 3,
+     "drafted": 6,
+     "accepted": 5,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "q_2",
+   "runs": {
+    "base": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 197.3,
+     "gen_tokens": 14,
+     "decode_ms": 402.0,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 190.3,
+     "gen_tokens": 14,
+     "decode_ms": 380.7,
+     "spec_steps": 10,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 191.3,
+     "gen_tokens": 14,
+     "decode_ms": 316.9,
+     "spec_steps": 9,
+     "drafted": 9,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 189.7,
+     "gen_tokens": 14,
+     "decode_ms": 326.5,
+     "spec_steps": 10,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 190.5,
+     "gen_tokens": 14,
+     "decode_ms": 392.8,
+     "spec_steps": 9,
+     "drafted": 12,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 190.7,
+     "gen_tokens": 14,
+     "decode_ms": 377.0,
+     "spec_steps": 10,
+     "drafted": 8,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 192.3,
+     "gen_tokens": 14,
+     "decode_ms": 351.1,
+     "spec_steps": 9,
+     "drafted": 6,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "No, I don't know if the client approved the budget yet.",
+     "prompt_tokens": 23,
+     "prefill_ms": 194.2,
+     "gen_tokens": 14,
+     "decode_ms": 345.8,
+     "spec_steps": 9,
+     "drafted": 8,
+     "accepted": 5,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "q_3",
+   "runs": {
+    "2,3": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 178.6,
+     "gen_tokens": 10,
+     "decode_ms": 313.7,
+     "spec_steps": 6,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 178.0,
+     "gen_tokens": 10,
+     "decode_ms": 157.3,
+     "spec_steps": 4,
+     "drafted": 6,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 178.1,
+     "gen_tokens": 10,
+     "decode_ms": 184.5,
+     "spec_steps": 5,
+     "drafted": 6,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 182.5,
+     "gen_tokens": 10,
+     "decode_ms": 212.5,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 179.5,
+     "gen_tokens": 10,
+     "decode_ms": 235.4,
+     "spec_steps": 5,
+     "drafted": 8,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 180.3,
+     "gen_tokens": 10,
+     "decode_ms": 211.0,
+     "spec_steps": 4,
+     "drafted": 6,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 178.7,
+     "gen_tokens": 10,
+     "decode_ms": 205.6,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "How far is it from San Jose to Tahoe?",
+     "prompt_tokens": 22,
+     "prefill_ms": 181.7,
+     "gen_tokens": 10,
+     "decode_ms": 290.7,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "q_4",
+   "runs": {
+    "3,2": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 193.7,
+     "gen_tokens": 7,
+     "decode_ms": 192.2,
+     "spec_steps": 6,
+     "drafted": 3,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 191.2,
+     "gen_tokens": 7,
+     "decode_ms": 220.7,
+     "spec_steps": 7,
+     "drafted": 3,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 190.3,
+     "gen_tokens": 7,
+     "decode_ms": 214.3,
+     "spec_steps": 6,
+     "drafted": 4,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 191.8,
+     "gen_tokens": 7,
+     "decode_ms": 244.3,
+     "spec_steps": 7,
+     "drafted": 4,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 194.9,
+     "gen_tokens": 7,
+     "decode_ms": 285.9,
+     "spec_steps": 7,
+     "drafted": 6,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 192.1,
+     "gen_tokens": 7,
+     "decode_ms": 285.1,
+     "spec_steps": 7,
+     "drafted": 8,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 190.7,
+     "gen_tokens": 7,
+     "decode_ms": 203.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "The capital of Australia is Canberra.",
+     "prompt_tokens": 23,
+     "prefill_ms": 190.5,
+     "gen_tokens": 7,
+     "decode_ms": 250.6,
+     "spec_steps": 7,
+     "drafted": 2,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "q_5",
+   "runs": {
+    "3,3": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so your total grows faster than if you only paid it once.",
+     "prompt_tokens": 20,
+     "prefill_ms": 154.3,
+     "gen_tokens": 29,
+     "decode_ms": 831.0,
+     "spec_steps": 29,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so the next period's interest is calculated on the new total. This means your money grows faster over time than if you only paid it once at the",
+     "prompt_tokens": 20,
+     "prefill_ms": 157.6,
+     "gen_tokens": 46,
+     "decode_ms": 1475.5,
+     "spec_steps": 45,
+     "drafted": 12,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so your total grows faster than if you only paid it once.",
+     "prompt_tokens": 20,
+     "prefill_ms": 206.4,
+     "gen_tokens": 29,
+     "decode_ms": 866.8,
+     "spec_steps": 29,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so your total grows faster than if you only paid it once.",
+     "prompt_tokens": 20,
+     "prefill_ms": 164.8,
+     "gen_tokens": 29,
+     "decode_ms": 842.9,
+     "spec_steps": 29,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so your total grows faster than if you only paid it once.",
+     "prompt_tokens": 20,
+     "prefill_ms": 155.0,
+     "gen_tokens": 29,
+     "decode_ms": 853.0,
+     "spec_steps": 29,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so your total grows faster than if you only paid it once.",
+     "prompt_tokens": 20,
+     "prefill_ms": 157.0,
+     "gen_tokens": 29,
+     "decode_ms": 849.1,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so your total grows faster than if you only paid it once.",
+     "prompt_tokens": 20,
+     "prefill_ms": 154.4,
+     "gen_tokens": 29,
+     "decode_ms": 855.4,
+     "spec_steps": 29,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Compound interest works by adding interest to your principal each time you pay it back, so the next period's interest is calculated on the new total. This means your money grows faster over time than if you only paid it once at the",
+     "prompt_tokens": 20,
+     "prefill_ms": 155.0,
+     "gen_tokens": 46,
+     "decode_ms": 1375.4,
+     "spec_steps": 45,
+     "drafted": 9,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "ins_1",
+   "runs": {
+    "4,2": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nIt's not just the water, it's the sky,\nWhere the clouds",
+     "prompt_tokens": 26,
+     "prefill_ms": 204.5,
+     "gen_tokens": 56,
+     "decode_ms": 1895.2,
+     "spec_steps": 55,
+     "drafted": 23,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nThe waves roll in, a rhythmic dance,\nWhere salt and blue meet",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.3,
+     "gen_tokens": 56,
+     "decode_ms": 1442.7,
+     "spec_steps": 45,
+     "drafted": 10,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nThe waves roll in, a rhythmic dance,\nWhere salt and blue meet",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.6,
+     "gen_tokens": 56,
+     "decode_ms": 1411.0,
+     "spec_steps": 44,
+     "drafted": 11,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nThe waves roll in, a rhythmic dance,\nWhere salt and blue meet",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.2,
+     "gen_tokens": 56,
+     "decode_ms": 1368.4,
+     "spec_steps": 44,
+     "drafted": 11,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nThe waves roll in, a rhythmic dance,\nWhere salt and blue meet",
+     "prompt_tokens": 26,
+     "prefill_ms": 202.5,
+     "gen_tokens": 56,
+     "decode_ms": 1652.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nThe waves roll in, a rhythmic dance,\nWhere salt and blue meet",
+     "prompt_tokens": 26,
+     "prefill_ms": 486.9,
+     "gen_tokens": 56,
+     "decode_ms": 2060.2,
+     "spec_steps": 47,
+     "drafted": 8,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nIt's not just the water, it's the sky,\nWhere the clouds",
+     "prompt_tokens": 26,
+     "prefill_ms": 203.5,
+     "gen_tokens": 56,
+     "decode_ms": 1770.8,
+     "spec_steps": 55,
+     "drafted": 18,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "The waves roll in, a rhythmic dance,\nWhere salt and blue meet in the air.\nA stormy night, a gentle breeze,\nTo bring the ocean to my side.\n\nThe waves roll in, a rhythmic dance,\nWhere salt and blue meet",
+     "prompt_tokens": 26,
+     "prefill_ms": 206.7,
+     "gen_tokens": 56,
+     "decode_ms": 1932.6,
+     "spec_steps": 46,
+     "drafted": 9,
+     "accepted": 9,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "ins_2",
+   "runs": {
+    "4,3": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 185.2,
+     "gen_tokens": 34,
+     "decode_ms": 1007.6,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 374.6,
+     "gen_tokens": 34,
+     "decode_ms": 1374.2,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 180.9,
+     "gen_tokens": 34,
+     "decode_ms": 1019.2,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 182.6,
+     "gen_tokens": 34,
+     "decode_ms": 1012.2,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 182.3,
+     "gen_tokens": 34,
+     "decode_ms": 1052.2,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 219.2,
+     "gen_tokens": 34,
+     "decode_ms": 1050.0,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 182.1,
+     "gen_tokens": 34,
+     "decode_ms": 987.2,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Ceci est le texte en français :\n\n« Pour le voyage, nous avons besoin de trois choses : un écran solaire, des chargeurs et des passeports. »",
+     "prompt_tokens": 22,
+     "prefill_ms": 180.6,
+     "gen_tokens": 34,
+     "decode_ms": 996.6,
+     "spec_steps": 34,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "ins_3",
+   "runs": {
+    "6,3": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 207.3,
+     "gen_tokens": 16,
+     "decode_ms": 302.8,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 206.8,
+     "gen_tokens": 16,
+     "decode_ms": 288.2,
+     "spec_steps": 4,
+     "drafted": 16,
+     "accepted": 13,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 208.2,
+     "gen_tokens": 16,
+     "decode_ms": 475.5,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 207.5,
+     "gen_tokens": 16,
+     "decode_ms": 450.5,
+     "spec_steps": 7,
+     "drafted": 10,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 209.3,
+     "gen_tokens": 16,
+     "decode_ms": 227.2,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 206.5,
+     "gen_tokens": 16,
+     "decode_ms": 253.2,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 207.0,
+     "gen_tokens": 16,
+     "decode_ms": 250.3,
+     "spec_steps": 4,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Summarize the attached report and send me the key takeaways by Friday.",
+     "prompt_tokens": 28,
+     "prefill_ms": 205.0,
+     "gen_tokens": 16,
+     "decode_ms": 280.6,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "ins_4",
+   "runs": {
+    "8,3": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 146.0,
+     "gen_tokens": 12,
+     "decode_ms": 351.8,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.0,
+     "gen_tokens": 12,
+     "decode_ms": 349.5,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.8,
+     "gen_tokens": 12,
+     "decode_ms": 351.4,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.8,
+     "gen_tokens": 12,
+     "decode_ms": 354.9,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.9,
+     "gen_tokens": 12,
+     "decode_ms": 348.1,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 141.2,
+     "gen_tokens": 12,
+     "decode_ms": 349.9,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 141.2,
+     "gen_tokens": 12,
+     "decode_ms": 346.9,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "What did the cat eat? A carrot and a tomato.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.2,
+     "gen_tokens": 12,
+     "decode_ms": 348.0,
+     "spec_steps": 12,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "ins_5",
+   "runs": {
+    "base": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.5,
+     "gen_tokens": 18,
+     "decode_ms": 526.7,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.9,
+     "gen_tokens": 18,
+     "decode_ms": 636.1,
+     "spec_steps": 18,
+     "drafted": 4,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 217.0,
+     "gen_tokens": 18,
+     "decode_ms": 548.7,
+     "spec_steps": 16,
+     "drafted": 12,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.8,
+     "gen_tokens": 18,
+     "decode_ms": 561.3,
+     "spec_steps": 18,
+     "drafted": 6,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 217.1,
+     "gen_tokens": 18,
+     "decode_ms": 633.6,
+     "spec_steps": 16,
+     "drafted": 16,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.2,
+     "gen_tokens": 18,
+     "decode_ms": 617.9,
+     "spec_steps": 18,
+     "drafted": 8,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 225.3,
+     "gen_tokens": 18,
+     "decode_ms": 800.4,
+     "spec_steps": 18,
+     "drafted": 12,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "For the trip, we require three essential items: sunscreen, chargers, and passports.",
+     "prompt_tokens": 27,
+     "prefill_ms": 218.6,
+     "gen_tokens": 18,
+     "decode_ms": 710.2,
+     "spec_steps": 18,
+     "drafted": 16,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "list_1",
+   "runs": {
+    "2,3": {
+     "out": "For groceries we need:\n- Eggs\n- Milk\n- Spinach\n- Coffee",
+     "prompt_tokens": 25,
+     "prefill_ms": 192.6,
+     "gen_tokens": 18,
+     "decode_ms": 609.6,
+     "spec_steps": 17,
+     "drafted": 4,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "For groceries, we need eggs, milk, spinach, and coffee.",
+     "prompt_tokens": 25,
+     "prefill_ms": 190.5,
+     "gen_tokens": 14,
+     "decode_ms": 389.5,
+     "spec_steps": 10,
+     "drafted": 15,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "For groceries we need:\n- Eggs\n- Milk\n- Spinach\n- Coffee",
+     "prompt_tokens": 25,
+     "prefill_ms": 194.9,
+     "gen_tokens": 18,
+     "decode_ms": 535.6,
+     "spec_steps": 17,
+     "drafted": 6,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "For groceries, we need eggs, milk, spinach, and coffee.",
+     "prompt_tokens": 25,
+     "prefill_ms": 196.3,
+     "gen_tokens": 14,
+     "decode_ms": 512.3,
+     "spec_steps": 10,
+     "drafted": 20,
+     "accepted": 5,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "For groceries we need:\n- Eggs\n- Milk\n- Spinach\n- Coffee",
+     "prompt_tokens": 25,
+     "prefill_ms": 191.1,
+     "gen_tokens": 18,
+     "decode_ms": 579.1,
+     "spec_steps": 17,
+     "drafted": 8,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "For groceries we need:\n- Eggs\n- Milk\n- Spinach\n- Coffee",
+     "prompt_tokens": 25,
+     "prefill_ms": 191.4,
+     "gen_tokens": 18,
+     "decode_ms": 670.3,
+     "spec_steps": 17,
+     "drafted": 12,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "For groceries we need:\n- Eggs\n- Milk\n- Spinach\n- Coffee",
+     "prompt_tokens": 25,
+     "prefill_ms": 199.1,
+     "gen_tokens": 18,
+     "decode_ms": 668.2,
+     "spec_steps": 17,
+     "drafted": 16,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "For groceries we need:\n- Eggs\n- Milk\n- Spinach\n- Coffee",
+     "prompt_tokens": 25,
+     "prefill_ms": 209.9,
+     "gen_tokens": 18,
+     "decode_ms": 529.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "list_2",
+   "runs": {
+    "3,2": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 331.2,
+     "gen_tokens": 30,
+     "decode_ms": 855.1,
+     "spec_steps": 24,
+     "drafted": 18,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 300.0,
+     "gen_tokens": 30,
+     "decode_ms": 861.6,
+     "spec_steps": 27,
+     "drafted": 9,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 297.7,
+     "gen_tokens": 30,
+     "decode_ms": 964.6,
+     "spec_steps": 24,
+     "drafted": 24,
+     "accepted": 6,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 296.3,
+     "gen_tokens": 30,
+     "decode_ms": 926.7,
+     "spec_steps": 27,
+     "drafted": 12,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 295.7,
+     "gen_tokens": 30,
+     "decode_ms": 1063.3,
+     "spec_steps": 27,
+     "drafted": 18,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 295.5,
+     "gen_tokens": 30,
+     "decode_ms": 1042.3,
+     "spec_steps": 27,
+     "drafted": 24,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 296.7,
+     "gen_tokens": 30,
+     "decode_ms": 874.7,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "My priorities this week are:\n1. Finish the API migration\n2. Review Priya's PR\n3. Write the on-call runbook",
+     "prompt_tokens": 39,
+     "prefill_ms": 295.3,
+     "gen_tokens": 30,
+     "decode_ms": 940.7,
+     "spec_steps": 27,
+     "drafted": 6,
+     "accepted": 3,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "list_3",
+   "runs": {
+    "3,3": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.1,
+     "gen_tokens": 17,
+     "decode_ms": 326.0,
+     "spec_steps": 8,
+     "drafted": 12,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 233.6,
+     "gen_tokens": 17,
+     "decode_ms": 359.2,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.1,
+     "gen_tokens": 17,
+     "decode_ms": 420.2,
+     "spec_steps": 8,
+     "drafted": 16,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 234.0,
+     "gen_tokens": 17,
+     "decode_ms": 482.7,
+     "spec_steps": 7,
+     "drafted": 18,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.1,
+     "gen_tokens": 17,
+     "decode_ms": 463.4,
+     "spec_steps": 7,
+     "drafted": 24,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 236.1,
+     "gen_tokens": 17,
+     "decode_ms": 502.7,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 234.8,
+     "gen_tokens": 17,
+     "decode_ms": 506.7,
+     "spec_steps": 9,
+     "drafted": 10,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Packing list, passport, laptop charger, two adapters, and my blue jacket.",
+     "prompt_tokens": 30,
+     "prefill_ms": 231.8,
+     "gen_tokens": 17,
+     "decode_ms": 258.1,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "num_1",
+   "runs": {
+    "4,2": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 245.2,
+     "gen_tokens": 21,
+     "decode_ms": 457.8,
+     "spec_steps": 8,
+     "drafted": 20,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 247.3,
+     "gen_tokens": 21,
+     "decode_ms": 443.9,
+     "spec_steps": 9,
+     "drafted": 16,
+     "accepted": 13,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 244.7,
+     "gen_tokens": 21,
+     "decode_ms": 526.8,
+     "spec_steps": 8,
+     "drafted": 18,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 245.3,
+     "gen_tokens": 21,
+     "decode_ms": 489.1,
+     "spec_steps": 8,
+     "drafted": 24,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 244.5,
+     "gen_tokens": 21,
+     "decode_ms": 618.5,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 244.4,
+     "gen_tokens": 21,
+     "decode_ms": 609.3,
+     "spec_steps": 11,
+     "drafted": 12,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 245.5,
+     "gen_tokens": 21,
+     "decode_ms": 340.9,
+     "spec_steps": 8,
+     "drafted": 15,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "The invoice total is $1,250 and it is due on November 15th.",
+     "prompt_tokens": 33,
+     "prefill_ms": 245.3,
+     "gen_tokens": 21,
+     "decode_ms": 392.7,
+     "spec_steps": 10,
+     "drafted": 15,
+     "accepted": 12,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "num_2",
+   "runs": {
+    "4,3": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 282.9,
+     "gen_tokens": 29,
+     "decode_ms": 487.0,
+     "spec_steps": 9,
+     "drafted": 20,
+     "accepted": 20,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 282.1,
+     "gen_tokens": 29,
+     "decode_ms": 641.4,
+     "spec_steps": 8,
+     "drafted": 24,
+     "accepted": 22,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 662.8,
+     "gen_tokens": 29,
+     "decode_ms": 468.7,
+     "spec_steps": 7,
+     "drafted": 24,
+     "accepted": 23,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 282.9,
+     "gen_tokens": 29,
+     "decode_ms": 837.1,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 283.1,
+     "gen_tokens": 29,
+     "decode_ms": 815.2,
+     "spec_steps": 13,
+     "drafted": 18,
+     "accepted": 17,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 283.3,
+     "gen_tokens": 29,
+     "decode_ms": 438.1,
+     "spec_steps": 10,
+     "drafted": 21,
+     "accepted": 20,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 286.4,
+     "gen_tokens": 29,
+     "decode_ms": 480.4,
+     "spec_steps": 11,
+     "drafted": 21,
+     "accepted": 19,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Please email me at kush dot k at gmail dot com, or call 669 250 1234.",
+     "prompt_tokens": 40,
+     "prefill_ms": 300.7,
+     "gen_tokens": 29,
+     "decode_ms": 554.4,
+     "spec_steps": 9,
+     "drafted": 24,
+     "accepted": 21,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "num_3",
+   "runs": {
+    "6,3": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 222.4,
+     "gen_tokens": 17,
+     "decode_ms": 704.9,
+     "spec_steps": 14,
+     "drafted": 18,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 222.0,
+     "gen_tokens": 17,
+     "decode_ms": 669.8,
+     "spec_steps": 14,
+     "drafted": 24,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.1,
+     "gen_tokens": 17,
+     "decode_ms": 492.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.9,
+     "gen_tokens": 17,
+     "decode_ms": 556.7,
+     "spec_steps": 14,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 216.7,
+     "gen_tokens": 17,
+     "decode_ms": 417.9,
+     "spec_steps": 11,
+     "drafted": 15,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.6,
+     "gen_tokens": 17,
+     "decode_ms": 463.0,
+     "spec_steps": 14,
+     "drafted": 9,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.8,
+     "gen_tokens": 17,
+     "decode_ms": 547.0,
+     "spec_steps": 11,
+     "drafted": 20,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Flight lands at 7:45 PM, gate B, 12.",
+     "prompt_tokens": 27,
+     "prefill_ms": 215.6,
+     "gen_tokens": 17,
+     "decode_ms": 544.8,
+     "spec_steps": 14,
+     "drafted": 12,
+     "accepted": 4,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "num_4",
+   "runs": {
+    "8,3": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 236.3,
+     "gen_tokens": 20,
+     "decode_ms": 381.2,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.0,
+     "gen_tokens": 20,
+     "decode_ms": 577.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.6,
+     "gen_tokens": 20,
+     "decode_ms": 527.2,
+     "spec_steps": 10,
+     "drafted": 10,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 229.9,
+     "gen_tokens": 20,
+     "decode_ms": 327.8,
+     "spec_steps": 8,
+     "drafted": 15,
+     "accepted": 13,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 230.7,
+     "gen_tokens": 20,
+     "decode_ms": 387.9,
+     "spec_steps": 10,
+     "drafted": 15,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 230.3,
+     "gen_tokens": 20,
+     "decode_ms": 386.6,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.9,
+     "gen_tokens": 20,
+     "decode_ms": 436.7,
+     "spec_steps": 9,
+     "drafted": 16,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "We grew revenue by 23 percent, to about $4.2 million in Q2.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.0,
+     "gen_tokens": 20,
+     "decode_ms": 501.1,
+     "spec_steps": 8,
+     "drafted": 18,
+     "accepted": 13,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "name_1",
+   "runs": {
+    "base": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 231.3,
+     "gen_tokens": 18,
+     "decode_ms": 519.8,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 229.6,
+     "gen_tokens": 18,
+     "decode_ms": 520.9,
+     "spec_steps": 11,
+     "drafted": 8,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 231.7,
+     "gen_tokens": 18,
+     "decode_ms": 358.1,
+     "spec_steps": 9,
+     "drafted": 15,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 229.9,
+     "gen_tokens": 18,
+     "decode_ms": 397.3,
+     "spec_steps": 11,
+     "drafted": 12,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 230.1,
+     "gen_tokens": 18,
+     "decode_ms": 480.0,
+     "spec_steps": 9,
+     "drafted": 20,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 233.9,
+     "gen_tokens": 18,
+     "decode_ms": 430.9,
+     "spec_steps": 10,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 232.0,
+     "gen_tokens": 18,
+     "decode_ms": 444.4,
+     "spec_steps": 9,
+     "drafted": 12,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Tell Mugdha and Kushagra that the reservation at Rooh is at 8.",
+     "prompt_tokens": 30,
+     "prefill_ms": 231.9,
+     "gen_tokens": 18,
+     "decode_ms": 434.1,
+     "spec_steps": 9,
+     "drafted": 16,
+     "accepted": 9,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "name_2",
+   "runs": {
+    "2,3": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 269.2,
+     "gen_tokens": 22,
+     "decode_ms": 576.4,
+     "spec_steps": 10,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 268.5,
+     "gen_tokens": 22,
+     "decode_ms": 349.2,
+     "spec_steps": 8,
+     "drafted": 18,
+     "accepted": 15,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 272.5,
+     "gen_tokens": 22,
+     "decode_ms": 414.6,
+     "spec_steps": 10,
+     "drafted": 18,
+     "accepted": 13,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 269.2,
+     "gen_tokens": 22,
+     "decode_ms": 356.8,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 16,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 268.9,
+     "gen_tokens": 22,
+     "decode_ms": 410.5,
+     "spec_steps": 8,
+     "drafted": 16,
+     "accepted": 15,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 269.0,
+     "gen_tokens": 22,
+     "decode_ms": 589.7,
+     "spec_steps": 8,
+     "drafted": 24,
+     "accepted": 15,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 269.9,
+     "gen_tokens": 22,
+     "decode_ms": 357.7,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 16,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Hi Dr. Nguyen, I wanted to follow up on my appointment with Dr. Okafor last Thursday.",
+     "prompt_tokens": 35,
+     "prefill_ms": 269.0,
+     "gen_tokens": 22,
+     "decode_ms": 632.7,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "short_1",
+   "runs": {
+    "3,2": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 142.4,
+     "gen_tokens": 5,
+     "decode_ms": 79.3,
+     "spec_steps": 2,
+     "drafted": 3,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.1,
+     "gen_tokens": 5,
+     "decode_ms": 107.4,
+     "spec_steps": 3,
+     "drafted": 3,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.5,
+     "gen_tokens": 5,
+     "decode_ms": 104.1,
+     "spec_steps": 2,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 138.8,
+     "gen_tokens": 5,
+     "decode_ms": 132.4,
+     "spec_steps": 3,
+     "drafted": 4,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.0,
+     "gen_tokens": 5,
+     "decode_ms": 180.0,
+     "spec_steps": 3,
+     "drafted": 6,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.4,
+     "gen_tokens": 5,
+     "decode_ms": 171.3,
+     "spec_steps": 3,
+     "drafted": 8,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.6,
+     "gen_tokens": 5,
+     "decode_ms": 145.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Sounds good, thanks.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.0,
+     "gen_tokens": 5,
+     "decode_ms": 219.9,
+     "spec_steps": 3,
+     "drafted": 2,
+     "accepted": 2,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "short_2",
+   "runs": {
+    "3,3": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 141.0,
+     "gen_tokens": 5,
+     "decode_ms": 107.3,
+     "spec_steps": 3,
+     "drafted": 3,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 138.7,
+     "gen_tokens": 5,
+     "decode_ms": 103.9,
+     "spec_steps": 2,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 138.4,
+     "gen_tokens": 5,
+     "decode_ms": 131.8,
+     "spec_steps": 3,
+     "drafted": 4,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.8,
+     "gen_tokens": 5,
+     "decode_ms": 175.9,
+     "spec_steps": 3,
+     "drafted": 6,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 143.3,
+     "gen_tokens": 5,
+     "decode_ms": 170.2,
+     "spec_steps": 3,
+     "drafted": 8,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.6,
+     "gen_tokens": 5,
+     "decode_ms": 145.9,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.6,
+     "gen_tokens": 5,
+     "decode_ms": 138.0,
+     "spec_steps": 3,
+     "drafted": 2,
+     "accepted": 2,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "On my way now.",
+     "prompt_tokens": 17,
+     "prefill_ms": 139.1,
+     "gen_tokens": 5,
+     "decode_ms": 78.6,
+     "spec_steps": 2,
+     "drafted": 3,
+     "accepted": 3,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "short_3",
+   "runs": {
+    "4,2": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 144.6,
+     "gen_tokens": 4,
+     "decode_ms": 131.9,
+     "spec_steps": 3,
+     "drafted": 4,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.8,
+     "gen_tokens": 4,
+     "decode_ms": 161.7,
+     "spec_steps": 4,
+     "drafted": 4,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.0,
+     "gen_tokens": 4,
+     "decode_ms": 206.5,
+     "spec_steps": 4,
+     "drafted": 6,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 141.3,
+     "gen_tokens": 4,
+     "decode_ms": 205.2,
+     "spec_steps": 4,
+     "drafted": 8,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.8,
+     "gen_tokens": 4,
+     "decode_ms": 119.6,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 143.5,
+     "gen_tokens": 4,
+     "decode_ms": 173.4,
+     "spec_steps": 4,
+     "drafted": 2,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.8,
+     "gen_tokens": 4,
+     "decode_ms": 108.1,
+     "spec_steps": 3,
+     "drafted": 3,
+     "accepted": 1,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "See you tomorrow.",
+     "prompt_tokens": 17,
+     "prefill_ms": 140.5,
+     "gen_tokens": 4,
+     "decode_ms": 136.5,
+     "spec_steps": 4,
+     "drafted": 3,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "short_4",
+   "runs": {
+    "4,3": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 155.3,
+     "gen_tokens": 6,
+     "decode_ms": 132.8,
+     "spec_steps": 3,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 153.5,
+     "gen_tokens": 6,
+     "decode_ms": 178.8,
+     "spec_steps": 3,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 153.7,
+     "gen_tokens": 6,
+     "decode_ms": 171.9,
+     "spec_steps": 3,
+     "drafted": 8,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 152.1,
+     "gen_tokens": 6,
+     "decode_ms": 186.1,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 157.5,
+     "gen_tokens": 6,
+     "decode_ms": 212.8,
+     "spec_steps": 4,
+     "drafted": 4,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 152.6,
+     "gen_tokens": 6,
+     "decode_ms": 127.1,
+     "spec_steps": 3,
+     "drafted": 6,
+     "accepted": 4,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 154.6,
+     "gen_tokens": 6,
+     "decode_ms": 111.1,
+     "spec_steps": 3,
+     "drafted": 3,
+     "accepted": 3,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Love you, good night.",
+     "prompt_tokens": 18,
+     "prefill_ms": 170.0,
+     "gen_tokens": 6,
+     "decode_ms": 117.8,
+     "spec_steps": 2,
+     "drafted": 4,
+     "accepted": 4,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "long_1",
+   "runs": {
+    "6,3": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if this plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 683.7,
+     "gen_tokens": 67,
+     "decode_ms": 2211.8,
+     "spec_steps": 42,
+     "drafted": 60,
+     "accepted": 26,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if that plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 676.1,
+     "gen_tokens": 67,
+     "decode_ms": 1954.2,
+     "spec_steps": 40,
+     "drafted": 72,
+     "accepted": 28,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if this plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 670.1,
+     "gen_tokens": 67,
+     "decode_ms": 1957.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if that plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 669.8,
+     "gen_tokens": 67,
+     "decode_ms": 2053.7,
+     "spec_steps": 46,
+     "drafted": 30,
+     "accepted": 22,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if this plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 666.4,
+     "gen_tokens": 67,
+     "decode_ms": 1478.2,
+     "spec_steps": 39,
+     "drafted": 54,
+     "accepted": 29,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if this plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 666.1,
+     "gen_tokens": 67,
+     "decode_ms": 1617.4,
+     "spec_steps": 46,
+     "drafted": 42,
+     "accepted": 21,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if this plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 667.4,
+     "gen_tokens": 67,
+     "decode_ms": 1797.3,
+     "spec_steps": 37,
+     "drafted": 64,
+     "accepted": 30,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "We are going to cut the branch on Thursday, with QA having Friday and Monday to test it. If everything looks good, we will ship Tuesday morning. However, if we find anything serious, such as a crash or data loss, we will push it to Wednesday. Please let me know if that plan doesn't work for you.",
+     "prompt_tokens": 95,
+     "prefill_ms": 666.0,
+     "gen_tokens": 67,
+     "decode_ms": 1703.1,
+     "spec_steps": 42,
+     "drafted": 44,
+     "accepted": 26,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "long_2",
+   "runs": {
+    "8,3": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 594.9,
+     "gen_tokens": 66,
+     "decode_ms": 1812.2,
+     "spec_steps": 37,
+     "drafted": 72,
+     "accepted": 30,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 681.2,
+     "gen_tokens": 66,
+     "decode_ms": 2039.6,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 1278.7,
+     "gen_tokens": 66,
+     "decode_ms": 2241.0,
+     "spec_steps": 43,
+     "drafted": 30,
+     "accepted": 24,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 591.9,
+     "gen_tokens": 66,
+     "decode_ms": 1291.3,
+     "spec_steps": 34,
+     "drafted": 48,
+     "accepted": 33,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 621.4,
+     "gen_tokens": 66,
+     "decode_ms": 1888.1,
+     "spec_steps": 40,
+     "drafted": 36,
+     "accepted": 26,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 589.8,
+     "gen_tokens": 66,
+     "decode_ms": 1472.0,
+     "spec_steps": 31,
+     "drafted": 52,
+     "accepted": 36,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 590.3,
+     "gen_tokens": 66,
+     "decode_ms": 1655.2,
+     "spec_steps": 39,
+     "drafted": 44,
+     "accepted": 28,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Yesterday was kind of wild. I went to the farmers market with Priya and got way too many peaches. Her car wouldn't start, so we had to wait an hour for the tow truck. By the time we got home, the peaches were all squished, but honestly it was still a really fun day.",
+     "prompt_tokens": 83,
+     "prefill_ms": 590.2,
+     "gen_tokens": 66,
+     "decode_ms": 2102.2,
+     "spec_steps": 39,
+     "drafted": 66,
+     "accepted": 28,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "long_3",
+   "runs": {
+    "base": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 716.7,
+     "gen_tokens": 90,
+     "decode_ms": 2623.7,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we will deliver the first draft of the design by the 12th, you will receive feedback from your team by the 19th, and then we will do one round of revisions and hand off final files by the end of the month. The budget remains at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 716.5,
+     "gen_tokens": 90,
+     "decode_ms": 2525.1,
+     "spec_steps": 50,
+     "drafted": 46,
+     "accepted": 40,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 713.8,
+     "gen_tokens": 90,
+     "decode_ms": 1488.3,
+     "spec_steps": 35,
+     "drafted": 72,
+     "accepted": 55,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 719.3,
+     "gen_tokens": 90,
+     "decode_ms": 1482.1,
+     "spec_steps": 38,
+     "drafted": 60,
+     "accepted": 53,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 712.9,
+     "gen_tokens": 90,
+     "decode_ms": 1950.0,
+     "spec_steps": 32,
+     "drafted": 84,
+     "accepted": 59,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 734.0,
+     "gen_tokens": 90,
+     "decode_ms": 1905.2,
+     "spec_steps": 36,
+     "drafted": 72,
+     "accepted": 54,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 719.9,
+     "gen_tokens": 90,
+     "decode_ms": 2202.2,
+     "spec_steps": 32,
+     "drafted": 84,
+     "accepted": 59,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hi Mark, thanks for the call earlier. Just to recap what we agreed on: we'll deliver the first draft of the design by the 12th, you'll get feedback from your team by the 19th, and then we'll do one round of revisions and hand off final files by the end of the month. The budget stays at $18,000 as quoted. Let me know if I missed anything.",
+     "prompt_tokens": 103,
+     "prefill_ms": 717.0,
+     "gen_tokens": 90,
+     "decode_ms": 1785.9,
+     "spec_steps": 29,
+     "drafted": 88,
+     "accepted": 62,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "style_casual",
+   "runs": {
+    "2,3": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 223.5,
+     "gen_tokens": 17,
+     "decode_ms": 469.5,
+     "spec_steps": 8,
+     "drafted": 10,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 220.2,
+     "gen_tokens": 17,
+     "decode_ms": 253.7,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.6,
+     "gen_tokens": 17,
+     "decode_ms": 280.7,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 10,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.1,
+     "gen_tokens": 17,
+     "decode_ms": 278.8,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 219.6,
+     "gen_tokens": 17,
+     "decode_ms": 307.3,
+     "spec_steps": 6,
+     "drafted": 12,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.4,
+     "gen_tokens": 17,
+     "decode_ms": 323.4,
+     "spec_steps": 5,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.4,
+     "gen_tokens": 17,
+     "decode_ms": 310.7,
+     "spec_steps": 5,
+     "drafted": 16,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Hey can you send me the photos from last night, the ones from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.3,
+     "gen_tokens": 17,
+     "decode_ms": 490.0,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "style_email",
+   "runs": {
+    "3,2": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 219.4,
+     "gen_tokens": 20,
+     "decode_ms": 414.0,
+     "spec_steps": 11,
+     "drafted": 15,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.5,
+     "gen_tokens": 20,
+     "decode_ms": 451.4,
+     "spec_steps": 13,
+     "drafted": 12,
+     "accepted": 7,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 219.4,
+     "gen_tokens": 20,
+     "decode_ms": 538.4,
+     "spec_steps": 11,
+     "drafted": 20,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 218.5,
+     "gen_tokens": 20,
+     "decode_ms": 481.1,
+     "spec_steps": 12,
+     "drafted": 12,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 219.5,
+     "gen_tokens": 20,
+     "decode_ms": 612.1,
+     "spec_steps": 12,
+     "drafted": 18,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 219.1,
+     "gen_tokens": 20,
+     "decode_ms": 599.7,
+     "spec_steps": 12,
+     "drafted": 24,
+     "accepted": 8,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 220.1,
+     "gen_tokens": 20,
+     "decode_ms": 588.1,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Hey, can you send me the photos from last night, specifically the ones taken from the rooftop?",
+     "prompt_tokens": 29,
+     "prefill_ms": 220.9,
+     "gen_tokens": 20,
+     "decode_ms": 647.2,
+     "spec_steps": 14,
+     "drafted": 10,
+     "accepted": 6,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "style_email_2",
+   "runs": {
+    "3,3": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 255.3,
+     "gen_tokens": 22,
+     "decode_ms": 298.6,
+     "spec_steps": 7,
+     "drafted": 15,
+     "accepted": 15,
+     "spec_fallback": 0
+    },
+    "4,2": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 255.3,
+     "gen_tokens": 22,
+     "decode_ms": 396.8,
+     "spec_steps": 6,
+     "drafted": 20,
+     "accepted": 17,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 256.6,
+     "gen_tokens": 22,
+     "decode_ms": 353.8,
+     "spec_steps": 6,
+     "drafted": 16,
+     "accepted": 16,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 255.9,
+     "gen_tokens": 22,
+     "decode_ms": 413.7,
+     "spec_steps": 5,
+     "drafted": 18,
+     "accepted": 18,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 255.8,
+     "gen_tokens": 22,
+     "decode_ms": 402.4,
+     "spec_steps": 5,
+     "drafted": 24,
+     "accepted": 18,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 257.8,
+     "gen_tokens": 22,
+     "decode_ms": 636.8,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 264.2,
+     "gen_tokens": 22,
+     "decode_ms": 598.2,
+     "spec_steps": 9,
+     "drafted": 14,
+     "accepted": 14,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "Hi Jen, just following up on the contract. Did legal get a chance to look at it? Thanks.",
+     "prompt_tokens": 34,
+     "prefill_ms": 256.5,
+     "gen_tokens": 22,
+     "decode_ms": 316.6,
+     "spec_steps": 7,
+     "drafted": 18,
+     "accepted": 16,
+     "spec_fallback": 0
+    }
+   }
+  },
+  {
+   "id": "nopunct_1",
+   "runs": {
+    "4,2": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.3,
+     "gen_tokens": 19,
+     "decode_ms": 381.1,
+     "spec_steps": 7,
+     "drafted": 16,
+     "accepted": 13,
+     "spec_fallback": 0
+    },
+    "4,3": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 230.7,
+     "gen_tokens": 19,
+     "decode_ms": 444.9,
+     "spec_steps": 9,
+     "drafted": 16,
+     "accepted": 11,
+     "spec_fallback": 0
+    },
+    "6,3": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.4,
+     "gen_tokens": 19,
+     "decode_ms": 503.3,
+     "spec_steps": 8,
+     "drafted": 18,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "8,3": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 231.3,
+     "gen_tokens": 19,
+     "decode_ms": 486.8,
+     "spec_steps": 8,
+     "drafted": 24,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "base": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 232.2,
+     "gen_tokens": 19,
+     "decode_ms": 543.3,
+     "spec_steps": 0,
+     "drafted": 0,
+     "accepted": 0,
+     "spec_fallback": 0
+    },
+    "2,3": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 229.9,
+     "gen_tokens": 19,
+     "decode_ms": 522.0,
+     "spec_steps": 10,
+     "drafted": 10,
+     "accepted": 9,
+     "spec_fallback": 0
+    },
+    "3,2": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 230.1,
+     "gen_tokens": 19,
+     "decode_ms": 283.1,
+     "spec_steps": 7,
+     "drafted": 12,
+     "accepted": 12,
+     "spec_fallback": 0
+    },
+    "3,3": {
+     "out": "I talked to the landlord and he said the plumber can come on Saturday between nine and noon.",
+     "prompt_tokens": 32,
+     "prefill_ms": 230.1,
+     "gen_tokens": 19,
+     "decode_ms": 419.1,
+     "spec_steps": 9,
+     "drafted": 12,
+     "accepted": 11,
+     "spec_fallback": 0
+    }
+   }
+  }
+ ]
+}

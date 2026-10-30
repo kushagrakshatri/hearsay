@@ -7,7 +7,7 @@ item), so machine-speed drift on a shared box cancels out. Same prompts, rules p
 
 Usage: spec_ab.py --bin ./hearsay_llm --model qwen2b=/path/Qwen3.5-2B-Q4_K_M.gguf --cfg 3,3 --cfg 4,3 --cfg 8,3 \
                   [--threads 2] [--only id1,id2] [--out results/2026-10-30-spec-ab]
---cfg is draft_max,ngram_min[,use_prefix]; the process is started with HEARSAY_SPEC=<largest draft>,2 so the
+--cfg is draft_max,ngram_min[,use_prefix[,pad_to]] (pad_to default 4, 0 = no padding); the process is started with HEARSAY_SPEC=<largest draft>,2 so the
 context keeps enough recurrent snapshots, and X switches settings between calls.
 """
 import argparse, json, os, sys
@@ -33,8 +33,8 @@ def main():
     prefix_fn, turn_fn = R.build_prompt_fns(fmt)
     eng = R.Engine(a.bin, path, a.threads, 1.0, None, f"{cap},2")
     def setx(c):
-        d, g, up = (c + (1,))[:3] if c else (0, 2, 1)
-        eng.p.stdin.write(f"X {d} {g} {up}\n".encode()); eng.p.stdin.flush(); eng.p.stdout.readline()
+        d, g, up, pad = (c + (1, 4)[len(c) - 2:])[:4] if c else (0, 2, 1, 4)
+        eng.p.stdin.write(f"X {d} {g} {up} {pad}\n".encode()); eng.p.stdin.flush(); eng.p.stdout.readline()
     pids = {st: eng.prefix(prefix_fn(st))[0] for st in ("casual", "polished")}
     variants = [None] + cfgs
     rows = []
