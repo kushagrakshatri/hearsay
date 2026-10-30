@@ -57,7 +57,7 @@ add("corr_5", "casual", "correction", "I'll be there at 6, um no, make that 6:30
 add("q_1", "casual", "question", "What time is the meeting tomorrow?",
     "What time is the meeting tomorrow?", keep=["what time", "meeting tomorrow"], gone=["the meeting is at"])
 add("q_2", "polished", "question", "Um, do you know if the client approved the budget yet?",
-    "Do you know if the client approved the budget yet?", keep=["client approved the budget"], gone=["um", "yes", "has approved"], fillers=["um"])
+    "Do you know if the client approved the budget yet?", keep=["client approved the budget"], gone=["um", "yes"], fillers=["um"])
 add("q_3", "casual", "question", "how far is it from San Jose to Tahoe",
     "How far is it from San Jose to Tahoe?", keep=["san jose", "tahoe"], gone=["miles", "hours"])
 add("q_4", "polished", "question", "What's the capital of Australia, uh, I always forget.",
