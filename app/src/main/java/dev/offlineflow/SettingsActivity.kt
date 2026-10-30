@@ -319,7 +319,12 @@ class SettingsActivity : AppCompatActivity() {
             BuildConfig.CLOUD && ChatGptPlan.account(this) != null && Prefs.chatGptCleanup(this) ->
                 "ChatGPT" + (c?.let { " \u00b7 ${it.tier} on this phone when offline" } ?: "")
             c == null -> "Off \u00b7 punctuation only"
-            models.isReady(c) -> "${c.tier} \u00b7 on this phone"
+            models.isReady(c) -> "${c.tier} \u00b7 on this phone" + when {
+                // Which chip it ended up on, once loaded (GPU, or the processor as a fallback).
+                dev.offlineflow.core.Brain.cleanerBackend?.endsWith("GPU") == true -> ", graphics chip"
+                dev.offlineflow.core.Brain.cleanerBackend != null && c.engine == ModelManager.Engine.LITERT -> ", processor"
+                else -> ""
+            }
             else -> "${c.tier} \u00b7 tap to download"
         }
         val n = Prefs.styleOverrides(this)

@@ -1,6 +1,8 @@
 package dev.offlineflow.cleanup
 
+import dev.offlineflow.llm.LiteRtEngine
 import dev.offlineflow.llm.LlamaEngine
+import dev.offlineflow.llm.TextEngine
 import dev.offlineflow.model.ModelManager
 import java.io.File
 import java.security.MessageDigest
@@ -9,14 +11,18 @@ import java.security.MessageDigest
  * Wispr-style cleanup with a small local LLM: removes fillers and false starts, applies
  * spoken self-corrections, fixes punctuation, and keeps the speaker's words otherwise.
  * Falls back to [RulesCleaner] whenever the model's output looks off.
+ *
+ * The model runs on any [TextEngine]: LiteRT-LM (GPU, else CPU) for .litertlm models, llama.cpp
+ * (CPU) for GGUF. Prompts, examples, notes and sanity checks are the same on every engine.
  */
 class LlmCleaner private constructor(
-    private val llm: LlamaEngine,
-    private val format: Format,
+    private val llm: TextEngine,
     /** Every spelling the dictionary had when this cleaner's prompts were built. */
     private val known: List<String>,
-    private val prefixCache: PrefixCache?,
 ) : Cleaner, AutoCloseable {
+    /** Runtime and processor the model runs on, e.g. "LiteRT-LM GPU". */
+    val backend: String get() = llm.backend
+
     private val dictionary = known.take(MAX_DICTIONARY)
     private val knownSet = known.toHashSet()
     private val prefixIds = HashMap<Style, Int>()
@@ -32,16 +38,15 @@ class LlmCleaner private constructor(
      * in the transcript ride in a short note after the cached prompt, for this call only.
      */
     fun clean(raw: String, style: Style, names: List<String> = emptyList()): String = cleanWith(raw, style) { input, words ->
-        val note = namesNote(hints(learned + names, input))?.let(format::note).orEmpty()
-        llm.complete(prefixFor(style), note + format.turn(input), maxTokens = words * 2 + 32).let(format::strip)
+        val note = namesNote(hints(learned + names, input))
+        llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
     fun warm(style: Style) { if (style != Style.VERBATIM) prefixFor(style) }
 
     private fun prefixFor(style: Style): Int = prefixIds.getOrPut(style) {
-        val text = format.prefix(systemFor(style, dictionary), examplesFor(style))
-        llm.addPrefix(text, prefixCache?.fileFor(text))
+        llm.prepare(systemFor(style, dictionary), examplesFor(style))
     }
 
     /**
@@ -65,14 +70,13 @@ class LlmCleaner private constructor(
      * Returns null when the model's output looks off, so the caller can leave the text alone.
      */
     fun edit(text: String, instruction: String): String? = editWith(text) { maxTokens ->
-        llm.complete(editPrefix(), format.turn(editTurn(text, instruction)), maxTokens).let(format::strip)
+        llm.complete(editPrefix(), null, editTurn(text, instruction), maxTokens).let(::strip)
     }
 
     /** Evaluates the command-mode prompt ahead of use (e.g. when text gets selected). */
     fun warmEdit() { editPrefix() }
 
-    private fun editPrefix(): Int = editPrefixId ?: format.prefix(EDIT_SYSTEM, EDIT_EXAMPLES)
-        .let { llm.addPrefix(it, prefixCache?.fileFor(it)) }.also { editPrefixId = it }
+    private fun editPrefix(): Int = editPrefixId ?: llm.prepare(EDIT_SYSTEM, EDIT_EXAMPLES).also { editPrefixId = it }
 
     override fun close() = llm.close()
 
@@ -81,7 +85,7 @@ class LlmCleaner private constructor(
      * weights. Null once enough prompt snapshots have piled up that a fresh load is better.
      */
     fun withDictionary(dictionary: Dictionary): LlmCleaner? =
-        if (llm.prefixCount < 12) LlmCleaner(llm, format, dictionary.spellings, prefixCache) else null
+        if (llm.preparedCount < 12) LlmCleaner(llm, dictionary.spellings) else null
 
     companion object {
         /**
@@ -227,13 +231,38 @@ class LlmCleaner private constructor(
 
         private fun examplesFor(style: Style) = if (style == Style.CASUAL) CASUAL_EXAMPLES else EXAMPLES
 
-        /** [cacheDir]: where evaluated prompt prefixes are kept across process restarts (null: memory only). */
-        fun load(model: ModelManager.Model, file: File, dictionary: Dictionary, cacheDir: File? = null): LlmCleaner {
-            val format = if (model == ModelManager.Model.GEMMA4_E2B) Format.GEMMA4 else Format.CHATML_NO_THINK
+        /**
+         * Loads [model]: LiteRT-LM (GPU first, then CPU) for .litertlm files, llama.cpp for GGUF.
+         * [prefixDir]: llama.cpp prompt states kept across restarts. [engineCacheDir] and
+         * [engineStateDir]: LiteRT-LM's load cache, and which of its backends failed here.
+         */
+        fun load(
+            model: ModelManager.Model, file: File, dictionary: Dictionary,
+            prefixDir: File? = null, engineCacheDir: File? = null, engineStateDir: File? = null,
+        ): LlmCleaner {
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-            val cache = cacheDir?.let { PrefixCache(it, file, format) }
-            return LlmCleaner(LlamaEngine.load(file, threads), format, dictionary.spellings, cache)
+            val engine: TextEngine = when (model.engine) {
+                ModelManager.Engine.LITERT -> LiteRtEngine.load(
+                    file,
+                    engineCacheDir ?: File(file.parentFile, "litertlm-cache"),
+                    engineStateDir ?: File(file.parentFile, "litertlm-state"),
+                    threads,
+                )
+                else -> {
+                    val format = if (model == ModelManager.Model.GEMMA4_E2B) Format.GEMMA4 else Format.CHATML_NO_THINK
+                    LlamaText(LlamaEngine.load(file, threads), format, prefixDir?.let { PrefixCache(it, file, format) })
+                }
+            }
+            return LlmCleaner(engine, dictionary.spellings)
         }
+
+        /** Drops any reasoning block and end-of-turn markers a model printed (any chat format). */
+        fun strip(out: String): String = out
+            .replace(Regex("(?s)<think>.*?</think>"), "")
+            .replace(Regex("(?s)<\\|channel>.*?<channel\\|>"), "")
+            .substringBefore("<|im_end|>").substringBefore("<turn|>").substringBefore("<|turn>")
+            .substringBefore("<end_of_turn>")
+            .trim()
 
         /** Names in the per-dictation note: only sound-alikes of the transcript, so usually none. */
         private const val MAX_NAMES = 5
@@ -301,11 +330,5 @@ class LlmCleaner private constructor(
         /** A system note placed between the cached prefix and the user's turn. */
         abstract fun note(text: String): String
 
-        /** Drops any reasoning block and trailing end-of-turn markers the model printed. */
-        fun strip(out: String): String = out
-            .replace(Regex("(?s)<think>.*?</think>"), "")
-            .replace(Regex("(?s)<\\|channel>.*?<channel\\|>"), "")
-            .substringBefore("<|im_end|>").substringBefore("<turn|>").substringBefore("<|turn>")
-            .trim()
     }
 }

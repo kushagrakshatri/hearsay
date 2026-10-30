@@ -17,12 +17,17 @@ class ModelManager(context: Context) {
     private val prefs = context.getSharedPreferences("hearsay", Context.MODE_PRIVATE)
     /** Evaluated LLM prompt prefixes, kept so a restarted process doesn't decode them again. */
     val prefixCacheDir = File(context.cacheDir, "llm-prefix")
+    /** LiteRT-LM's own load cache (compiled GPU kernels, weight layouts). */
+    val engineCacheDir = File(context.cacheDir, "litertlm")
+    /** Which LiteRT-LM backends failed to start on this phone, so they aren't retried. */
+    val engineStateDir = File(context.filesDir, "engine-state")
     private val totalRam: Long = ActivityManager.MemoryInfo().also {
         context.getSystemService(ActivityManager::class.java).getMemoryInfo(it)
     }.totalMem
 
     enum class Kind { SPEECH, CLEANUP }
-    enum class Engine { WHISPER, PARAKEET, LLAMA }
+    /** LLAMA: llama.cpp on the CPU (GGUF). LITERT: Google LiteRT-LM, GPU with CPU fallback (.litertlm). */
+    enum class Engine { WHISPER, PARAKEET, LLAMA, LITERT }
 
     data class Asset(val name: String, val url: String, val bytes: Long, val sha256: String)
 
@@ -47,7 +52,7 @@ class ModelManager(context: Context) {
             ),
         ),
         QWEN35_2B(
-            "Qwen3.5 2B (Alibaba) · balanced", Kind.CLEANUP, Engine.LLAMA, "llm",
+            "Qwen3.5 2B (Alibaba) · CPU", Kind.CLEANUP, Engine.LLAMA, "llm",
             listOf(
                 Asset(
                     "Qwen3.5-2B-Q4_K_M.gguf",
@@ -56,8 +61,18 @@ class ModelManager(context: Context) {
                 ),
             ),
         ),
+        GEMMA4_E2B_GPU(
+            "Gemma 4 E2B (Google, LiteRT-LM) · GPU", Kind.CLEANUP, Engine.LITERT, "llm",
+            listOf(
+                Asset(
+                    "gemma-4-E2B-it.litertlm",
+                    "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
+                    2_588_147_712, "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
+                ),
+            ),
+        ),
         GEMMA4_E2B(
-            "Gemma 4 E2B (Google) · best quality, slower", Kind.CLEANUP, Engine.LLAMA, "llm",
+            "Gemma 4 E2B (Google, GGUF) · CPU", Kind.CLEANUP, Engine.LLAMA, "llm",
             listOf(
                 Asset(
                     "gemma-4-E2B-it-Q4_0.gguf",
@@ -67,7 +82,7 @@ class ModelManager(context: Context) {
             ),
         ),
         QWEN35_0_8B(
-            "Qwen3.5 0.8B (Alibaba) · fastest", Kind.CLEANUP, Engine.LLAMA, "llm",
+            "Qwen3.5 0.8B (Alibaba) · CPU", Kind.CLEANUP, Engine.LLAMA, "llm",
             listOf(
                 Asset(
                     "Qwen3.5-0.8B-Q4_K_M.gguf",
@@ -84,16 +99,18 @@ class ModelManager(context: Context) {
         val tier: String get() = when (this) {
             PARAKEET_V2 -> "Accurate"
             WHISPER_BASE_EN -> "Light"
-            QWEN35_0_8B -> "Fast"
+            QWEN35_0_8B -> "Light"
             QWEN35_2B -> "Balanced"
-            GEMMA4_E2B -> "Best"
+            GEMMA4_E2B_GPU -> "Best"
+            GEMMA4_E2B -> "Best (no GPU)"
         }
         val blurb: String get() = when (this) {
             PARAKEET_V2 -> "Catches more words, names and accents. Best on newer phones."
             WHISPER_BASE_EN -> "Small and quick. Works well on any phone."
-            QWEN35_0_8B -> "Quick touch-ups. Easy on battery and space."
-            QWEN35_2B -> "Smarter rewrites that still feel instant."
-            GEMMA4_E2B -> "The most natural writing. Slower and needs more space."
+            QWEN35_0_8B -> "Quick touch-ups on the processor. Easy on battery and space."
+            QWEN35_2B -> "Smarter rewrites on the processor. Fine on most newer phones."
+            GEMMA4_E2B_GPU -> "The most natural writing, on your phone's graphics chip, so it's quick too. Uses the processor if the graphics chip can't run it."
+            GEMMA4_E2B -> "Same Gemma 4 on the processor only. Slower; for phones where Best won't start."
         }
         val size: String get() = if (approxMb >= 1000) "%.1f GB".format(approxMb / 1000f) else "$approxMb MB"
     }
@@ -108,23 +125,38 @@ class ModelManager(context: Context) {
         set(value) { require(value.kind == Kind.SPEECH); prefs.edit().putString(KEY_MODEL, value.name).apply() }
 
     /**
-     * Cleanup LLM default: Qwen3.5 2B on ~8 GB+ phones (it shares RAM with the speech model),
-     * else 0.8B. Gemma 4 E2B is opt-in: best quality but ~2.8 GB and slower per word.
+     * Cleanup LLM default: Gemma 4 E2B on LiteRT-LM (GPU, CPU fallback) on ~8 GB+ phones (it
+     * shares RAM with the speech model; on the GPU it needs well under 1 GB of CPU memory),
+     * else Qwen3.5 0.8B on llama.cpp.
      */
     val recommendedCleanup: Model
-        get() = if (totalRam >= 7_000_000_000L) Model.QWEN35_2B else Model.QWEN35_0_8B
+        get() = if (totalRam >= 7_000_000_000L) Model.GEMMA4_E2B_GPU else Model.QWEN35_0_8B
 
     /** null = LLM cleanup off (rules only). */
     var selectedCleanup: Model?
         get() = when (val v = prefs.getString(KEY_CLEANUP, null)) {
-            null -> recommendedCleanup
+            null -> defaultCleanup()
             OFF -> null
-            else -> Model.entries.firstOrNull { it.name == v && it.kind == Kind.CLEANUP } ?: recommendedCleanup
+            else -> Model.entries.firstOrNull { it.name == v && it.kind == Kind.CLEANUP } ?: defaultCleanup()
         }
         set(value) {
             require(value == null || value.kind == Kind.CLEANUP)
             prefs.edit().putString(KEY_CLEANUP, value?.name ?: OFF).apply()
         }
+
+    /**
+     * Someone who never picked keeps the default they already downloaded (Qwen3.5 2B was the
+     * default before the GPU model) rather than suddenly needing a new 2.6 GB download.
+     */
+    private fun defaultCleanup(): Model {
+        val rec = recommendedCleanup
+        if (isReady(rec)) return rec
+        return listOf(Model.QWEN35_2B, Model.QWEN35_0_8B).firstOrNull { isReady(it) } ?: rec
+    }
+
+    /** A downloaded llama.cpp cleanup model to use when a LiteRT-LM one can't start on this phone. */
+    fun fallbackCleanup(): Model? =
+        listOf(Model.GEMMA4_E2B, Model.QWEN35_2B, Model.QWEN35_0_8B).firstOrNull { isReady(it) }
 
     fun dir(m: Model): File = if (m.subdir.isEmpty()) root else File(root, m.subdir)
     fun file(m: Model, asset: Asset = m.assets.first()) = File(dir(m), asset.name)

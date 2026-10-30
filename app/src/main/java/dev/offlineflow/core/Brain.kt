@@ -54,10 +54,32 @@ object Brain {
             c.withDictionary(dictionary)?.let { cleaner = it; return it }
         }
         cleaner?.close(); cleaner = null; cleanerModel = null
-        return LlmCleaner.load(want, models.file(want), dictionary, models.prefixCacheDir).also {
-            cleaner = it; cleanerModel = want
+        if (want == failedModel) return RulesCleaner
+        fun load(m: ModelManager.Model) = LlmCleaner.load(
+            m, models.file(m), dictionary, models.prefixCacheDir, models.engineCacheDir, models.engineStateDir,
+        )
+        val loaded = try {
+            load(want)
+        } catch (t: Throwable) {
+            // LiteRT-LM couldn't start on GPU or CPU here: use a downloaded GGUF model on llama.cpp.
+            val fallback = models.fallbackCleanup()?.takeIf { want.engine == ModelManager.Engine.LITERT }
+            Log.e(TAG, "${want.name} failed to load" + (fallback?.let { ", using ${it.name}" } ?: ""), t)
+            try {
+                fallback?.let(::load)
+            } catch (t2: Throwable) {
+                Log.e(TAG, "${fallback?.name} failed to load too", t2); null
+            } ?: run { failedModel = want; return RulesCleaner }
         }
+        Log.i(TAG, "cleanup model ${want.name} on ${loaded.backend}")
+        cleaner = loaded; cleanerModel = want
+        return loaded
     }
+
+    /** A cleanup model that failed to load in this process; not retried until another is picked. */
+    private var failedModel: ModelManager.Model? = null
+
+    /** Where the loaded cleanup model runs ("LiteRT-LM GPU", "llama.cpp CPU"), or null when none is loaded. */
+    val cleanerBackend: String? get() = cleaner?.backend
 
     /** The selected cleanup model is in memory (or none is selected, so there's nothing to load). */
     fun cleanerLoaded(models: ModelManager) = models.selectedCleanup.let { it == null || (cleaner != null && cleanerModel == it) }

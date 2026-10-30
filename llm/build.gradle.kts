@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Local LLM (llama.cpp) for transcript cleanup. Its own module so its ggml copy
+// Local LLM for transcript cleanup: llama.cpp (GGUF, CPU) and LiteRT-LM (.litertlm, GPU/CPU). Its own module so its ggml copy
 // never collides with whisper.cpp's at the CMake target level.
 android {
     namespace = "dev.offlineflow.llm"
@@ -29,5 +29,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+}
+
+kotlin {
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+}
+
+dependencies {
+    // Google LiteRT-LM: GPU (OpenCL) / CPU inference for .litertlm models. Prebuilt arm64 + x86_64 JNI.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.0")
 }
