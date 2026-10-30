@@ -74,7 +74,11 @@ waitfield() { # before timeout: until the text changes and holds still for a sec
     local t; t=$(fieldtext); [ "$t" != "$1" ] && [ "$t" = "$last" ] && return; last=$t; sleep 1; done; }
 say() { # clip: press the mic for the clip's length while it plays into the demo mic
   local clip=$1 before; before=$(fieldtext)
-  local xy=; for i in $(seq 1 20); do xy=$(adb shell cat $DEMO/bubble.txt 2>/dev/null); [ -n "$xy" ] && break; sleep 0.5; done
+  local xy=; for i in $(seq 1 40); do
+    xy=$(adb shell cat $DEMO/bubble.txt 2>/dev/null); [ -n "$xy" ] && break
+    # No mic yet: the keyboard didn't come up on its own, so tap the field like a person would.
+    [ $i = 12 ] || [ $i = 28 ] && adb shell input tap $(adb shell cat $DEMO/fieldpos.txt)
+    sleep 0.5; done
   [ -z "$xy" ] && { log "WARN no bubble.txt"; xy="1000 1500"; }
   sleep 0.8
   adb push $A/$clip.pcm $DEMO/next.tmp >/dev/null && adb shell mv $DEMO/next.tmp $DEMO/next.pcm
@@ -113,7 +117,7 @@ scene_plane() {
   chat Maya "text me when you land"
   rec plane
   adb shell cmd statusbar expand-settings; sleep 2
-  adb shell cmd connectivity airplane-mode enable
+  adb shell cmd connectivity airplane-mode enable; sleep 1; bar
   adb shell am broadcast -a com.android.systemui.demo -e command network -e airplane show -e wifi hide >/dev/null; sleep 2.5
   adb shell cmd statusbar collapse; sleep 1.5
   field Message; say plane; sleep 2.5; send; sleep 2.5; stop

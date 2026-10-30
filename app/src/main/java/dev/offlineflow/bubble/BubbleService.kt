@@ -528,7 +528,8 @@ class BubbleService : AccessibilityService() {
                 val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)
                 put(node, text, sel, out, spaced = true)
                 val ms = SystemClock.elapsedRealtime() - t0
-                val done = "Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f)
+                // Demo footage comes from a slow emulator; the edit marks the trimmed wait, so leave out its timing.
+                val done = if (Recorder.demoDir != null) "Done" else "Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f)
                 val rawText = raw.trim()
                 if (style != Style.VERBATIM && out.trim() != rawText && rawText.isNotEmpty()) {
                     lastRaw = rawText

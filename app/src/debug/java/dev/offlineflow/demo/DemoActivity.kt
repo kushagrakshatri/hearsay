@@ -167,6 +167,7 @@ class DemoActivity : Activity() {
         })
         // Focus it and bring up the keyboard, the way a real compose screen opens.
         field.post {
+            spot("fieldpos.txt", field)
             field.requestFocus()
             getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(field, 0)
         }
