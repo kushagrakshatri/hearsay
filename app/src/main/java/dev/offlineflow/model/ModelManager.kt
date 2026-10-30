@@ -15,6 +15,8 @@ import java.security.MessageDigest
 class ModelManager(context: Context) {
     private val root = File(context.filesDir, "models").apply { mkdirs() }
     private val prefs = context.getSharedPreferences("hearsay", Context.MODE_PRIVATE)
+    /** Evaluated LLM prompt prefixes, kept so a restarted process doesn't decode them again. */
+    val prefixCacheDir = File(context.cacheDir, "llm-prefix")
     private val totalRam: Long = ActivityManager.MemoryInfo().also {
         context.getSystemService(ActivityManager::class.java).getMemoryInfo(it)
     }.totalMem

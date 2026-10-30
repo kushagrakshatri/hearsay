@@ -83,7 +83,6 @@ class OfflineFlowIME : InputMethodService() {
     private var hasSelection = false
     private val watch = CorrectionWatch()
     private var fieldKey: String? = null
-    private var idleJob: Job? = null
     private lateinit var wave: LevelView
 
     override fun onCreate() {
@@ -276,7 +275,6 @@ class OfflineFlowIME : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        idleJob?.cancel(); idleJob = null
         // Back in a field we dictated into (e.g. after fixing a word with another keyboard): learn from it.
         val key = info?.let { "${it.packageName}:${it.fieldId}" }
         learnFrom(key)
@@ -304,23 +302,17 @@ class OfflineFlowIME : InputMethodService() {
         handsFree = false
         setMic(MicButton.State.IDLE)
         if (::wave.isInitialized) { wave.visibility = View.INVISIBLE; wave.clear(); status.visibility = View.VISIBLE }
-        // Keyboard hidden: free the cleanup LLM after a minute and the speech model after five,
-        // so a hidden keyboard doesn't hold gigabytes of RAM. Reopening cancels this.
-        idleJob?.cancel()
-        idleJob = scope.launch {
-            delay(LLM_IDLE_MS)
-            releaseLlm()
-            delay(ASR_IDLE_MS - LLM_IDLE_MS)
-            releaseAsr()
-        }
+        // Models stay loaded while the keyboard is hidden: their weights are memory-mapped file
+        // pages the system can drop on its own, and reloading made the next dictation slow.
+        // Real memory pressure frees them in onTrimMemory.
     }
 
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (recorder != null) return
-        val hidden = !isInputViewShown
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL || (hidden && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)) {
+        // Only real pressure: UI_HIDDEN and friends are also >= RUNNING_CRITICAL numerically.
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL || level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE) {
             Log.i(TAG, "trim memory level=$level, releasing models")
             scope.launch { releaseLlm(); releaseAsr() }
         }
@@ -385,6 +377,8 @@ class OfflineFlowIME : InputMethodService() {
 
     private fun startDictation() {
         if (!hasMicPermission() || !speechAvailable()) return
+        // Models dropped under memory pressure: start loading now, while the user talks.
+        if (!Brain.engineLoaded(models.selected) || !Brain.cleanerLoaded(models)) warmUp()
         status.visibility = View.INVISIBLE
         setMic(MicButton.State.LISTENING)
         val gate = SpeechGate.create(assets)
@@ -639,7 +633,5 @@ class OfflineFlowIME : InputMethodService() {
         private const val TAG = "OfflineFlowIME"
         private const val TAP_MS = 350L
         private const val MAX_EDIT_CHARS = 2400
-        private const val LLM_IDLE_MS = 60_000L
-        private const val ASR_IDLE_MS = 300_000L
     }
 }

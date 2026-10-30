@@ -89,7 +89,12 @@ class SettingsActivity : AppCompatActivity() {
                 speechModels.forEachIndexed { i, m ->
                     addView(option(1000 + i, m, m == models.recommended, m == models.selected))
                 }
-                setOnCheckedChangeListener { _, id -> models.selected = speechModels[id - 1000]; refresh() }
+                setOnCheckedChangeListener { _, id ->
+                    val m = speechModels[id - 1000]
+                    // Switched models: free the old one now rather than at the next dictation.
+                    if (m != models.selected) lifecycleScope.launch { dev.offlineflow.core.Brain.releaseAsr() }
+                    models.selected = m; refresh()
+                }
             })
             addView(speechBar); addView(speechAction)
         }
@@ -102,7 +107,9 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 addView(radio(2999, "Off", "Just punctuation and your words.", models.selectedCleanup == null))
                 setOnCheckedChangeListener { _, id ->
-                    models.selectedCleanup = if (id == 2999) null else cleanupModels[id - 2000]; refresh()
+                    val m = if (id == 2999) null else cleanupModels[id - 2000]
+                    if (m != models.selectedCleanup) lifecycleScope.launch { dev.offlineflow.core.Brain.releaseLlm() }
+                    models.selectedCleanup = m; refresh()
                 }
             })
             addView(cleanupBar); addView(cleanupAction)

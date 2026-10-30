@@ -3,6 +3,7 @@ package dev.offlineflow.cleanup
 import dev.offlineflow.llm.LlamaEngine
 import dev.offlineflow.model.ModelManager
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Wispr-style cleanup with a small local LLM: removes fillers and false starts, applies
@@ -12,18 +13,26 @@ import java.io.File
 class LlmCleaner private constructor(
     private val llm: LlamaEngine,
     private val format: Format,
-    private val dictionary: List<String>,
+    /** Every spelling the dictionary had when this cleaner's prompts were built. */
+    private val known: List<String>,
+    private val prefixCache: PrefixCache?,
 ) : Cleaner, AutoCloseable {
+    private val dictionary = known.take(MAX_DICTIONARY)
+    private val knownSet = known.toHashSet()
     private val prefixIds = HashMap<Style, Int>()
+
+    /** Words added to the dictionary since the prompts were built; they ride in the per-dictation note. */
+    private var learned: List<String> = emptyList()
 
     override fun clean(raw: String): String = clean(raw, Style.POLISHED)
 
     /**
      * Cleans [raw] in [style]. The first use of a style evaluates and caches its prompt.
-     * [names] (seen on screen) ride in a short note after the cached prompt, for this call only.
+     * Of [names] (seen on screen) and newly learned words, only the few that sound like something
+     * in the transcript ride in a short note after the cached prompt, for this call only.
      */
     fun clean(raw: String, style: Style, names: List<String> = emptyList()): String = cleanWith(raw, style) { input, words ->
-        val note = namesNote(names)?.let(format::note).orEmpty()
+        val note = namesNote(hints(learned + names, input))?.let(format::note).orEmpty()
         llm.complete(prefixFor(style), note + format.turn(input), maxTokens = words * 2 + 32).let(format::strip)
     }
 
@@ -31,7 +40,22 @@ class LlmCleaner private constructor(
     fun warm(style: Style) { if (style != Style.VERBATIM) prefixFor(style) }
 
     private fun prefixFor(style: Style): Int = prefixIds.getOrPut(style) {
-        llm.addPrefix(format.prefix(systemFor(style, dictionary), examplesFor(style)))
+        val text = format.prefix(systemFor(style, dictionary), examplesFor(style))
+        llm.addPrefix(text, prefixCache?.fileFor(text))
+    }
+
+    /**
+     * Takes up [dictionary] without rebuilding the cached prompts: words learned since they were
+     * built go in the per-dictation note instead. False when that no longer fits (a word was
+     * removed, or many piled up), so the caller should rebuild with [withDictionary].
+     */
+    fun adopt(dictionary: Dictionary): Boolean {
+        val now = dictionary.spellings
+        val added = now.filter { it !in knownSet }
+        if (added.size > MAX_LEARNED) return false
+        if (now.size - added.size < knownSet.size) return false // something was removed
+        learned = added
+        return true
     }
 
     private var editPrefixId: Int? = null
@@ -47,7 +71,8 @@ class LlmCleaner private constructor(
     /** Evaluates the command-mode prompt ahead of use (e.g. when text gets selected). */
     fun warmEdit() { editPrefix() }
 
-    private fun editPrefix(): Int = editPrefixId ?: llm.addPrefix(format.prefix(EDIT_SYSTEM, EDIT_EXAMPLES)).also { editPrefixId = it }
+    private fun editPrefix(): Int = editPrefixId ?: format.prefix(EDIT_SYSTEM, EDIT_EXAMPLES)
+        .let { llm.addPrefix(it, prefixCache?.fileFor(it)) }.also { editPrefixId = it }
 
     override fun close() = llm.close()
 
@@ -56,7 +81,7 @@ class LlmCleaner private constructor(
      * weights. Null once enough prompt snapshots have piled up that a fresh load is better.
      */
     fun withDictionary(dictionary: Dictionary): LlmCleaner? =
-        if (llm.prefixCount < 12) LlmCleaner(llm, format, dictionary.spellings.take(MAX_DICTIONARY)) else null
+        if (llm.prefixCount < 12) LlmCleaner(llm, format, dictionary.spellings, prefixCache) else null
 
     companion object {
         /**
@@ -93,11 +118,14 @@ class LlmCleaner private constructor(
 
         /** Chat messages (role, content) for an OpenAI-compatible endpoint: cleanup. */
         fun cleanupMessages(style: Style, dictionary: List<String>, input: String, names: List<String> = emptyList()): List<Pair<String, String>> =
-            messages(systemFor(style, dictionary.take(MAX_DICTIONARY)), examplesFor(style), input, namesNote(names))
+            messages(systemFor(style, dictionary.take(MAX_DICTIONARY)), examplesFor(style), input, namesNote(hints(names, input)))
 
-        /** The per-dictation note listing names on screen, or null when there are none. */
+        /** Of [candidates], the few that sound like something in [input]; usually none. */
+        fun hints(candidates: List<String>, input: String): List<String> = SoundAlike.matches(candidates, input, MAX_NAMES)
+
+        /** The per-dictation note listing names to spell exactly, or null when there are none. */
         fun namesNote(names: List<String>): String? = names.take(MAX_NAMES).takeIf { it.isNotEmpty() }?.let {
-            "Names and words on the speaker's screen right now: " + it.joinToString(", ") +
+            "Names and words the speaker may have said: " + it.joinToString(", ") +
                 ". If the transcript has something that sounds like one of them, spell it exactly that way. Otherwise ignore this list."
         }
 
@@ -199,16 +227,45 @@ class LlmCleaner private constructor(
 
         private fun examplesFor(style: Style) = if (style == Style.CASUAL) CASUAL_EXAMPLES else EXAMPLES
 
-        fun load(model: ModelManager.Model, file: File, dictionary: Dictionary): LlmCleaner {
+        /** [cacheDir]: where evaluated prompt prefixes are kept across process restarts (null: memory only). */
+        fun load(model: ModelManager.Model, file: File, dictionary: Dictionary, cacheDir: File? = null): LlmCleaner {
             val format = if (model == ModelManager.Model.GEMMA4_E2B) Format.GEMMA4 else Format.CHATML_NO_THINK
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
-            return LlmCleaner(LlamaEngine.load(file, threads), format, dictionary.spellings.take(MAX_DICTIONARY))
+            val cache = cacheDir?.let { PrefixCache(it, file, format) }
+            return LlmCleaner(LlamaEngine.load(file, threads), format, dictionary.spellings, cache)
         }
 
-        private const val MAX_NAMES = 30
+        /** Names in the per-dictation note: only sound-alikes of the transcript, so usually none. */
+        private const val MAX_NAMES = 5
+
+        /** Learned words carried in the note before the prompts are rebuilt with them. */
+        private const val MAX_LEARNED = 20
 
         /** Keeps the cached prompt prefixes small enough for the 2048-token context. */
         private const val MAX_DICTIONARY = 150
+    }
+
+    /**
+     * Prompt-prefix state files, one per (model file, prefix text). Kept few: each is a few MB of
+     * KV cache, and the dictionary changing makes old ones useless.
+     */
+    class PrefixCache(private val dir: File, model: File, format: Format) {
+        private val modelId = "v1|${model.name}|${model.length()}|${model.lastModified()}|$format"
+
+        fun fileFor(prefix: String): File {
+            val md = MessageDigest.getInstance("SHA-256")
+            md.update(modelId.toByteArray()); md.update(0.toByte()); md.update(prefix.toByteArray())
+            val f = File(dir, md.digest().take(16).joinToString("") { "%02x".format(it) } + ".kv")
+            if (f.exists()) f.setLastModified(System.currentTimeMillis()) else prune()
+            return f
+        }
+
+        private fun prune() {
+            val files = dir.listFiles { f -> f.name.endsWith(".kv") }?.sortedByDescending { it.lastModified() } ?: return
+            files.drop(KEEP - 1).forEach { it.delete() }
+        }
+
+        private companion object { const val KEEP = 8 }
     }
 
     /** Chat formats, written out by hand so behavior doesn't depend on template detection. */

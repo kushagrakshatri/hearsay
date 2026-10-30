@@ -13,10 +13,15 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
     var prefixCount = 0
         private set
 
-    /** Decodes and caches [prefix]; returns its id for [complete]. */
-    fun addPrefix(prefix: String): Int {
+    /**
+     * Decodes and caches [prefix]; returns its id for [complete]. With a [cache] file, the
+     * evaluated state is read from it when it holds exactly this prefix, and saved to it otherwise,
+     * so the next process doesn't decode the prefix again.
+     */
+    fun addPrefix(prefix: String, cache: File? = null): Int {
         check(handle != 0L) { "LlamaEngine is closed" }
-        val id = nativeAddPrefix(handle, prefix)
+        cache?.parentFile?.mkdirs()
+        val id = nativeAddPrefix(handle, prefix, cache?.absolutePath ?: "")
         check(id >= 0) { "Failed to evaluate prompt prefix" }
         prefixCount++
         return id
@@ -33,7 +38,7 @@ class LlamaEngine private constructor(private var handle: Long) : AutoCloseable 
         handle = 0L
     }
 
-    private external fun nativeAddPrefix(handle: Long, prefix: String): Int
+    private external fun nativeAddPrefix(handle: Long, prefix: String, cache: String): Int
     private external fun nativeComplete(handle: Long, prefix: Int, suffix: String, maxTokens: Int): String
     private external fun nativeFree(handle: Long)
 

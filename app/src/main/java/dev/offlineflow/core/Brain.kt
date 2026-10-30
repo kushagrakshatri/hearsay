@@ -28,7 +28,6 @@ object Brain {
     private var engineModel: ModelManager.Model? = null
     private var cleaner: LlmCleaner? = null
     private var cleanerModel: ModelManager.Model? = null
-    private var cleanerDictKey: String? = null
 
     fun engineLoaded(m: ModelManager.Model) = engine != null && engineModel == m
 
@@ -47,20 +46,24 @@ object Brain {
             cleaner?.close(); cleaner = null; cleanerModel = null
             return RulesCleaner
         }
-        // The dictionary is part of the cached prompt, so a dictionary edit reloads the prefix.
-        cleaner?.let { if (cleanerModel == want && cleanerDictKey == dictionary.key) return it }
-        // Only the dictionary changed (e.g. a word was just learned): keep the loaded weights.
-        cleaner?.takeIf { cleanerModel == want }?.withDictionary(dictionary)?.let {
-            cleaner = it; cleanerDictKey = dictionary.key; return it
+        // The dictionary is part of the cached prompt. A few newly learned words ride in the
+        // per-dictation note instead, so learning a word doesn't re-evaluate the whole prompt.
+        cleaner?.takeIf { cleanerModel == want }?.let { c ->
+            if (c.adopt(dictionary)) return c
+            // A word was removed or many piled up: rebuild the prompts, keeping the loaded weights.
+            c.withDictionary(dictionary)?.let { cleaner = it; return it }
         }
         cleaner?.close(); cleaner = null; cleanerModel = null
-        return LlmCleaner.load(want, models.file(want), dictionary).also {
-            cleaner = it; cleanerModel = want; cleanerDictKey = dictionary.key
+        return LlmCleaner.load(want, models.file(want), dictionary, models.prefixCacheDir).also {
+            cleaner = it; cleanerModel = want
         }
     }
 
+    /** The selected cleanup model is in memory (or none is selected, so there's nothing to load). */
+    fun cleanerLoaded(models: ModelManager) = models.selectedCleanup.let { it == null || (cleaner != null && cleanerModel == it) }
+
     suspend fun releaseLlm() = withContext(llm) {
-        cleaner?.close(); cleaner = null; cleanerModel = null; cleanerDictKey = null
+        cleaner?.close(); cleaner = null; cleanerModel = null
     }
 
     suspend fun releaseAsr() = withContext(asr) {

@@ -94,7 +94,6 @@ class BubbleService : AccessibilityService() {
     private var startX = 0; private var startY = 0
     private var dragging = false
     private var lastInserted: String? = null
-    private var idleJob: Job? = null
     private var warmedFor: String? = null
     private var lastEditable: AccessibilityNodeInfo? = null
     // Undo to what you actually said: the raw words for the last cleaned insert.
@@ -272,7 +271,6 @@ class BubbleService : AccessibilityService() {
     @SuppressLint("ClickableViewAccessibility")
     private fun show() {
         if (destroyed) return
-        idleJob?.cancel(); idleJob = null
         if (root == null) {
             val t = DynamicColors.wrapContextIfAvailable(ContextThemeWrapper(this, R.style.Theme_Hearsay))
             fun c(attr: Int) = MaterialColors.getColor(t, attr, Color.GRAY)
@@ -338,13 +336,9 @@ class BubbleService : AccessibilityService() {
         val r = root ?: return
         if (r.visibility != View.VISIBLE) return
         r.visibility = View.GONE
-        // Hidden: free the models after a while (low memory frees them sooner via onTrimMemory).
-        // A one-minute timeout meant reloading the cleanup model between most messages.
-        idleJob?.cancel()
-        idleJob = scope.launch {
-            delay(10 * 60_000L); Brain.releaseLlm()
-            delay(5 * 60_000L); Brain.releaseAsr()
-        }
+        // Models stay loaded while hidden: their weights are memory-mapped file pages the system
+        // can drop without us, and reloading them made the first dictation after a break slow.
+        // Real memory pressure frees them in onTrimMemory.
     }
 
     private fun say(msg: String?, holdMs: Long = 2500) {
@@ -385,7 +379,11 @@ class BubbleService : AccessibilityService() {
         val pkg = node.packageName?.toString()
         if (warmedFor == pkg) return
         warmedFor = pkg
-        val style = Style.forApp(this, pkg, node.inputType)
+        preload(Style.forApp(this, pkg, node.inputType))
+    }
+
+    /** Loads the speech model and the cleanup model with [style]'s prompt, if they aren't already. */
+    private fun preload(style: Style) {
         if (models.isReady(models.selected) && !CloudClient.speechOn(this)) scope.launch(Brain.asr) {
             runCatching { Brain.engine(models) }.onFailure { Log.e(TAG, "speech warm-up failed", it) }
         }
@@ -447,6 +445,10 @@ class BubbleService : AccessibilityService() {
     private fun startListening() {
         if (!hasMic()) { say("Open Hearsay to allow the microphone"); return }
         learnNow()
+        // Models dropped under memory pressure: start loading now, while the user talks.
+        if (!Brain.engineLoaded(models.selected) || !Brain.cleanerLoaded(models)) target()?.let { n ->
+            preload(Style.forApp(this, n.packageName?.toString(), n.inputType))
+        }
         mic.state = MicButton.State.LISTENING
         buzz()
         val gate = spareGate ?: SpeechGate.create(assets)
@@ -624,7 +626,10 @@ class BubbleService : AccessibilityService() {
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (recorder == null && !busy && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+        // Only real pressure: UI_HIDDEN and friends are also >= RUNNING_CRITICAL numerically.
+        if (recorder == null && !busy && (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL || level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE)) {
+            Log.i(TAG, "trim memory level=$level, releasing models")
+            warmedFor = null
             scope.launch { Brain.releaseLlm(); Brain.releaseAsr() }
         }
     }

@@ -6,9 +6,15 @@
 // the new turn. A snapshot (rather than trimming the KV cache) also works for models
 // whose memory can't be partially rewound: hybrid/recurrent (Qwen3.5) and sliding-window
 // attention (Gemma 4).
+//
+// Snapshots are also saved to disk (llama_state_seq_save_file) under a path the Kotlin side
+// derives from the model file and the prefix text, so after the process is killed the prefix
+// is read back instead of decoded again. A file is only used when its saved tokens match the
+// prefix's tokens exactly.
 #include <jni.h>
 #include <android/log.h>
 #include <algorithm>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include "llama.h"
@@ -117,15 +123,49 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeInit(JNIEnv *env, jclass, jstring jpa
     return reinterpret_cast<jlong>(l);
 }
 
+// Tries to restore sequence 0 from a saved prefix file. True only when the file's tokens are
+// exactly [toks]; on any mismatch the sequence is cleared again so the caller can decode.
+static bool load_prefix_file(Llm &l, const std::string &path, const std::vector<llama_token> &toks) {
+    if (path.empty()) return false;
+    FILE *f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    std::fclose(f);
+    std::vector<llama_token> saved(toks.size() + 1);
+    size_t n_saved = 0;
+    size_t got = llama_state_seq_load_file(l.ctx, path.c_str(), 0, saved.data(), saved.size(), &n_saved);
+    bool ok = got > 0 && n_saved == toks.size() && std::equal(toks.begin(), toks.end(), saved.begin());
+    if (!ok) {
+        llama_memory_seq_rm(llama_get_memory(l.ctx), 0, -1, -1);
+        std::remove(path.c_str()); // stale or from another build: don't try it again
+    }
+    return ok;
+}
+
+static void save_prefix_file(Llm &l, const std::string &path, const std::vector<llama_token> &toks) {
+    if (path.empty()) return;
+    std::string tmp = path + ".tmp";
+    size_t n = llama_state_seq_save_file(l.ctx, tmp.c_str(), 0, toks.data(), toks.size());
+    if (n == 0 || std::rename(tmp.c_str(), path.c_str()) != 0) {
+        std::remove(tmp.c_str());
+        LOGE("could not save prefix to %s", path.c_str());
+    }
+}
+
 extern "C" JNIEXPORT jint JNICALL
-Java_dev_offlineflow_llm_LlamaEngine_nativeAddPrefix(JNIEnv *env, jobject, jlong handle, jstring jprefix) {
+Java_dev_offlineflow_llm_LlamaEngine_nativeAddPrefix(JNIEnv *env, jobject, jlong handle, jstring jprefix, jstring jcache) {
     auto *l = reinterpret_cast<Llm *>(handle);
     if (!l) return -1;
     llama_memory_seq_rm(llama_get_memory(l->ctx), 0, -1, -1);
     auto toks = tokenize(l->vocab, jstr(env, jprefix), true);
-    if (toks.empty() || (int) toks.size() >= l->n_ctx - 256 || !decode_all(*l, toks)) {
-        LOGE("prefix decode failed (%zu tokens)", toks.size());
+    if (toks.empty() || (int) toks.size() >= l->n_ctx - 256) {
+        LOGE("prefix too long or empty (%zu tokens)", toks.size());
         return -1;
+    }
+    std::string cache = jstr(env, jcache);
+    bool from_disk = load_prefix_file(*l, cache, toks);
+    if (!from_disk) {
+        if (!decode_all(*l, toks)) { LOGE("prefix decode failed (%zu tokens)", toks.size()); return -1; }
+        save_prefix_file(*l, cache, toks);
     }
     Llm::Prefix p;
     p.n_tokens = (int) toks.size();
@@ -134,7 +174,8 @@ Java_dev_offlineflow_llm_LlamaEngine_nativeAddPrefix(JNIEnv *env, jobject, jlong
     if (n == 0) { LOGE("snapshot failed"); return -1; }
     p.state.resize(n);
     l->prefixes.push_back(std::move(p));
-    LOGI("prefix %zu: %d tokens, %zu bytes", l->prefixes.size() - 1, l->prefixes.back().n_tokens, n);
+    LOGI("prefix %zu: %d tokens, %zu bytes%s", l->prefixes.size() - 1, l->prefixes.back().n_tokens, n,
+         from_disk ? " (from disk)" : "");
     return (jint) (l->prefixes.size() - 1);
 }
 
