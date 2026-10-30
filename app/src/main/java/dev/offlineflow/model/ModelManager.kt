@@ -81,6 +81,28 @@ class ModelManager(context: Context) {
                 ),
             ),
         ),
+        /** Liquid AI, LFM Open License v1.0 (free under $10M revenue; attribution in the picker, README, NOTICE). */
+        LFM25_1_2B(
+            "LFM2.5 1.2B (Liquid AI, LFM Open License) · CPU", Kind.CLEANUP, Engine.LLAMA, "llm",
+            listOf(
+                Asset(
+                    "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+                    "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+                    730_895_168, "b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5",
+                ),
+            ),
+        ),
+        /** OpenBMB, Apache-2.0. Llama architecture; hybrid thinking, run with thinking off. */
+        MINICPM5_1B(
+            "MiniCPM5 1B (OpenBMB) · CPU", Kind.CLEANUP, Engine.LLAMA, "llm",
+            listOf(
+                Asset(
+                    "MiniCPM5-1B-Q4_K_M.gguf",
+                    "https://huggingface.co/openbmb/MiniCPM5-1B-GGUF/resolve/main/MiniCPM5-1B-Q4_K_M.gguf",
+                    688_065_920, "81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa",
+                ),
+            ),
+        ),
         QWEN35_0_8B(
             "Qwen3.5 0.8B (Alibaba) · CPU", Kind.CLEANUP, Engine.LLAMA, "llm",
             listOf(
@@ -100,6 +122,8 @@ class ModelManager(context: Context) {
             PARAKEET_V2 -> "Accurate"
             WHISPER_BASE_EN -> "Light"
             QWEN35_0_8B -> "Light"
+            LFM25_1_2B -> "Fast (Liquid LFM2.5 1.2B)"
+            MINICPM5_1B -> "Fast (MiniCPM5 1B)"
             QWEN35_2B -> "Balanced"
             GEMMA4_E2B_GPU -> "Best"
             GEMMA4_E2B -> "Best (no GPU)"
@@ -108,6 +132,8 @@ class ModelManager(context: Context) {
             PARAKEET_V2 -> "Catches more words, names and accents. Best on newer phones."
             WHISPER_BASE_EN -> "Small and quick. Works well on any phone."
             QWEN35_0_8B -> "Quick touch-ups on the processor. Easy on battery and space."
+            LFM25_1_2B -> "Experimental: quick touch-ups on the processor. LFM2.5 by Liquid AI, used under the LFM Open License v1.0."
+            MINICPM5_1B -> "Experimental: quick touch-ups on the processor. MiniCPM5 by OpenBMB, Apache-2.0."
             QWEN35_2B -> "Smarter rewrites on the processor. Fine on most newer phones."
             GEMMA4_E2B_GPU -> "The most natural writing, on your phone's graphics chip, so it's quick too. Uses the processor if the graphics chip can't run it."
             GEMMA4_E2B -> "Same Gemma 4 on the processor only. Slower; for phones where Best won't start."

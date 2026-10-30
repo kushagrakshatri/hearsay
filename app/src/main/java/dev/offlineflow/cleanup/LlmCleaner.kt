@@ -249,7 +249,12 @@ class LlmCleaner private constructor(
                     threads,
                 )
                 else -> {
-                    val format = if (model == ModelManager.Model.GEMMA4_E2B) Format.GEMMA4 else Format.CHATML_NO_THINK
+                    val format = when (model) {
+                        ModelManager.Model.GEMMA4_E2B -> Format.GEMMA4
+                        ModelManager.Model.LFM25_1_2B -> Format.CHATML
+                        ModelManager.Model.MINICPM5_1B -> Format.MINICPM_NO_THINK
+                        else -> Format.CHATML_NO_THINK
+                    }
                     LlamaText(LlamaEngine.load(file, threads), format, prefixDir?.let { PrefixCache(it, file, format) })
                 }
             }
@@ -311,6 +316,25 @@ class LlmCleaner private constructor(
             override fun note(text: String) = "<|im_start|>system\n$text<|im_end|>\n"
             override fun turn(user: String) =
                 "<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        },
+        /**
+         * Plain ChatML for models without a thinking mode (Liquid LFM2.5). The tokenizer adds the
+         * BOS (<|startoftext|>) itself, since the prefix is tokenized with specials; <|im_end|> is
+         * the model's end-of-generation token.
+         */
+        CHATML {
+            override fun prefix(system: String, examples: List<String>) = CHATML_NO_THINK.prefix(system, examples)
+            override fun note(text: String) = CHATML_NO_THINK.note(text)
+            override fun turn(user: String) = "<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n"
+        },
+        /**
+         * MiniCPM5: ChatML with an empty think block (its no-think template). Its GGUF doesn't add
+         * the BOS, but the template starts with one, so the prefix writes <s> (parsed as a special token).
+         */
+        MINICPM_NO_THINK {
+            override fun prefix(system: String, examples: List<String>) = "<s>" + CHATML_NO_THINK.prefix(system, examples)
+            override fun note(text: String) = CHATML_NO_THINK.note(text)
+            override fun turn(user: String) = CHATML_NO_THINK.turn(user)
         },
         /** Gemma 4: <|turn>role … <turn|>; BOS is added by the tokenizer. Thinking off by default. */
         GEMMA4 {

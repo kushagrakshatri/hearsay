@@ -1,0 +1,16 @@
+Hearsay
+Copyright 2026 Kushagra Kshatri and contributors. Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Hearsay does not bundle language or speech model weights. Models are downloaded on the phone, at the
+user's choice, from their publishers and are used under their own licenses:
+
+- LFM2.5-1.2B-Instruct (GGUF), optional cleanup model "Fast (Liquid LFM2.5 1.2B)":
+  Copyright Liquid AI, Inc. Licensed under the LFM Open License v1.0
+  (https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/blob/main/LICENSE; copy in
+  docs/licenses/LFM-Open-License-v1.0.txt). Free for use by entities under US$10M annual revenue;
+  see the license for commercial terms.
+- Qwen3.5 0.8B / 2B (Alibaba Cloud, Apache-2.0), Gemma 4 E2B (Google, Apache-2.0),
+  NVIDIA Parakeet TDT 0.6B v2 (CC-BY-4.0), OpenAI Whisper base.en (MIT), Silero VAD (MIT, bundled).
+
+Third-party code: llama.cpp and whisper.cpp (MIT), sherpa-onnx (Apache-2.0), LiteRT-LM (Apache-2.0).
+The common-words list comes from SCOWL (app/src/main/assets/words/SCOWL-LICENSE.txt).
