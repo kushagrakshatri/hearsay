@@ -74,34 +74,40 @@ waitfield() { # before timeout: until the text changes and holds still for a sec
     local t; t=$(fieldtext); [ "$t" != "$1" ] && [ "$t" = "$last" ] && return; last=$t; sleep 1; done; }
 say() { # clip: press the mic for the clip's length while it plays into the demo mic
   local clip=$1 before; before=$(fieldtext)
+  local xy=; for i in $(seq 1 20); do xy=$(adb shell cat $DEMO/bubble.txt 2>/dev/null); [ -n "$xy" ] && break; sleep 0.5; done
+  [ -z "$xy" ] && { log "WARN no bubble.txt"; xy="1000 1500"; }
   sleep 0.8
   adb push $A/$clip.pcm $DEMO/next.tmp >/dev/null && adb shell mv $DEMO/next.tmp $DEMO/next.pcm
-  local xy; xy=$(adb shell cat $DEMO/bubble.txt 2>/dev/null)
-  [ -z "$xy" ] && { log "WARN no bubble.txt"; xy="1000 1500"; }
   local ms=$(( $(stat -c%s $A/$clip.pcm) / 32 + 600 ))
-  log "say $clip at $(echo "$(now) - $T0" | bc) s, hold ${ms} ms at $xy"
+  log "say $clip, hold ${ms} ms at $xy"
   adb shell input swipe $xy $xy $ms
   local t1; t1=$(now)
-  waitfield "$before" 60
+  # The emulator thinks ~10x slower than a phone: film the first seconds of thinking, pause the camera
+  # through the rest, and start a new segment once the text lands. The edit marks the cut.
+  [ -n "${SEG:-}" ] && { sleep 6; stopseg; }
+  waitfield "$before" 400
   log "text $clip after $(echo "$(now) - $t1" | bc) s: $(fieldtext)"
+  [ -n "${SEG:-}" ] && { K=$((K+1)); startseg; sleep 1.5; }
 }
-rec() { bar; adb shell rm -f /sdcard/$1.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/$1.mp4 & REC=$!; T0=$(now); sleep 1; log "== $1"; }
-stop() { sleep 1; adb shell pkill -INT screenrecord; wait $REC 2>/dev/null; sleep 2; adb pull /sdcard/$1.mp4 $OUT/$1.mp4 >/dev/null; }
+startseg() { adb shell rm -f /sdcard/seg.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/seg.mp4 & REC=$!; sleep 0.5; log "-- ${SEG}_$K"; }
+stopseg() { sleep 0.5; adb shell pkill -INT screenrecord; wait $REC 2>/dev/null; sleep 2; adb pull /sdcard/seg.mp4 $OUT/${SEG}_$K.mp4 >/dev/null; }
+rec() { bar; SEG=$1; K=1; log "== $1"; startseg; sleep 1; }
+stop() { sleep 1; stopseg; SEG=; }
 send() { adb shell input tap $(adb shell cat $DEMO/send.txt); }
 
 # Warm up: first load of both models is slow, and isn't the point.
-chat Maya "warming up"; field Message; say edit; say edit; adb shell input keyevent BACK
+chat Maya "warming up"; field Message; say plane; adb shell input keyevent BACK
 
 chat Maya "dinner this week?" "that new place on Santana Row finally opened"
-rec chat; field Message; say chat; sleep 2.5; send; sleep 2.5; stop chat
+rec chat; field Message; say chat; sleep 2.5; send; sleep 2.5; stop
 
 adb shell am start -f 0x10008000 -n $P/$N.demo.DemoActivity --es scene mail >/dev/null; sleep 2.5
 rec mail; field "Compose email"; say mail; sleep 3
 adb shell input keycombination KEYCODE_CTRL_LEFT KEYCODE_A; sleep 1.5
-say edit; sleep 3.5; stop mail
+say edit; sleep 3.5; stop
 
 chat Siobhan "did you get a chance to finish the deck?" "Aoife wants to see it before Monday too"
-rec names; field Message; say names; sleep 2.5; send; sleep 2.5; stop names
+rec names; field Message; say names; sleep 2.5; send; sleep 2.5; stop
 
 chat Maya "text me when you land"
 rec plane
@@ -109,7 +115,7 @@ adb shell cmd statusbar expand-settings; sleep 2
 adb shell cmd connectivity airplane-mode enable
 adb shell am broadcast -a com.android.systemui.demo -e command network -e airplane show -e wifi hide >/dev/null; sleep 2.5
 adb shell cmd statusbar collapse; sleep 1.5
-field Message; say plane; sleep 2.5; send; sleep 2.5; stop plane
+field Message; say plane; sleep 2.5; send; sleep 2.5; stop
 adb shell cmd connectivity airplane-mode disable
 
 adb logcat -d -s HearsayBubble:* > $OUT/bubble-log.txt 2>&1
