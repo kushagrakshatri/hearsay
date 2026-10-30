@@ -84,7 +84,9 @@ class DemoActivity : Activity() {
             maxLines = 5; background = round(Color.parseColor("#F3F4F6"), 22)
             setPadding(dp(18), dp(12), dp(18), dp(12))
         }
+        watch(input)
         val send = text("➤", 20f, Color.WHITE).apply {
+            post { spot("send.txt", this) }
             gravity = Gravity.CENTER; background = round(brand, 22); contentDescription = "Send"
             setOnClickListener {
                 val t = input.text.toString().trim()
@@ -140,9 +142,34 @@ class DemoActivity : Activity() {
             gravity = Gravity.TOP or Gravity.START; background = null
             setPadding(dp(16), dp(16), dp(16), dp(16)); setLineSpacing(0f, 1.15f)
         }
+        watch(body)
         col.addView(ScrollView(this).apply { addView(body, ViewGroup.LayoutParams(-1, -2)); isFillViewport = true },
             LinearLayout.LayoutParams(-1, 0, 1f))
         return insets(col)
+    }
+
+    // The recording script reads the field and the Send button from files: uiautomator would register a
+    // UiAutomation, and that unbinds every accessibility service, the floating mic included.
+    private val demoDir get() = java.io.File(getExternalFilesDir(null), "demo").apply { mkdirs() }
+
+    private fun spot(name: String, v: View) {
+        val loc = IntArray(2); v.getLocationOnScreen(loc)
+        runCatching { java.io.File(demoDir, name).writeText("${loc[0] + v.width / 2} ${loc[1] + v.height / 2}") }
+    }
+
+    private fun watch(field: EditText) {
+        fun write() = runCatching { java.io.File(demoDir, "field.txt").writeText(field.text.toString()) }
+        write()
+        field.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) { write() }
+        })
+        // Focus it and bring up the keyboard, the way a real compose screen opens.
+        field.post {
+            field.requestFocus()
+            getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(field, 0)
+        }
     }
 
     /** Keeps content clear of the status bar, and the composer above the keyboard. */

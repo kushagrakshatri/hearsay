@@ -66,8 +66,12 @@ chat() { # name m1 [m2 ...]
   for m in "$@"; do args+=(--es m$i "'$m'"); i=$((i+1)); done
   adb shell am start -f 0x10008000 -n $P/$N.demo.DemoActivity --es scene chat --es name "$name" "${args[@]}" >/dev/null; sleep 2.5
 }
-field() { python3 tools/ui/ui.py tapnoscroll "$1"; sleep 2; }
-fieldtext() { python3 tools/demo/field.py text; }
+# No uiautomator here: it registers a UiAutomation, which unbinds the floating mic's accessibility service.
+field() { sleep 2; }  # DemoActivity focuses its field and opens the keyboard itself
+fieldtext() { adb shell cat $DEMO/field.txt 2>/dev/null | tr '\n' '~'; }
+waitfield() { # before timeout: until the text changes and holds still for a second
+  local end=$(( $(date +%s) + $2 )) last=; while [ $(date +%s) -lt $end ]; do
+    local t; t=$(fieldtext); [ "$t" != "$1" ] && [ "$t" = "$last" ] && return; last=$t; sleep 1; done; }
 say() { # clip: press the mic for the clip's length while it plays into the demo mic
   local clip=$1 before; before=$(fieldtext)
   sleep 0.8
@@ -78,12 +82,12 @@ say() { # clip: press the mic for the clip's length while it plays into the demo
   log "say $clip at $(echo "$(now) - $T0" | bc) s, hold ${ms} ms at $xy"
   adb shell input swipe $xy $xy $ms
   local t1; t1=$(now)
-  python3 tools/demo/field.py wait "$before" 60
+  waitfield "$before" 60
   log "text $clip after $(echo "$(now) - $t1" | bc) s: $(fieldtext)"
 }
 rec() { bar; adb shell rm -f /sdcard/$1.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/$1.mp4 & REC=$!; T0=$(now); sleep 1; log "== $1"; }
 stop() { sleep 1; adb shell pkill -INT screenrecord; wait $REC 2>/dev/null; sleep 2; adb pull /sdcard/$1.mp4 $OUT/$1.mp4 >/dev/null; }
-send() { python3 tools/ui/ui.py tapnoscroll Send; }
+send() { adb shell input tap $(adb shell cat $DEMO/send.txt); }
 
 # Warm up: first load of both models is slow, and isn't the point.
 chat Maya "warming up"; field Message; say edit; say edit; adb shell input keyevent BACK
