@@ -548,10 +548,28 @@ class BubbleService : AccessibilityService() {
     /** The field's real text (not its hint) and selection; no cursor means the end. */
     private fun current(node: AccessibilityNodeInfo): Pair<String, IntRange> {
         val raw = node.text?.toString().orEmpty()
-        val text = if (node.isShowingHintText || (raw.isNotEmpty() && raw == node.hintText?.toString())) "" else raw
+        val text = if (looksLikeHint(node, raw)) "" else raw
         var s = node.textSelectionStart; var e = node.textSelectionEnd
         if (s < 0 || e < 0 || s > text.length || e > text.length) { s = text.length; e = text.length }
         return text to (minOf(s, e)..maxOf(s, e))
+    }
+
+    /**
+     * Some apps (WhatsApp, for one) report an empty box's placeholder as its text without
+     * flagging it as a hint, so "Message" would end up in front of what you said.
+     */
+    private val PLACEHOLDER = Regex("""(?i)((type|write|send|enter|add)\s+)?((a|an|your)\s+)?(message|reply|comment|caption|text|note|search)(\.\.\.|\u2026)?""")
+
+    private fun looksLikeHint(node: AccessibilityNodeInfo, raw: String): Boolean {
+        if (raw.isEmpty()) return false
+        if (node.isShowingHintText) return true
+        val r = raw.trim()
+        if (r.equals(node.hintText?.toString()?.trim(), true)) return true
+        if (r.equals(node.contentDescription?.toString()?.trim(), true)) return true
+        if (r.equals(node.tooltipText?.toString()?.trim(), true)) return true
+        // Cursor at the very start of a short placeholder-looking phrase, e.g. "Message", "Type a message".
+        val atStart = node.textSelectionStart <= 0 && node.textSelectionEnd <= 0
+        return atStart && r.length <= 40 && PLACEHOLDER.matches(r)
     }
 
     /** Replaces the selection (or inserts at the cursor) with [ins]; falls back to paste when set-text is refused. */
