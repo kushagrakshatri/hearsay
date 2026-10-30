@@ -77,7 +77,7 @@ say() { # clip: press the mic for the clip's length while it plays into the demo
   local xy=; for i in $(seq 1 40); do
     xy=$(adb shell cat $DEMO/bubble.txt 2>/dev/null); [ -n "$xy" ] && break
     # No mic yet: the keyboard didn't come up on its own, so tap the field like a person would.
-    [ $i = 12 ] || [ $i = 28 ] && adb shell input tap $(adb shell cat $DEMO/fieldpos.txt)
+    [ $i = 12 ] || [ $i = 28 ] && { nodialogs; adb shell input tap $(adb shell cat $DEMO/fieldpos.txt); }
     sleep 0.5; done
   [ -z "$xy" ] && { log "WARN no bubble.txt"; xy="1000 1500"; }
   sleep 0.8
@@ -96,7 +96,8 @@ say() { # clip: press the mic for the clip's length while it plays into the demo
 startseg() { adb shell rm -f /sdcard/seg.mp4; adb shell screenrecord --bit-rate 16000000 /sdcard/seg.mp4 & REC=$!; sleep 0.5; log "-- ${SEG}_$K"; }
 stopseg() { sleep 0.5; adb shell pkill -INT screenrecord; wait $REC 2>/dev/null; sleep 2; adb pull /sdcard/seg.mp4 $OUT/${SEG}_$K.mp4 >/dev/null; }
 # Let the models finish warming up for this screen first: on the emulator that starves screenrecord.
-rec() { sleep ${WARM:-150}; bar; SEG=$1; K=1; log "== $1"; startseg; sleep 1; }
+nodialogs() { adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1; }
+rec() { sleep ${WARM:-150}; nodialogs; bar; SEG=$1; K=1; log "== $1"; startseg; sleep 1; }
 stop() { sleep 1; stopseg; SEG=; }
 send() { adb shell input tap $(adb shell cat $DEMO/send.txt); }
 
@@ -120,8 +121,9 @@ scene_plane() {
   adb shell cmd statusbar expand-settings; sleep 2
   adb shell cmd connectivity airplane-mode enable; sleep 1; bar
   adb shell am broadcast -a com.android.systemui.demo -e command network -e airplane show -e wifi hide >/dev/null; sleep 2.5
-  adb shell cmd statusbar collapse; sleep 1.5
-  field Message; say plane; sleep 2.5; send; sleep 2.5; stop
+  adb shell cmd statusbar collapse; sleep 1.5; nodialogs
+  adb shell input tap $(adb shell cat $DEMO/fieldpos.txt); sleep 2
+  say plane; sleep 2.5; send; sleep 2.5; stop
   adb shell cmd connectivity airplane-mode disable
 }
 # One scene per emulator (CI runs them in parallel), or all of them.
