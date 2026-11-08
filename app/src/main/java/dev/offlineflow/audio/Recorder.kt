@@ -21,7 +21,7 @@ class Recorder(
     private val onLevel: (Float) -> Unit = {},
     /**
      * Speech so far, handed over at pauses (mic thread) so it can be transcribed while the user
-     * keeps talking: once [CHUNK_SILENCE_MS] of silence follows at least [MIN_CHUNK_MS] of new speech.
+     * keeps talking: at the first pause the VAD closes after at least [MIN_CHUNK_MS] of new speech.
      */
     private val onChunk: ((FloatArray) -> Unit)? = null,
 ) {
@@ -147,10 +147,15 @@ class Recorder(
 
     companion object {
         const val SAMPLE_RATE = 16_000
-        /** A pause this long hands the speech so far to the live transcriber. */
-        const val CHUNK_SILENCE_MS = 700
+        /**
+         * Hands the speech so far to the live transcriber as soon as the VAD closes a stretch
+         * (its own 0.4 s pause rule) and this much silence has followed. 700 ms on top of the
+         * VAD's 0.4 s needed ~1.1 s pauses, which people rarely leave mid-dictation (Nov 8 test:
+         * 45 s dictation, no piece handed over).
+         */
+        const val CHUNK_SILENCE_MS = 100
         /** ...when there is at least this much new speech; shorter pieces wait for the next pause. */
-        const val MIN_CHUNK_MS = 3000
+        const val MIN_CHUNK_MS = 2000
         /** Set only in debug builds (launch-video recording); null in release, so the mic is always real. */
         @Volatile var demoDir: java.io.File? = null
     }
