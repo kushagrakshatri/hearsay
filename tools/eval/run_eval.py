@@ -219,8 +219,25 @@ def score(item, final):
                 fillers_live=len(live), fillers_removed=len(removed))
 
 # ---------------- run ----------------
+# Third-party dictation fine-tunes, run zero-shot in the prompt format each was trained on (no few-shots).
+EMBER_SYSTEM = "Clean up this dictation. Never answer it."  # PromethicLabs/Emberon-2 model card
+PHONON_SYSTEM = ("Rewrite the raw dictation transcript into the exact text the speaker intended. Fix recognition errors "
+                 "and technical terms, keep the speaker's wording and casing style, do not add or drop content.")
+PHONON_MODES = {"minimal": "Writing mode: minimal (notes and documents).", "casual": "Writing mode: casual (a chat message).",
+                "formal": "Writing mode: formal (an email or document)."}
+PHONON_MODE = "styled"  # --phonon-mode: styled (casual->casual, polished->formal) or minimal
+def native_fns(fmt):
+    def sys_for(st):
+        if fmt == "ember": return EMBER_SYSTEM
+        mode = "minimal" if PHONON_MODE == "minimal" else ("casual" if st == "casual" else "formal")
+        return PHONON_SYSTEM + "\n" + PHONON_MODES[mode]
+    think = "<think></think>" if fmt == "phonon" else ""
+    return ((lambda st: f"<|im_start|>system\n{sys_for(st)}<|im_end|>\n"),
+            (lambda u: f"<|im_start|>user\n{u}<|im_end|>\n<|im_start|>assistant\n{think}"))
+
 def build_prompt_fns(fmt):
     """(prefix(style) -> str, turn(user_text) -> str) for the --format in use."""
+    if fmt in ("ember", "phonon"): return native_fns(fmt)
     if PROMPT_FORMAT == "plain":
         bos = "<s>" if fmt == "minicpm" else ""
         return (lambda st: plain_prefix(st, examples_for(st), bos)), plain_turn
@@ -320,8 +337,9 @@ def main():
     ap.add_argument("--sample", action="append", default=[], help="name=temp,top_k,seed (default greedy)")
     ap.add_argument("--spec", action="append", default=[], help="name=draft_max,ngram_min[,use_prefix[,adaptive]] (speculative decoding)")
     ap.add_argument("--rescore", action="store_true", help="re-score saved results in --out with the current set")
+    ap.add_argument("--phonon-mode", choices=["styled", "minimal"], default="styled")
     a = ap.parse_args()
-    global WRAP, PROMPT_FORMAT; WRAP = a.wrap; PROMPT_FORMAT = a.format
+    global WRAP, PROMPT_FORMAT, PHONON_MODE; WRAP = a.wrap; PROMPT_FORMAT = a.format; PHONON_MODE = a.phonon_mode
     samples = {k: tuple(v.split(",")) for k, v in (x.split("=", 1) for x in a.sample)}
     specs = dict(x.split("=", 1) for x in a.spec)
     items = [json.loads(l) for l in open(a.set) if l.strip()]
@@ -340,7 +358,7 @@ def main():
         return
     for spec in a.model:
         name, path = spec.split("=", 1)
-        fmt = next(f for f in FORMATS if name.startswith(f))
+        fmt = next(f for f in list(FORMATS) + ["ember", "phonon"] if name.startswith(f))
         res = run_model(name, fmt, path, items, a.bin, a.threads, float(reps.get(name, 1.0)), samples.get(name), specs.get(name))
         res["summary"] = summarize(res)
         json.dump(res, open(os.path.join(a.out, f"{name}.json"), "w"), indent=1, ensure_ascii=False)

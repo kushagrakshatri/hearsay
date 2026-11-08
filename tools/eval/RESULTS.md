@@ -231,3 +231,28 @@ off, 2 threads, 15 items, passes off/on/on/off, LiteRT-LM's own benchmark counte
 dominated by prefilling the ~417-token prompt (≈265 tok/s), which the app skips by cloning a prefilled conversation.
 Results: `results/2026-10-30-spec-ab/gemma4-e2b-litert-mtp.json`. GPU (and the PowerVR regression) can't be measured
 here.
+
+## Dictation fine-tunes, Nov 7, 2026 (`results/2026-11-07-finetunes/`)
+Third-party cleanup fine-tunes run zero-shot in their own trained prompt (`--model ember=…`, `--model phonon=…`; no few-shots),
+same 45 items, same rules pre-pass / sanity check / cap, same sandbox (2 threads). Baselines re-run in the same session
+(this session's sandbox was slower: Qwen 2B mean 2407 ms vs 1713 on Oct 30), so compare speed within the table only.
+
+| | Emberon-2 (LFM2.5-350M, Q4_K_M 200 MB) | Phonon refiner 1.7B (LFM3, Q4_K_S 988 MB), casual/formal | Phonon, minimal mode | Qwen3.5 2B (Balanced, app prompt) | Qwen3.5 0.8B |
+|---|---|---|---|---|---|
+| Near match (/45) | **42** | 40 | **42** | **42** | 34 |
+| Exact match | 17 | 12 | 16 | **23** | 13 |
+| Mean WER | **0.027** | 0.045 | 0.033 | 0.039 | 0.122 |
+| Answered/followed (raw output) | **0** | **0** | **0** | 1 | 6 |
+| Meaning violations (inserted) | **2** | 3 | 3 | 3 | 4 |
+| Self-corrections | **5/5** | 4/5 | 4/5 | 4/5 | 4/5 |
+| Sanity fallbacks | **0** | **0** | **0** | 1 | 4 |
+| Prompt tokens to cache | **16** | 54 | 54 | 381–397 | 381–397 |
+| Decode tok/s | **43.5** | 18.0 | 16.4 | 10.7 | 14.6 |
+| Mean / p90 ms per dictation | **546 / 1383** | 1539 / 2455 | 1641 / 2630 | 2407 / 3996 | 1774 / 3530 |
+
+- **Emberon-2 matches Qwen 2B on quality at ~4.4× the speed and 1/6 the size**, never answers, applies all 5 self-corrections.
+  Misses: never formats enumerations as lists (writes "first…; second…"), drops "You know what" as filler, "20"/"9" digits
+  (expected words), "B 12". Inherits the pre-pass "landed., give" comma bug (fix RulesCleaner).
+- Phonon: same quality as Qwen 2B but barely faster on CPU (LFM3 1.7B decode ~Qwen 2B); casing lowercase in casual mode by design.
+  Its speed claims rely on its Mac-only Metal engine + drafter. Not worth the 988 MB on Android.
+- Licence for both: LFM Open License v1.0 (free under US$10M annual revenue).
