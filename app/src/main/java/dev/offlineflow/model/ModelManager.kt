@@ -13,9 +13,6 @@ import java.security.MessageDigest
  * Every file is pinned by size and SHA-256; a mismatch is deleted, never loaded.
  */
 class ModelManager(context: Context) {
-    private companion object {
-        val RETIRED = listOf("LFM2.5-1.2B-Instruct-Q4_K_M.gguf", "MiniCPM5-1B-Q4_K_M.gguf")
-    }
     private val root = File(context.filesDir, "models").apply {
         mkdirs()
         // Retired picks (untuned LFM2.5 1.2B and MiniCPM5 1B, Nov 2026): free their space.
@@ -242,6 +239,8 @@ class ModelManager(context: Context) {
     }
 
     companion object {
+        /** Retired picks (untuned LFM2.5 1.2B and MiniCPM5 1B, Nov 2026), deleted on start. */
+        private val RETIRED = listOf("LFM2.5-1.2B-Instruct-Q4_K_M.gguf", "MiniCPM5-1B-Q4_K_M.gguf")
         private const val KEY_MODEL = "model"
         private const val KEY_CLEANUP = "cleanup"
         private const val OFF = "OFF"
