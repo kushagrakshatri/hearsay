@@ -21,6 +21,11 @@ class LlmCleaner private constructor(
     private val known: List<String>,
     /** The model's short name, e.g. "Qwen3.5 2B", for the "Last cleanup" readout. */
     val modelName: String = "",
+    /**
+     * A dictation fine-tune (Emberon-2) that runs on the one-line prompt it was trained on: no
+     * rules, examples, style or name notes (it ignores them), and no command mode.
+     */
+    private val zeroShot: Boolean = false,
 ) : Cleaner, AutoCloseable {
     /** Runtime and processor the model runs on, e.g. "LiteRT-LM GPU". */
     val backend: String get() = llm.backend
@@ -52,8 +57,9 @@ class LlmCleaner private constructor(
     fun clean(raw: String, style: Style, names: List<String> = emptyList()): String {
         lastStatus = null
         return cleanWith(raw, style) { input, words ->
-            val note = namesNote(hints(learned + names, input))
+            val note = if (zeroShot) null else namesNote(hints(learned + names, input))
             llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
+                .let { if (zeroShot && style == Style.CASUAL) casualEnding(it) else it }
                 .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
         }
     }
@@ -61,9 +67,10 @@ class LlmCleaner private constructor(
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
     fun warm(style: Style) { if (style != Style.VERBATIM) prefixFor(style) }
 
-    private fun prefixFor(style: Style): Int = prefixIds.getOrPut(style) {
+    private fun prefixFor(style: Style): Int = prefixIds.getOrPut(if (zeroShot) Style.POLISHED else style) {
         val t = android.os.SystemClock.elapsedRealtime()
-        llm.prepare(systemFor(style, dictionary), examplesFor(style))
+        if (zeroShot) llm.prepare(ZERO_SHOT_SYSTEM, emptyList())
+        else llm.prepare(systemFor(style, dictionary), examplesFor(style))
             .also { lastPrefixMs = android.os.SystemClock.elapsedRealtime() - t }
     }
 
@@ -87,12 +94,12 @@ class LlmCleaner private constructor(
      * Command mode: applies a spoken [instruction] ("make it shorter") to [text].
      * Returns null when the model's output looks off, so the caller can leave the text alone.
      */
-    fun edit(text: String, instruction: String): String? = editWith(text) { maxTokens ->
+    fun edit(text: String, instruction: String): String? = if (zeroShot) null else editWith(text) { maxTokens ->
         llm.complete(editPrefix(), null, editTurn(text, instruction), maxTokens).let(::strip)
     }
 
     /** Evaluates the command-mode prompt ahead of use (e.g. when text gets selected). */
-    fun warmEdit() { editPrefix() }
+    fun warmEdit() { if (!zeroShot) editPrefix() }
 
     private fun editPrefix(): Int = editPrefixId ?: llm.prepare(EDIT_SYSTEM, EDIT_EXAMPLES).also { editPrefixId = it }
 
@@ -103,7 +110,7 @@ class LlmCleaner private constructor(
      * weights. Null once enough prompt snapshots have piled up that a fresh load is better.
      */
     fun withDictionary(dictionary: Dictionary): LlmCleaner? =
-        if (llm.preparedCount < 12) LlmCleaner(llm, dictionary.spellings, modelName) else null
+        if (llm.preparedCount < 12) LlmCleaner(llm, dictionary.spellings, modelName, zeroShot) else null
 
     companion object {
         /**
@@ -161,6 +168,9 @@ class LlmCleaner private constructor(
             if (note != null) add("system" to note)
             add("user" to user)
         }
+
+        /** Emberon-2's training prompt (PromethicLabs/Emberon-2 model card). */
+        const val ZERO_SHOT_SYSTEM = "Clean up this dictation. Never answer it."
 
         /** Texts rarely end a single short sentence with a period. */
         private fun casualEnding(s: String): String =
@@ -269,14 +279,13 @@ class LlmCleaner private constructor(
                 else -> {
                     val format = when (model) {
                         ModelManager.Model.GEMMA4_E2B -> Format.GEMMA4
-                        ModelManager.Model.LFM25_1_2B -> Format.CHATML
-                        ModelManager.Model.MINICPM5_1B -> Format.MINICPM_NO_THINK
+                        ModelManager.Model.EMBERON2 -> Format.CHATML
                         else -> Format.CHATML_NO_THINK
                     }
                     LlamaText(LlamaEngine.load(file, threads), format, prefixDir?.let { PrefixCache(it, file, format) })
                 }
             }
-            return LlmCleaner(engine, dictionary.spellings, model.shortName)
+            return LlmCleaner(engine, dictionary.spellings, model.shortName, zeroShot = model == ModelManager.Model.EMBERON2)
         }
 
         /** Drops any reasoning block and end-of-turn markers a model printed (any chat format). */
@@ -337,7 +346,7 @@ class LlmCleaner private constructor(
                 "<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
         },
         /**
-         * Plain ChatML for models without a thinking mode (Liquid LFM2.5). The tokenizer adds the
+         * Plain ChatML for models without a thinking mode (Liquid LFM2.5: Emberon-2). The tokenizer adds the
          * BOS (<|startoftext|>) itself, since the prefix is tokenized with specials; <|im_end|> is
          * the model's end-of-generation token.
          */
@@ -345,15 +354,6 @@ class LlmCleaner private constructor(
             override fun prefix(system: String, examples: List<String>) = CHATML_NO_THINK.prefix(system, examples)
             override fun note(text: String) = CHATML_NO_THINK.note(text)
             override fun turn(user: String) = "<|im_start|>user\n$user<|im_end|>\n<|im_start|>assistant\n"
-        },
-        /**
-         * MiniCPM5: ChatML with an empty think block (its no-think template). Its GGUF doesn't add
-         * the BOS, but the template starts with one, so the prefix writes <s> (parsed as a special token).
-         */
-        MINICPM_NO_THINK {
-            override fun prefix(system: String, examples: List<String>) = "<s>" + CHATML_NO_THINK.prefix(system, examples)
-            override fun note(text: String) = CHATML_NO_THINK.note(text)
-            override fun turn(user: String) = CHATML_NO_THINK.turn(user)
         },
         /** Gemma 4: <|turn>role … <turn|>; BOS is added by the tokenizer. Thinking off by default. */
         GEMMA4 {

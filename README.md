@@ -20,7 +20,7 @@ Hold the floating mic in any app, say what you mean (ums, restarts, "no wait, Th
 
 ```
 Mic (16 kHz, in memory only) → Silero VAD → Parakeet TDT 0.6B or Whisper (on-device)
-  → your dictionary + names on screen → small local LLM cleanup (Qwen3.5 / Gemma 4 / LFM2.5 / MiniCPM5) → your app
+  → your dictionary + names on screen → small local LLM cleanup (Qwen3.5 / Gemma 4 / Emberon-2) → your app
 ```
 
 - **Speech:** NVIDIA Parakeet TDT 0.6B v2 (int8) via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), or [whisper.cpp](https://github.com/ggml-org/whisper.cpp) `base.en` for lighter phones.
@@ -28,8 +28,7 @@ Mic (16 kHz, in memory only) → Silero VAD → Parakeet TDT 0.6B or Whisper (on
   - Light: Qwen3.5 0.8B (Alibaba, Apache-2.0)
   - Balanced: Qwen3.5 2B (Alibaba, Apache-2.0)
   - Best: Gemma 4 E2B (Google, Apache-2.0), GPU or CPU
-  - Fast (experimental): LFM2.5 1.2B Instruct (Liquid AI, [LFM Open License v1.0](docs/licenses/LFM-Open-License-v1.0.txt))
-  - Fast (experimental): MiniCPM5 1B (OpenBMB, Apache-2.0)
+  - Fast: Emberon-2, a 200 MB dictation fine-tune of LFM2.5-350M (Promethic Labs on Liquid AI, [LFM Open License v1.0](docs/licenses/LFM-Open-License-v1.0.txt)). Matched Qwen3.5 2B on our cleanup eval at ~4x the speed; no voice edits or list formatting
 - **Optional cloud boost:** sign in with ChatGPT or bring your own OpenAI-compatible key for cleanup. Off by default. Your voice is still transcribed on the phone. The F-Droid build leaves this out.
 
 ## Install
@@ -77,4 +76,4 @@ tools/eval/   offline cleanup eval (seed set, desktop llama.cpp twin of the JNI,
 
 Apache-2.0. whisper.cpp and llama.cpp are MIT, and sherpa-onnx is Apache-2.0. The common-words list comes from SCOWL (see `app/src/main/assets/words/SCOWL-LICENSE.txt`). Models are downloaded from their publishers under their own licenses.
 
-Model attribution (see [NOTICE](NOTICE)): the optional "Fast (Liquid LFM2.5 1.2B)" cleanup model is LFM2.5-1.2B-Instruct by Liquid AI, Inc., used under the LFM Open License v1.0 (copy in `docs/licenses/LFM-Open-License-v1.0.txt`; free for organizations under US$10M annual revenue). Hearsay doesn't ship its weights; the phone downloads them from Liquid AI's Hugging Face repo when you pick it.
+Model attribution (see [NOTICE](NOTICE)): the "Fast" cleanup model is Emberon-2 by Promethic Labs (https://wispercode.com), a modified version of LFM2.5-350M by Liquid AI, used under the LFM Open License v1.0 (copy in `docs/licenses/LFM-Open-License-v1.0.txt`; free for organizations under US$10M annual revenue). Hearsay doesn't ship its weights; the phone downloads them from Promethic Labs' Hugging Face repo when you pick it.

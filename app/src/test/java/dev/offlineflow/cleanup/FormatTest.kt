@@ -17,12 +17,6 @@ class FormatTest {
         assertFalse(f.turn("hi").contains("think"))
     }
 
-    @Test fun miniCpmStartsWithBosAndTurnsThinkingOff() {
-        val f = LlmCleaner.Format.MINICPM_NO_THINK
-        assertTrue(f.prefix("sys", ex).startsWith("<s><|im_start|>system\nsys<|im_end|>\n"))
-        assertTrue(f.turn("hi").endsWith("<|im_start|>assistant\n<think>\n\n</think>\n\n"))
-    }
-
     @Test fun stripStopsAtImEnd() {
         assertEquals("Hello there", LlmCleaner.strip("Hello there<|im_end|>\nextra"))
     }
