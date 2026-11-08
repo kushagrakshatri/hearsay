@@ -11,8 +11,18 @@ import kotlinx.coroutines.async
  * stretch of speech at a pause ([add]); it is transcribed on the speech thread right away, so
  * when the mic is released only the last stretch is left to do ([finish]).
  */
-class LiveSpeech(private val scope: CoroutineScope, private val transcribe: (FloatArray) -> String) {
+class LiveSpeech(
+    private val scope: CoroutineScope,
+    private val transcribe: (FloatArray) -> String,
+    /** Speech thread: the transcript so far, one entry per piece, after each piece is done. */
+    private val onText: (List<String>) -> Unit = {},
+) {
     private val parts = ArrayList<Deferred<String?>>()
+    private val texts = ArrayList<String>()
+
+    /** The transcript in pieces (one per pause, then the tail), as [finish] joined them. */
+    var pieces: List<String> = emptyList()
+        private set
     @Volatile private var audioMs = 0L
 
     val started: Boolean get() = synchronized(parts) { parts.isNotEmpty() }
@@ -22,6 +32,10 @@ class LiveSpeech(private val scope: CoroutineScope, private val transcribe: (Flo
         audioMs += chunk.size * 1000L / Recorder.SAMPLE_RATE
         val d = scope.async(Brain.asr) {
             runCatching { transcribe(chunk) }.onFailure { Log.e(TAG, "live chunk failed", it) }.getOrNull()
+                ?.also { text ->
+                    val soFar = synchronized(texts) { texts += text.trim(); texts.filter { it.isNotEmpty() } }
+                    runCatching { onText(soFar) }
+                }
         }
         synchronized(parts) { parts += d }
     }
@@ -35,7 +49,8 @@ class LiveSpeech(private val scope: CoroutineScope, private val transcribe: (Flo
         val done = synchronized(parts) { parts.toList() }.map { it.await() ?: return null }
         t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs }
         val last = if (tail.size >= Recorder.SAMPLE_RATE / 4) Brain.onAsr(t) { transcribe(tail) } else ""
-        return (done + last).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
+        pieces = (done + last).map { it.trim() }.filter { it.isNotEmpty() }
+        return pieces.joinToString(" ")
     }
 
     private companion object { const val TAG = "HearsayLive" }

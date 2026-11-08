@@ -15,6 +15,9 @@ class Timing {
     var llmWait = 0L; var llmLoad = 0L; var prompt = 0L; var llm = 0L
     /** Speech transcribed while the user was still talking, and the wait for its last piece. */
     var liveAudioMs = 0L; var liveWait = 0L
+    /** Live cleanup: stretches cleaned while the user talked, of how many. */
+    var cleanReused = 0; var cleanPieces = 0
+    fun livePieces(c: dev.offlineflow.cleanup.LlmCleaner) { cleanReused = c.lastReused; cleanPieces = c.lastPieces }
     var ranLlm = false
     var cloud = false
 
@@ -31,7 +34,7 @@ class Timing {
         if (prompt >= MIN) add("first-use prompt setup ${secs(prompt)}")
         add(when {
             cloud -> "cleanup ${secs(llm)} (ChatGPT)"
-            ranLlm -> "cleanup ${secs(llm)}"
+            ranLlm -> "cleanup ${secs(llm)}" + if (cleanReused > 0) " ($cleanReused of $cleanPieces pieces done while you talked)" else ""
             else -> "no cleanup model ran"
         })
         val other = totalMs - (liveWait + asrWait + asrLoad + asr + llmWait + llmLoad + prompt + llm)

@@ -467,8 +467,8 @@ class OfflineFlowIME : InputMethodService() {
             val ctx = this@OfflineFlowIME
             suspend fun local() = Brain.onLlm(timing) {
                 when (val c = cleanerForSelected(saved)) {
-                    is LlmCleaner -> Brain.respell(ctx, c, fixWords(c.clean(heard, s, names)), saved, names)
-                        .also { Prefs.recordCleanup(ctx, c.lastStatus) }
+                    is LlmCleaner -> Brain.respell(ctx, c, fixWords(c.clean(heard, s, names, liveNow?.pieces?.map(::fixWords))), saved, names)
+                        .also { Prefs.recordCleanup(ctx, c.lastStatus); timing.livePieces(c) }
                     else -> fixWords(rulesFor(heard, s))
                 }
             }

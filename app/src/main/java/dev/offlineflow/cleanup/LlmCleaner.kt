@@ -54,8 +54,18 @@ class LlmCleaner private constructor(
      * Of [names] (seen on screen) and newly learned words, only the few that sound like something
      * in the transcript ride in a short note after the cached prompt, for this call only.
      */
-    fun clean(raw: String, style: Style, names: List<String> = emptyList()): String {
+    fun clean(raw: String, style: Style, names: List<String> = emptyList(), pieces: List<String>? = null): String {
         lastStatus = null
+        lastReused = 0; lastPieces = 0
+        // Live cleanup (Emberon-2): reuse the stretches cleaned while the user was talking.
+        if (zeroShot && style != Style.VERBATIM && pieces != null && pieces.size > 1 &&
+            pieces.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ") == raw.trim()) {
+            val units = Pieces.units(pieces)
+            lastPieces = units.size
+            lastReused = units.count { synchronized(ahead) { it in ahead } }
+            val out = Pieces.join(units.map(::unit))
+            return Lists.format(if (style == Style.CASUAL) casualEnding(out) else out)
+        }
         val out = cleanWith(raw, style) { input, words ->
             val note = if (zeroShot) null else namesNote(hints(learned + names, input))
             llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
@@ -64,6 +74,35 @@ class LlmCleaner private constructor(
         }
         // Emberon-2 keeps "first …, second …" in one sentence; lay it out as a numbered list.
         return if (zeroShot) Lists.format(out) else out
+    }
+
+    /** Stretches cleaned so far (live cleanup), by their text. */
+    private val ahead = object : LinkedHashMap<String, String>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 32
+    }
+
+    /** Of the last [clean]'s stretches, how many were cleaned while the user talked, and how many there were. */
+    var lastReused = 0; private set
+    var lastPieces = 0; private set
+
+    /**
+     * Live cleanup, zero-shot models only: cleans the newest stretch of [pieces] (the transcript
+     * so far, one entry per pause) so [clean] can reuse it. Model thread only.
+     */
+    fun cleanAhead(pieces: List<String>) {
+        if (!zeroShot) return
+        Pieces.units(pieces).lastOrNull()?.let(::unit)
+    }
+
+    private fun unit(text: String): String {
+        synchronized(ahead) { ahead[text] }?.let { return it }
+        // Style only changes the final period for zero-shot models; that is applied to the whole text.
+        val out = cleanWith(text, Style.POLISHED) { input, words ->
+            llm.complete(prefixFor(Style.POLISHED), null, input, maxTokens = words * 2 + 32).let(::strip)
+                .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
+        }
+        synchronized(ahead) { ahead[text] = out }
+        return out
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */

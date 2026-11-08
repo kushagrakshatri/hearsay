@@ -534,7 +534,7 @@ class BubbleService : AccessibilityService() {
                 }
                 val style = Style.forApp(this@BubbleService, node.packageName?.toString(), node.inputType)
                 if (style != Style.VERBATIM && Brain.cleanupAvailable(this@BubbleService, models)) say("Polishing\u2026", 0)
-                val cleaned = Brain.clean(this@BubbleService, models, raw, style, names?.await().orEmpty(), timing)
+                val cleaned = Brain.clean(this@BubbleService, models, raw, style, names?.await().orEmpty(), timing, liveNow?.pieces)
                 if (cleaned.text.isBlank()) { say("Didn't catch any words"); return@launch }
                 val before = text.substring(0, sel.first).takeLast(2)
                 val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)

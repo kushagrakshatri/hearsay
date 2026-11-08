@@ -15,6 +15,7 @@ import dev.offlineflow.cloud.CloudClient
 import dev.offlineflow.cloud.CloudText
 import dev.offlineflow.model.ModelManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -154,7 +155,17 @@ object Brain {
     /** Live transcription for a dictation about to start, or null when speech runs in the cloud. */
     fun liveSpeech(ctx: Context, models: ModelManager, scope: kotlinx.coroutines.CoroutineScope): LiveSpeech? =
         if (CloudClient.speechOn(ctx) || !models.isReady(models.selected)) null
-        else LiveSpeech(scope) { engine(models).transcribe(it) }
+        else LiveSpeech(scope, { engine(models).transcribe(it) }) { soFar ->
+            scope.launch(llm) { cleanAhead(ctx, soFar) }
+        }
+
+    /** Live cleanup: cleans the newest piece while the user keeps talking, if the model is already loaded. [llm] thread. */
+    private fun cleanAhead(ctx: Context, soFar: List<String>) {
+        val c = cleaner?.takeIf { it.zeroShot } ?: return
+        if (CloudText.on(ctx)) return
+        val d = Dictionary.load(ctx)
+        runCatching { c.cleanAhead(soFar.map { d.apply(it) }) }.onFailure { Log.e(TAG, "live cleanup failed", it) }
+    }
 
     class Cleaned(val text: String, val usedLlm: Boolean, val cloudNote: String?)
 
@@ -162,7 +173,10 @@ object Brain {
      * Raw text → cleaned text in [style]: ChatGPT / own key first when on, then the local LLM, then rules.
      * [names] are names seen on screen for this dictation: exact sound-alike fixes plus a hint to the LLM.
      */
-    suspend fun clean(ctx: Context, models: ModelManager, raw: String, style: Style, names: List<String> = emptyList(), t: Timing? = null): Cleaned {
+    suspend fun clean(
+        ctx: Context, models: ModelManager, raw: String, style: Style, names: List<String> = emptyList(), t: Timing? = null,
+        pieces: List<String>? = null,
+    ): Cleaned {
         val saved = Dictionary.load(ctx)
         val screen = Dictionary.exact(names)
         fun fix(t: String) = screen.apply(saved.apply(t))
@@ -171,8 +185,8 @@ object Brain {
         var note: String? = null
         suspend fun local() = onLlm(t) {
             when (val c = cleaner(models, saved)) {
-                is LlmCleaner -> respell(ctx, c, fix(c.clean(heard, style, names)), saved, names)
-                    .also { dev.offlineflow.Prefs.recordCleanup(ctx, c.lastStatus) }
+                is LlmCleaner -> respell(ctx, c, fix(c.clean(heard, style, names, pieces?.map(::fix))), saved, names)
+                    .also { dev.offlineflow.Prefs.recordCleanup(ctx, c.lastStatus); t?.livePieces(c) }
                 else -> fix(rules(heard, style))
             }
         }
