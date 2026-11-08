@@ -148,10 +148,11 @@ class ModelManager(context: Context) {
     /**
      * Cleanup LLM default: Gemma 4 E2B on LiteRT-LM (GPU, CPU fallback) on ~8 GB+ phones (it
      * shares RAM with the speech model; on the GPU it needs well under 1 GB of CPU memory),
-     * else Emberon-2 on llama.cpp (200 MB; matched Qwen3.5 2B on the cleanup eval, Nov 2026).
+     * Emberon-2 on every phone (Nov 2026): 200 MB, matched Qwen3.5 2B on the cleanup eval and
+     * cleaned a 16 s dictation in 1.3 s on a phone where Qwen3.5 2B took 9.1 s.
      */
     val recommendedCleanup: Model
-        get() = if (totalRam >= 7_000_000_000L) Model.GEMMA4_E2B_GPU else Model.EMBERON2
+        get() = Model.EMBERON2
 
     /** null = LLM cleanup off (rules only). */
     var selectedCleanup: Model?
@@ -172,12 +173,16 @@ class ModelManager(context: Context) {
     private fun defaultCleanup(): Model {
         val rec = recommendedCleanup
         if (isReady(rec)) return rec
-        return listOf(Model.QWEN35_2B, Model.QWEN35_0_8B).firstOrNull { isReady(it) } ?: rec
+        return listOf(Model.QWEN35_2B, Model.GEMMA4_E2B_GPU, Model.GEMMA4_E2B, Model.QWEN35_0_8B).firstOrNull { isReady(it) } ?: rec
     }
 
     /** A downloaded llama.cpp cleanup model to use when a LiteRT-LM one can't start on this phone. */
     fun fallbackCleanup(): Model? =
         listOf(Model.GEMMA4_E2B, Model.QWEN35_2B, Model.QWEN35_0_8B).firstOrNull { isReady(it) }
+
+    /** A downloaded model that can do voice edits, for when Fast (Emberon-2) is picked. */
+    fun editFallback(): Model? =
+        listOf(Model.QWEN35_2B, Model.QWEN35_0_8B, Model.GEMMA4_E2B, Model.GEMMA4_E2B_GPU).firstOrNull { isReady(it) }
 
     fun dir(m: Model): File = if (m.subdir.isEmpty()) root else File(root, m.subdir)
     fun file(m: Model, asset: Asset = m.assets.first()) = File(dir(m), asset.name)

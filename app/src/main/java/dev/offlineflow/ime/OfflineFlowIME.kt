@@ -66,6 +66,7 @@ class OfflineFlowIME : InputMethodService() {
     private val llmDispatcher = Brain.llm
     private lateinit var models: ModelManager
     private var recorder: Recorder? = null
+    private var live: dev.offlineflow.core.LiveSpeech? = null
     private var micDownAt = 0L
     private var handsFree = false
 
@@ -384,10 +385,12 @@ class OfflineFlowIME : InputMethodService() {
         val gate = SpeechGate.create(assets)
         buzz()
         wave.clear(); wave.visibility = View.VISIBLE
+        val liveNow = Brain.liveSpeech(this, models, scope).also { live = it }
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
             mic.post { if (handsFree) finishDictation() }
-        }, onLevel = { level -> wave.post { wave.push(level); mic.push(level) } }).also { it.start() }
+        }, onLevel = { level -> wave.post { wave.push(level); mic.push(level) } },
+            onChunk = liveNow?.let { l -> { chunk: FloatArray -> l.add(chunk) } }).also { it.start() }
     }
 
     private fun finishDictation() {
@@ -399,6 +402,9 @@ class OfflineFlowIME : InputMethodService() {
         wave.visibility = View.INVISIBLE
         status.visibility = View.VISIBLE
         val audio = rec.stop()
+        val liveNow = live?.takeIf { rec.chunksSent > 0 }
+        live = null
+        val tail = rec.tail
         // Captured now: the selection decides whether this is a command or a replacement.
         val selected = currentInputConnection?.getSelectedText(0)?.toString()?.takeIf { it.isNotEmpty() }
         if (!rec.heardSpeech) { say("Didn't catch that. Try again a little closer."); return }
@@ -424,7 +430,7 @@ class OfflineFlowIME : InputMethodService() {
                         Log.w(TAG, "cloud transcription failed, using on-device", t)
                         Brain.onAsr(timing) { engineForSelected().transcribe(audio) }
                     }.also { if (timing.asr == 0L) timing.asr = SystemClock.elapsedRealtime() - t0 }
-                } else Brain.onAsr(timing) {
+                } else liveNow?.finish(tail, timing) ?: Brain.onAsr(timing) {
                     engineForSelected().transcribe(audio)
                 }
             } catch (t: Throwable) {
@@ -461,7 +467,8 @@ class OfflineFlowIME : InputMethodService() {
             val ctx = this@OfflineFlowIME
             suspend fun local() = Brain.onLlm(timing) {
                 when (val c = cleanerForSelected(saved)) {
-                    is LlmCleaner -> fixWords(c.clean(heard, s, names)).also { Prefs.recordCleanup(ctx, c.lastStatus) }
+                    is LlmCleaner -> Brain.respell(ctx, c, fixWords(c.clean(heard, s, names)), saved, names)
+                        .also { Prefs.recordCleanup(ctx, c.lastStatus) }
                     else -> fixWords(rulesFor(heard, s))
                 }
             }
@@ -512,8 +519,11 @@ class OfflineFlowIME : InputMethodService() {
         if (!cleanupAvailable()) {
             say("Voice edits need cleanup on. Turn it on in Hearsay."); return
         }
+        if (Brain.editsNeedBiggerModel(this, models)) {
+            say("Voice edits need Balanced or Best downloaded. Fast only cleans up."); return
+        }
         say("${instruction.replaceFirstChar { it.uppercase() }}\u2026", R.drawable.ic_sparkle)
-        suspend fun local() = withContext(llmDispatcher) { (cleanerForSelected() as? LlmCleaner)?.edit(target.trim(), instruction) }
+        suspend fun local() = Brain.editLocal(this, models, target, instruction)
         val edited = try {
             if (CloudText.on(this)) try {
                 withContext(Dispatchers.IO) {

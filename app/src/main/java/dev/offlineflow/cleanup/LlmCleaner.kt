@@ -25,7 +25,7 @@ class LlmCleaner private constructor(
      * A dictation fine-tune (Emberon-2) that runs on the one-line prompt it was trained on: no
      * rules, examples, style or name notes (it ignores them), and no command mode.
      */
-    private val zeroShot: Boolean = false,
+    val zeroShot: Boolean = false,
 ) : Cleaner, AutoCloseable {
     /** Runtime and processor the model runs on, e.g. "LiteRT-LM GPU". */
     val backend: String get() = llm.backend
@@ -56,12 +56,14 @@ class LlmCleaner private constructor(
      */
     fun clean(raw: String, style: Style, names: List<String> = emptyList()): String {
         lastStatus = null
-        return cleanWith(raw, style) { input, words ->
+        val out = cleanWith(raw, style) { input, words ->
             val note = if (zeroShot) null else namesNote(hints(learned + names, input))
             llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
                 .let { if (zeroShot && style == Style.CASUAL) casualEnding(it) else it }
                 .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
         }
+        // Emberon-2 keeps "first …, second …" in one sentence; lay it out as a numbered list.
+        return if (zeroShot) Lists.format(out) else out
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
@@ -69,8 +71,8 @@ class LlmCleaner private constructor(
 
     private fun prefixFor(style: Style): Int = prefixIds.getOrPut(if (zeroShot) Style.POLISHED else style) {
         val t = android.os.SystemClock.elapsedRealtime()
-        if (zeroShot) llm.prepare(ZERO_SHOT_SYSTEM, emptyList())
-        else llm.prepare(systemFor(style, dictionary), examplesFor(style))
+        (if (zeroShot) llm.prepare(ZERO_SHOT_SYSTEM, emptyList())
+        else llm.prepare(systemFor(style, dictionary), examplesFor(style)))
             .also { lastPrefixMs = android.os.SystemClock.elapsedRealtime() - t }
     }
 

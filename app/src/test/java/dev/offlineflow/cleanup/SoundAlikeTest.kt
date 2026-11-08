@@ -50,4 +50,15 @@ class SoundAlikeTest {
     @Test fun noNoteForNoNames() = assertNull(LlmCleaner.namesNote(emptyList()))
 
     @Test fun soundKey() = assertEquals(SoundAlike.key("Kushagra"), SoundAlike.key("cash agra"))
+
+    private val everyday = setOf("will", "send", "the", "hear", "say", "cash", "to", "and", "ask", "build")
+
+    @Test fun fixRespellsNames() {
+        assertEquals("Ask Kushagra to send the Hearsay build",
+            SoundAlike.fix("Ask cash agra to send the hear say build", listOf("Kushagra", "Hearsay"), { it.lowercase() in everyday }))
+    }
+
+    @Test fun fixLeavesSingleEverydayWords() {
+        assertEquals("I will send it", SoundAlike.fix("I will send it", listOf("Will"), { it.lowercase() in everyday }))
+    }
 }

@@ -8,6 +8,8 @@ import dev.offlineflow.cleanup.Cleaner
 import dev.offlineflow.cleanup.Dictionary
 import dev.offlineflow.cleanup.LlmCleaner
 import dev.offlineflow.cleanup.RulesCleaner
+import dev.offlineflow.cleanup.SoundAlike
+import dev.offlineflow.cleanup.Words
 import dev.offlineflow.cleanup.Style
 import dev.offlineflow.cloud.CloudClient
 import dev.offlineflow.cloud.CloudText
@@ -118,6 +120,7 @@ object Brain {
     fun cleanerLoaded(models: ModelManager) = models.selectedCleanup.let { it == null || (cleaner != null && cleanerModel == it) }
 
     suspend fun releaseLlm() = withContext(llm) {
+        editor?.close(); editor = null; editorModel = null
         cleaner?.close(); cleaner = null; cleanerModel = null
     }
 
@@ -128,7 +131,10 @@ object Brain {
     // ------------------------------------------------------------------ one-call helpers (floating mic)
 
     /** Audio → raw text: cloud speech when the user turned it on (falling back to local), else local. */
-    suspend fun transcribe(ctx: Context, models: ModelManager, audio: FloatArray, t: Timing? = null): String {
+    suspend fun transcribe(
+        ctx: Context, models: ModelManager, audio: FloatArray, t: Timing? = null,
+        live: LiveSpeech? = null, tail: FloatArray = audio,
+    ): String {
         t?.audioMs = audio.size * 1000L / dev.offlineflow.audio.Recorder.SAMPLE_RATE
         val cloud = CloudClient.from(ctx)?.takeIf { CloudClient.speechOn(ctx) }
         if (cloud != null) {
@@ -141,8 +147,14 @@ object Brain {
                 Log.w(TAG, "cloud transcription failed, using on-device", t)
             }
         }
+        live?.finish(tail, t)?.let { return it }
         return onAsr(t) { engine(models).transcribe(audio) }
     }
+
+    /** Live transcription for a dictation about to start, or null when speech runs in the cloud. */
+    fun liveSpeech(ctx: Context, models: ModelManager, scope: kotlinx.coroutines.CoroutineScope): LiveSpeech? =
+        if (CloudClient.speechOn(ctx) || !models.isReady(models.selected)) null
+        else LiveSpeech(scope) { engine(models).transcribe(it) }
 
     class Cleaned(val text: String, val usedLlm: Boolean, val cloudNote: String?)
 
@@ -159,7 +171,8 @@ object Brain {
         var note: String? = null
         suspend fun local() = onLlm(t) {
             when (val c = cleaner(models, saved)) {
-                is LlmCleaner -> fix(c.clean(heard, style, names)).also { dev.offlineflow.Prefs.recordCleanup(ctx, c.lastStatus) }
+                is LlmCleaner -> respell(ctx, c, fix(c.clean(heard, style, names)), saved, names)
+                    .also { dev.offlineflow.Prefs.recordCleanup(ctx, c.lastStatus) }
                 else -> fix(rules(heard, style))
             }
         }
@@ -184,11 +197,44 @@ object Brain {
         return Cleaned(text, usedLlm, note)
     }
 
+    /**
+     * After a model that ignores spelling hints (Emberon-2): respell sound-alikes of the
+     * dictionary and on-screen names ("cash agra" → "Kushagra").
+     */
+    fun respell(ctx: Context, c: LlmCleaner, text: String, saved: Dictionary, names: List<String>): String =
+        if (!c.zeroShot) text
+        else runCatching { SoundAlike.fix(text, saved.spellings + names, { w -> Words.isCommon(ctx, w) }) }.getOrDefault(text)
+
+    // Voice edits when the cleanup model can't do them (Emberon-2): a downloaded instruction model.
+    private var editor: LlmCleaner? = null
+    private var editorModel: ModelManager.Model? = null
+
+    /** The model that applies voice edits, or null when none can. [llm] thread only. */
+    private fun editorFor(models: ModelManager, dictionary: Dictionary): LlmCleaner? {
+        val c = cleaner(models, dictionary) as? LlmCleaner ?: return null
+        if (!c.zeroShot) { editor?.close(); editor = null; editorModel = null; return c }
+        val want = models.editFallback() ?: return null
+        editor?.takeIf { editorModel == want }?.let { return it }
+        editor?.close(); editor = null; editorModel = null
+        return runCatching {
+            LlmCleaner.load(want, models.file(want), dictionary, models.prefixCacheDir, models.engineCacheDir, models.engineStateDir)
+        }.onFailure { Log.e(TAG, "edit model ${want.name} failed to load", it) }.getOrNull()
+            ?.also { editor = it; editorModel = want }
+    }
+
+    /** On-device voice edit with the selected model, or the edit fallback when it can't edit. */
+    suspend fun editLocal(ctx: Context, models: ModelManager, target: String, instruction: String): String? = withContext(llm) {
+        editorFor(models, Dictionary.load(ctx))?.edit(target.trim(), instruction)
+    }
+
+    /** Fast (Emberon-2) is picked, ChatGPT is off, and no model that can do voice edits is downloaded. */
+    fun editsNeedBiggerModel(ctx: Context, models: ModelManager) =
+        models.selectedCleanup?.let { models.isReady(it) && it == ModelManager.Model.EMBERON2 } == true &&
+            models.editFallback() == null && !CloudText.on(ctx)
+
     /** Applies a spoken edit to [target]; null when it couldn't. */
     suspend fun edit(ctx: Context, models: ModelManager, target: String, instruction: String): String? {
-        suspend fun local() = withContext(llm) {
-            (cleaner(models, Dictionary.load(ctx)) as? LlmCleaner)?.edit(target.trim(), instruction)
-        }
+        suspend fun local() = editLocal(ctx, models, target, instruction)
         return try {
             if (CloudText.on(ctx)) try {
                 withContext(Dispatchers.IO) {

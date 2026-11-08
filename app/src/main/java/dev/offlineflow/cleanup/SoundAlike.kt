@@ -41,6 +41,46 @@ object SoundAlike {
         return scored.sortedBy { it.second }.take(max).map { it.first }
     }
 
+    /**
+     * Respells sound-alikes of [candidates] in [text] ("cash agra" → "Kushagra"), for models that
+     * ignore spelling hints (Emberon-2). Conservative: a stretch made only of everyday words
+     * ([isCommon]) is changed only when its letters are exactly the name's ("hear say" → "Hearsay"),
+     * and a single everyday word never is ("will" stays, even with a "Will" in the list).
+     */
+    fun fix(text: String, candidates: List<String>, isCommon: (String) -> Boolean, max: Int = 5): String {
+        val names = matches(candidates, text, max)
+        if (names.isEmpty()) return text
+        val found = WORD.findAll(text).toList()
+        val normWords = found.map { norm(it.value) }
+        val keys = HashMap<String, String>()
+        class Hit(val from: Int, val to: Int, val name: String, val score: Int)
+        val hits = ArrayList<Hit>()
+        for (name in names) {
+            val target = norm(name)
+            val targetKey = key(target)
+            val nameWords = name.split(Regex("\\s+")).size
+            var best: Hit? = null
+            for (i in normWords.indices) {
+                for (span in 1..minOf(nameWords + 2, 4, normWords.size - i)) {
+                    val heard = normWords.subList(i, i + span).joinToString("")
+                    if (heard.isEmpty()) continue
+                    if (heard.length > target.length * 2 + 2) break
+                    val score = closeness(heard, target, targetKey, keys)
+                    if (score == Int.MAX_VALUE) continue
+                    val everyday = found.subList(i, i + span).all { isCommon(it.value) }
+                    if (everyday && (score > 0 || span == 1)) continue
+                    if (best == null || score < best.score) best = Hit(found[i].range.first, found[i + span - 1].range.last + 1, name, score)
+                }
+            }
+            best?.let { hits += it }
+        }
+        val kept = ArrayList<Hit>()
+        for (h in hits.sortedBy { it.score }) if (kept.none { h.from < it.to && it.from < h.to }) kept += h
+        var out = text
+        for (h in kept.sortedByDescending { it.from }) out = out.replaceRange(h.from, h.to, h.name)
+        return out
+    }
+
     /** Lower is closer; [Int.MAX_VALUE] means not a plausible sound-alike. */
     private fun closeness(heard: String, target: String, targetKey: String, keys: HashMap<String, String>): Int {
         if (heard == target) return 0 // right sounds, wrong case or split ("github", "hear say")

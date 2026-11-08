@@ -19,12 +19,26 @@ class Recorder(
     private val noSpeechMs: Int = 8000,
     private val onSpeechEnd: () -> Unit = {},
     private val onLevel: (Float) -> Unit = {},
+    /**
+     * Speech so far, handed over at pauses (mic thread) so it can be transcribed while the user
+     * keeps talking: once [CHUNK_SILENCE_MS] of silence follows at least [MIN_CHUNK_MS] of new speech.
+     */
+    private val onChunk: ((FloatArray) -> Unit)? = null,
 ) {
     private var record: AudioRecord? = null
     private var worker: Thread? = null
     @Volatile private var running = false
     private val chunks = ArrayList<FloatArray>()
     @Volatile private var endFired = false
+    /** Speech stretches already handed to [onChunk]. */
+    @Volatile private var emitted = 0
+
+    /** Chunks handed to [onChunk] that [tail] continues from; 0 means [tail] is everything. Valid after [stop]. */
+    val chunksSent: Int get() = emitted
+
+    /** The speech after the last chunk handed to [onChunk] (all of it when none was). Valid after [stop]. */
+    var tail = FloatArray(0)
+        private set
 
     /** Whether the VAD heard any speech (true when there is no VAD). Valid after [stop]. */
     var heardSpeech = true
@@ -47,22 +61,39 @@ class Recorder(
             val buf = FloatArray(1600) // 100 ms
             while (running) {
                 val n = rec.read(buf, 0, buf.size, AudioRecord.READ_BLOCKING)
-                if (n > 0) {
-                    val c = buf.copyOf(n)
-                    synchronized(chunks) { chunks.add(c) }
-                    onLevel(rms(c))
-                    gate?.let { g ->
-                        runCatching { g.accept(c) }
-                        val silentTooLong = if (g.heardSpeech) g.trailingSilence >= endSilenceMs * SAMPLE_RATE / 1000L
-                            else synchronized(chunks) { chunks.size } * 100 >= noSpeechMs
-                        if (!endFired && silentTooLong) {
-                            endFired = true
-                            onSpeechEnd()
-                        }
-                    }
-                }
+                if (n > 0) afterRead(buf.copyOf(n))
             }
         }
+    }
+
+    /** Mic thread: keeps [c], updates the level and the VAD, ends hands-free, hands over chunks. */
+    private fun afterRead(c: FloatArray) {
+        synchronized(chunks) { chunks.add(c) }
+        onLevel(rms(c))
+        val g = gate ?: return
+        runCatching { g.accept(c) }
+        val silentTooLong = if (g.heardSpeech) g.trailingSilence >= endSilenceMs * SAMPLE_RATE / 1000L
+            else synchronized(chunks) { chunks.size } * 100 >= noSpeechMs
+        if (!endFired && silentTooLong) {
+            endFired = true
+            onSpeechEnd()
+        }
+        val cb = onChunk ?: return
+        if (endFired || !g.heardSpeech || g.trailingSilence < CHUNK_SILENCE_MS * SAMPLE_RATE / 1000L) return
+        val n = g.rangeCount
+        if (n <= emitted) return
+        val ranges = g.rangesFrom(emitted)
+        if (ranges.last().last - ranges.first().first < MIN_CHUNK_MS * SAMPLE_RATE / 1000L) return
+        emitted = n
+        runCatching { cb(SpeechGate.cut(snapshot(), ranges)) }
+    }
+
+    private fun snapshot(): FloatArray {
+        val all = synchronized(chunks) { chunks.toList() }
+        val out = FloatArray(all.sumOf { it.size })
+        var i = 0
+        for (c in all) { c.copyInto(out, i); i += c.size }
+        return out
     }
 
     /** Debug builds only: a scripted clip (16 kHz s16le) waiting in [demoDir], consumed once. */
@@ -83,14 +114,7 @@ class Recorder(
             while (running) {
                 val c = FloatArray(1600)
                 if (i < clip.size) { val n = minOf(1600, clip.size - i); clip.copyInto(c, 0, i, i + n); i += n }
-                synchronized(chunks) { chunks.add(c) }
-                onLevel(rms(c))
-                gate?.let { g ->
-                    runCatching { g.accept(c) }
-                    val silentTooLong = if (g.heardSpeech) g.trailingSilence >= endSilenceMs * SAMPLE_RATE / 1000L
-                        else synchronized(chunks) { chunks.size } * 100 >= noSpeechMs
-                    if (!endFired && silentTooLong) { endFired = true; onSpeechEnd() }
-                }
+                afterRead(c)
                 next += 100
                 val wait = next - android.os.SystemClock.elapsedRealtime()
                 if (wait > 0) Thread.sleep(wait)
@@ -104,15 +128,15 @@ class Recorder(
         worker?.join(500)
         record?.run { stop(); release() }
         record = null
-        val all = synchronized(chunks) { chunks.toList().also { chunks.clear() } }
-        val out = FloatArray(all.sumOf { it.size })
-        var i = 0
-        for (c in all) { c.copyInto(out, i); i += c.size }
-        val g = gate ?: return Silence.trim(out)
-        val speech = runCatching { g.finish() }.getOrNull() ?: return Silence.trim(out)
+        val out = snapshot()
+        synchronized(chunks) { chunks.clear() }
+        val g = gate ?: return Silence.trim(out).also { tail = it }
+        val speech = runCatching { g.finish() }.getOrNull() ?: return Silence.trim(out).also { tail = it; emitted = 0 }
         g.close()
         heardSpeech = speech.isNotEmpty()
-        return if (heardSpeech) SpeechGate.cut(out, speech) else FloatArray(0)
+        val all = if (heardSpeech) SpeechGate.cut(out, speech) else FloatArray(0)
+        tail = if (emitted > 0) SpeechGate.cut(out, speech.drop(emitted)) else all
+        return all
     }
 
     private fun rms(x: FloatArray): Float {
@@ -123,6 +147,10 @@ class Recorder(
 
     companion object {
         const val SAMPLE_RATE = 16_000
+        /** A pause this long hands the speech so far to the live transcriber. */
+        const val CHUNK_SILENCE_MS = 700
+        /** ...when there is at least this much new speech; shorter pieces wait for the next pause. */
+        const val MIN_CHUNK_MS = 3000
         /** Set only in debug builds (launch-video recording); null in release, so the mic is always real. */
         @Volatile var demoDir: java.io.File? = null
     }

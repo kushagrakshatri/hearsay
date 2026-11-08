@@ -30,6 +30,12 @@ class SpeechGate private constructor(private val vad: Vad) : AutoCloseable {
         drain()
     }
 
+    /** Speech stretches finished so far. */
+    val rangeCount: Int get() = ranges.size
+
+    /** Finished speech stretches from index [from] on (sample offsets). */
+    fun rangesFrom(from: Int): List<LongRange> = ranges.subList(from, ranges.size).toList()
+
     /** Speech stretches of the whole recording (sample offsets), after flushing the VAD. */
     fun finish(): List<LongRange> {
         vad.flush()

@@ -87,6 +87,8 @@ class BubbleService : AccessibilityService() {
     private var imeTop = 0
 
     private var recorder: Recorder? = null
+
+    private var live: dev.offlineflow.core.LiveSpeech? = null
     private var handsFree = false
     private var busy = false
     private var downAt = 0L
@@ -453,9 +455,11 @@ class BubbleService : AccessibilityService() {
         buzz()
         val gate = spareGate ?: SpeechGate.create(assets)
         spareGate = null; prepGate()
+        val liveNow = Brain.liveSpeech(this, models, scope).also { live = it }
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             mic.post { if (handsFree) finish() }
-        }, onLevel = { level -> mic.post { mic.push(level) } }).also { it.start() }
+        }, onLevel = { level -> mic.post { mic.push(level) } },
+            onChunk = liveNow?.let { l -> { chunk: FloatArray -> l.add(chunk) } }).also { it.start() }
     }
 
     /** Glides to the nearer side of the screen after a drag, then saves the spot. */
@@ -482,7 +486,7 @@ class BubbleService : AccessibilityService() {
     private fun cancelListening() {
         // Stopping waits on the mic thread; do it off the main thread so the drag stays smooth.
         recorder?.let { r -> scope.launch(Dispatchers.Default) { r.stop() } }
-        recorder = null; handsFree = false
+        recorder = null; handsFree = false; live = null
         mic.state = MicButton.State.IDLE; say(null)
     }
 
@@ -491,6 +495,9 @@ class BubbleService : AccessibilityService() {
         recorder = null; handsFree = false
         buzz()
         val audio = rec.stop()
+        val liveNow = live?.takeIf { rec.chunksSent > 0 }
+        live = null
+        val tail = rec.tail
         if (!rec.heardSpeech || audio.size < Recorder.SAMPLE_RATE / 4) {
             mic.state = MicButton.State.IDLE
             say(if (!rec.heardSpeech) "Didn't catch that" else "Hold the mic while you talk"); return
@@ -504,7 +511,7 @@ class BubbleService : AccessibilityService() {
         scope.launch {
             try {
                 Log.i(TAG, "transcribe ${audio.size} samples on ${System.identityHashCode(this@BubbleService)}")
-                val raw = try { Brain.transcribe(this@BubbleService, models, audio, timing) } catch (t: Throwable) {
+                val raw = try { Brain.transcribe(this@BubbleService, models, audio, timing, liveNow, tail) } catch (t: Throwable) {
                     Log.e(TAG, "transcription failed", t); say("Couldn't write that down"); return@launch
                 }
                 val node = target() ?: run { say("Tap a text box first"); return@launch }
@@ -515,6 +522,7 @@ class BubbleService : AccessibilityService() {
                 if (selected == null && Commands.isScratch(raw)) { scratch(node, text, sel); return@launch }
                 if (selected != null && Commands.forSelection(raw)) {
                     if (!Brain.cleanupAvailable(this@BubbleService, models)) { say("Voice edits need cleanup on"); return@launch }
+                    if (Brain.editsNeedBiggerModel(this@BubbleService, models)) { say("Voice edits need Balanced or Best downloaded"); return@launch }
                     val instruction = Commands.instruction(raw)
                     say("${instruction.replaceFirstChar { it.uppercase() }}\u2026", 0)
                     val edited = Brain.edit(this@BubbleService, models, selected, instruction)
