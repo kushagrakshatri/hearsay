@@ -329,8 +329,10 @@ class SettingsActivity : AppCompatActivity() {
     private fun refreshLastCleanup() {
         val last = Prefs.lastCleanup(this)
         val gpu = Prefs.gpuRenderer(this)
+        val timing = Prefs.lastTiming(this)
         lastCleanupView.text = (if (last.isEmpty()) "Last cleanup: none yet. Dictate something to see what ran."
-            else "Last cleanup: $last") + if (gpu.isNotEmpty()) "\nGraphics chip: $gpu" else ""
+            else "Last cleanup: $last") + (if (gpu.isNotEmpty()) "\nGraphics chip: $gpu" else "") +
+            if (timing.isNotEmpty()) "\nLast dictation: $timing" else ""
     }
 
     private fun refreshSummaries() {

@@ -83,6 +83,10 @@ object Prefs {
 
     /** The "Last cleanup" readout (see CleanupStatus), updated after each on-device cleanup. */
     fun lastCleanup(c: Context): String = p(c).getString("last_cleanup", null) ?: ""
+    /** The "Last dictation" readout (see core.Timing): where the last dictation's time went. */
+    fun lastTiming(c: Context): String = p(c).getString("last_timing", null) ?: ""
+    fun recordTiming(c: Context, line: String) = p(c).edit().putString("last_timing", line).apply()
+
     /** The GPU's GL renderer, once Hearsay has looked it up (when Gemma loads on the graphics chip). */
     fun gpuRenderer(c: Context): String = p(c).getString("gpu_renderer", null) ?: ""
 

@@ -39,6 +39,9 @@ class LlmCleaner private constructor(
     /** Words added to the dictionary since the prompts were built; they ride in the per-dictation note. */
     private var learned: List<String> = emptyList()
 
+    /** Time the last [clean] spent evaluating its style's prompt for the first time (0 when cached). */
+    var lastPrefixMs = 0L
+
     override fun clean(raw: String): String = clean(raw, Style.POLISHED)
 
     /**
@@ -59,7 +62,9 @@ class LlmCleaner private constructor(
     fun warm(style: Style) { if (style != Style.VERBATIM) prefixFor(style) }
 
     private fun prefixFor(style: Style): Int = prefixIds.getOrPut(style) {
+        val t = android.os.SystemClock.elapsedRealtime()
         llm.prepare(systemFor(style, dictionary), examplesFor(style))
+            .also { lastPrefixMs = android.os.SystemClock.elapsedRealtime() - t }
     }
 
     /**

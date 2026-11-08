@@ -409,6 +409,7 @@ class OfflineFlowIME : InputMethodService() {
             else -> "Writing it down\u2026"
         })
         val t0 = SystemClock.elapsedRealtime()
+        val timing = dev.offlineflow.core.Timing().apply { audioMs = audio.size * 1000L / Recorder.SAMPLE_RATE }
         val cloudAsrModel = Prefs.cloudSpeechModel(this)
         setMic(MicButton.State.BUSY)
         scope.launch {
@@ -421,9 +422,9 @@ class OfflineFlowIME : InputMethodService() {
                         // Cloud failed: fall back to the on-device model when there is one.
                         if (!models.isReady(models.selected)) throw t
                         Log.w(TAG, "cloud transcription failed, using on-device", t)
-                        withContext(asrDispatcher) { engineForSelected().transcribe(audio) }
-                    }
-                } else withContext(asrDispatcher) {
+                        Brain.onAsr(timing) { engineForSelected().transcribe(audio) }
+                    }.also { if (timing.asr == 0L) timing.asr = SystemClock.elapsedRealtime() - t0 }
+                } else Brain.onAsr(timing) {
                     engineForSelected().transcribe(audio)
                 }
             } catch (t: Throwable) {
@@ -458,7 +459,7 @@ class OfflineFlowIME : InputMethodService() {
             fun fixWords(t: String) = screen.apply(saved.apply(t))
             val heard = fixWords(raw)
             val ctx = this@OfflineFlowIME
-            suspend fun local() = withContext(llmDispatcher) {
+            suspend fun local() = Brain.onLlm(timing) {
                 when (val c = cleanerForSelected(saved)) {
                     is LlmCleaner -> fixWords(c.clean(heard, s, names)).also { Prefs.recordCleanup(ctx, c.lastStatus) }
                     else -> fixWords(rulesFor(heard, s))
@@ -466,11 +467,12 @@ class OfflineFlowIME : InputMethodService() {
             }
             val cleaned = if (s == Style.VERBATIM) RulesCleaner.verbatim(heard) else try {
                 if (CloudText.on(ctx)) try {
+                    val began = SystemClock.elapsedRealtime()
                     withContext(Dispatchers.IO) {
                         fixWords(LlmCleaner.cleanWithOrThrow(heard, s) { input, words ->
                             CloudText.chat(ctx, LlmCleaner.cleanupMessages(s, saved.spellings, input, names), words * 2 + 32)
                         })
-                    }
+                    }.also { timing.cloud = true; timing.llm = SystemClock.elapsedRealtime() - began }
                 } catch (t: Throwable) {
                     // Offline, plan limit, signed out: fall back to the on-device model (or rules).
                     Log.w(TAG, "cloud cleanup failed, using on-device", t)
@@ -495,6 +497,7 @@ class OfflineFlowIME : InputMethodService() {
             else say("Done \u00b7 ${secs(ms)}" + if (useLlm || s == Style.VERBATIM) "" else " \u00b7 basic cleanup", R.drawable.ic_check)
             cloudNote = null
             Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
+            if (cleaned.isNotEmpty()) Prefs.recordTiming(ctx, timing.line(ms))
           } finally {
             if (recorder == null) setMic(MicButton.State.IDLE)
             updateUndo()

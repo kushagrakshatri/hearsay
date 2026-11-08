@@ -498,12 +498,13 @@ class BubbleService : AccessibilityService() {
         busy = true; mic.state = MicButton.State.BUSY
         say(if (Brain.engineLoaded(models.selected)) "Writing it down\u2026" else "Warming up\u2026", 0)
         val t0 = SystemClock.elapsedRealtime()
+        val timing = dev.offlineflow.core.Timing()
         // Read the names on screen while the speech model works.
         val names = target()?.let { n -> scope.async(Dispatchers.Default) { runCatching { screenNames(n) }.getOrDefault(emptyList()) } }
         scope.launch {
             try {
                 Log.i(TAG, "transcribe ${audio.size} samples on ${System.identityHashCode(this@BubbleService)}")
-                val raw = try { Brain.transcribe(this@BubbleService, models, audio) } catch (t: Throwable) {
+                val raw = try { Brain.transcribe(this@BubbleService, models, audio, timing) } catch (t: Throwable) {
                     Log.e(TAG, "transcription failed", t); say("Couldn't write that down"); return@launch
                 }
                 val node = target() ?: run { say("Tap a text box first"); return@launch }
@@ -525,12 +526,13 @@ class BubbleService : AccessibilityService() {
                 }
                 val style = Style.forApp(this@BubbleService, node.packageName?.toString(), node.inputType)
                 if (style != Style.VERBATIM && Brain.cleanupAvailable(this@BubbleService, models)) say("Polishing\u2026", 0)
-                val cleaned = Brain.clean(this@BubbleService, models, raw, style, names?.await().orEmpty())
+                val cleaned = Brain.clean(this@BubbleService, models, raw, style, names?.await().orEmpty(), timing)
                 if (cleaned.text.isBlank()) { say("Didn't catch any words"); return@launch }
                 val before = text.substring(0, sel.first).takeLast(2)
                 val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)
                 put(node, text, sel, out, spaced = true)
                 val ms = SystemClock.elapsedRealtime() - t0
+                timing.line(ms).let { Log.i(TAG, "timing $it"); dev.offlineflow.Prefs.recordTiming(this@BubbleService, it) }
                 // Demo footage comes from a slow emulator; the edit marks the trimmed wait, so leave out its timing.
                 val done = if (Recorder.demoDir != null) "Done" else "Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f)
                 val rawText = raw.trim()

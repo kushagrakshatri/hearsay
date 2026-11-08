@@ -36,7 +36,8 @@ object Brain {
         val want = models.selected
         engine?.let { if (engineModel == want) return it }
         engine?.close(); engine = null; engineModel = null
-        return Engines.load(models, want).also { engine = it; engineModel = want }
+        val t = Timing.now()
+        return Engines.load(models, want).also { engine = it; engineModel = want; asrLoadMs = Timing.now() - t }
     }
 
     /** The selected cleanup LLM, or RulesCleaner when off / not downloaded. [llm] thread only. */
@@ -58,6 +59,7 @@ object Brain {
         fun load(m: ModelManager.Model) = LlmCleaner.load(
             m, models.file(m), dictionary, models.prefixCacheDir, models.engineCacheDir, models.engineStateDir,
         )
+        val loadStart = Timing.now()
         val loaded = try {
             load(want)
         } catch (t: Throwable) {
@@ -70,9 +72,40 @@ object Brain {
                 Log.e(TAG, "${fallback?.name} failed to load too", t2); null
             } ?: run { failedModel = want; return RulesCleaner }
         }
-        Log.i(TAG, "cleanup model ${want.name} on ${loaded.backend}")
+        llmLoadMs = Timing.now() - loadStart
+        Log.i(TAG, "cleanup model ${want.name} on ${loaded.backend} in ${llmLoadMs} ms")
         cleaner = loaded; cleanerModel = want
         return loaded
+    }
+
+    // Load time of the model the current [onAsr] / [onLlm] block loaded (0 when it was already in memory).
+    @Volatile private var asrLoadMs = 0L
+    @Volatile private var llmLoadMs = 0L
+
+    /** Runs [block] on the speech thread, filling [t]'s wait / load / run times. */
+    suspend fun <T> onAsr(t: Timing?, block: () -> T): T {
+        val asked = Timing.now()
+        return withContext(asr) {
+            val began = Timing.now(); asrLoadMs = 0
+            try { block() } finally {
+                t?.apply { asrWait = began - asked; asrLoad = asrLoadMs; asr = Timing.now() - began - asrLoadMs }
+            }
+        }
+    }
+
+    /** Runs [block] on the LLM thread, filling [t]'s wait / load / prompt setup / cleanup times. */
+    suspend fun <T> onLlm(t: Timing?, block: () -> T): T {
+        val asked = Timing.now()
+        return withContext(llm) {
+            val began = Timing.now(); llmLoadMs = 0; cleaner?.lastPrefixMs = 0
+            try { block() } finally {
+                t?.apply {
+                    llmWait = began - asked; llmLoad = llmLoadMs
+                    ranLlm = cleaner != null; prompt = cleaner?.lastPrefixMs ?: 0
+                    llm = Timing.now() - began - llmLoad - prompt
+                }
+            }
+        }
     }
 
     /** A cleanup model that failed to load in this process; not retried until another is picked. */
@@ -95,17 +128,20 @@ object Brain {
     // ------------------------------------------------------------------ one-call helpers (floating mic)
 
     /** Audio → raw text: cloud speech when the user turned it on (falling back to local), else local. */
-    suspend fun transcribe(ctx: Context, models: ModelManager, audio: FloatArray): String {
+    suspend fun transcribe(ctx: Context, models: ModelManager, audio: FloatArray, t: Timing? = null): String {
+        t?.audioMs = audio.size * 1000L / dev.offlineflow.audio.Recorder.SAMPLE_RATE
         val cloud = CloudClient.from(ctx)?.takeIf { CloudClient.speechOn(ctx) }
         if (cloud != null) {
+            val began = Timing.now()
             try {
                 return withContext(Dispatchers.IO) { cloud.transcribe(audio, dev.offlineflow.Prefs.cloudSpeechModel(ctx)) }
+                    .also { t?.asr = Timing.now() - began }
             } catch (t: Throwable) {
                 if (!models.isReady(models.selected)) throw t
                 Log.w(TAG, "cloud transcription failed, using on-device", t)
             }
         }
-        return withContext(asr) { engine(models).transcribe(audio) }
+        return onAsr(t) { engine(models).transcribe(audio) }
     }
 
     class Cleaned(val text: String, val usedLlm: Boolean, val cloudNote: String?)
@@ -114,14 +150,14 @@ object Brain {
      * Raw text → cleaned text in [style]: ChatGPT / own key first when on, then the local LLM, then rules.
      * [names] are names seen on screen for this dictation: exact sound-alike fixes plus a hint to the LLM.
      */
-    suspend fun clean(ctx: Context, models: ModelManager, raw: String, style: Style, names: List<String> = emptyList()): Cleaned {
+    suspend fun clean(ctx: Context, models: ModelManager, raw: String, style: Style, names: List<String> = emptyList(), t: Timing? = null): Cleaned {
         val saved = Dictionary.load(ctx)
         val screen = Dictionary.exact(names)
         fun fix(t: String) = screen.apply(saved.apply(t))
         val heard = fix(raw)
         if (style == Style.VERBATIM) return Cleaned(RulesCleaner.verbatim(heard), false, null)
         var note: String? = null
-        suspend fun local() = withContext(llm) {
+        suspend fun local() = onLlm(t) {
             when (val c = cleaner(models, saved)) {
                 is LlmCleaner -> fix(c.clean(heard, style, names)).also { dev.offlineflow.Prefs.recordCleanup(ctx, c.lastStatus) }
                 else -> fix(rules(heard, style))
@@ -130,11 +166,12 @@ object Brain {
         val usedLlm = models.selectedCleanup?.let { models.isReady(it) } == true || CloudText.on(ctx)
         val text = try {
             if (CloudText.on(ctx)) try {
+                val began = Timing.now()
                 withContext(Dispatchers.IO) {
                     fix(LlmCleaner.cleanWithOrThrow(heard, style) { input, words ->
                         CloudText.chat(ctx, LlmCleaner.cleanupMessages(style, saved.spellings, input, names), words * 2 + 32)
                     })
-                }
+                }.also { t?.apply { cloud = true; llm = Timing.now() - began } }
             } catch (t: Throwable) {
                 Log.w(TAG, "cloud cleanup failed, using on-device", t)
                 note = t.message
