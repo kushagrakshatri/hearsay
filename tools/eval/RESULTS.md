@@ -256,3 +256,16 @@ same 45 items, same rules pre-pass / sanity check / cap, same sandbox (2 threads
 - Phonon: same quality as Qwen 2B but barely faster on CPU (LFM3 1.7B decode ~Qwen 2B); casing lowercase in casual mode by design.
   Its speed claims rely on its Mac-only Metal engine + drafter. Not worth the 988 MB on Android.
 - Licence for both: LFM Open License v1.0 (free under US$10M annual revenue).
+
+## Live drafts as speculative source (Nov 8, 2026; `hint_ab.py`, results/2026-11-08-live-drafts.json)
+8 long dictations (5 eval items stitched, ~69 words), Emberon-2, sandbox CPU 2 threads. Pieces cleaned one by one
+(as live cleanup while talking would), joined, fed as the first draft source (`H` command, `Hint` in ngram_spec.h).
+| final pass | decode ms | tokens/step | accepted | same as plain |
+|---|---|---|---|---|
+| plain | 746 | 1 | – | 8/8 |
+| lookup draft 3 (app today) | 594 | 2.1 | 78% | 8/8 |
+| live draft 8 | 481 | 6.9 | 81% | 8/8 |
+| live draft 16 | 508 | 10.8 | 72% | 7/8 |
+Prefill ~278 ms in every case. Verdict: only ~19% off decode (~13% off the pass): a 9-token verify batch costs
+several single steps on CPU. Not worth it. Pieces cleaned alone scored WER 0.031 vs 0.038 for the whole-text pass
+(the whole pass sometimes ran sentences together); stitched unrelated items flatter the piece approach.

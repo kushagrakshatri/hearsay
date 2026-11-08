@@ -57,10 +57,36 @@ inline bool find_continuation(const std::vector<llama_token> &src, size_t src_en
     return false;
 }
 
+// An expected output (e.g. pieces cleaned while the user was still talking), searched first and
+// forward from where the last hint draft came from, so drafts follow it in order.
+struct Hint {
+    std::vector<llama_token> tokens;
+    size_t cursor = 0;
+};
+
+inline bool hint_continuation(Hint &h, const std::vector<llama_token> &gen, int n, int want, std::vector<llama_token> &draft) {
+    const auto &src = h.tokens;
+    if ((int) gen.size() < n || src.size() < (size_t) n + 1) return false;
+    const llama_token *key = gen.data() + gen.size() - n;
+    auto try_at = [&](size_t end) {
+        if (!std::equal(key, key + n, src.begin() + (end - n))) return false;
+        draft.clear();
+        for (size_t k = end; k < src.size() && (int) draft.size() < want; ++k) draft.push_back(src[k]);
+        h.cursor = end;
+        return !draft.empty();
+    };
+    for (size_t end = std::max(h.cursor, (size_t) n); end < src.size(); ++end) if (try_at(end)) return true;
+    for (size_t end = std::min(h.cursor, src.size() - 1); end >= (size_t) n; --end) if (try_at(end)) return true;
+    return false;
+}
+
 inline void make_draft(const std::vector<llama_token> &user, const std::vector<llama_token> *prefix,
-                       const std::vector<llama_token> &gen, const Config &cfg, int want, std::vector<llama_token> &draft) {
+                       const std::vector<llama_token> &gen, const Config &cfg, int want, std::vector<llama_token> &draft,
+                       Hint *hint = nullptr) {
     draft.clear();
     if (want <= 0) return;
+    if (hint && !hint->tokens.empty())
+        for (int n = cfg.ngram_max; n >= 1; --n) if (hint_continuation(*hint, gen, n, want, draft)) return;
     for (int n = cfg.ngram_max; n >= cfg.ngram_min; --n) {
         if (find_continuation(user, user.size(), gen, n, want, draft)) return;
         if (gen.size() > (size_t) n && find_continuation(gen, gen.size() - 1, gen, n, want, draft)) return;
@@ -75,7 +101,7 @@ inline void make_draft(const std::vector<llama_token> &user, const std::vector<l
 template <class Emit>
 int generate(llama_context *ctx, llama_sampler *smpl, const llama_vocab *vocab, int pos, int budget,
              const std::vector<llama_token> &user, const std::vector<llama_token> *prefix, const Config &cfg,
-             Stats &st, Emit emit) {
+             Stats &st, Emit emit, Hint *hint = nullptr) {
     const int n_ctx = (int) llama_n_ctx(ctx);
     const int dmax = std::max(0, cfg.draft_max);
     llama_batch batch = llama_batch_init(dmax + 1, 0, 1);
@@ -95,7 +121,7 @@ int generate(llama_context *ctx, llama_sampler *smpl, const llama_vocab *vocab, 
     if (take(cur)) {
         while (true) {
             int room = std::min(budget - (int) gen.size() - 1, n_ctx - pos - 2);
-            make_draft(user, cfg.use_prefix ? prefix : nullptr, gen, cfg, std::min(cfg.adaptive ? want_len : dmax, room), draft);
+            make_draft(user, cfg.use_prefix ? prefix : nullptr, gen, cfg, std::min(cfg.adaptive ? want_len : dmax, room), draft, hint);
             if (cfg.pad_to > 1 && !draft.empty()) {
                 int target = ((int) draft.size() + 1 + cfg.pad_to - 1) / cfg.pad_to * cfg.pad_to - 1;
                 while ((int) draft.size() < std::min({target, dmax, room})) draft.push_back(draft.back());

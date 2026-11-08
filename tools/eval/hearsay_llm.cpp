@@ -106,6 +106,7 @@ int main(int argc, char **argv) {
         return true;
     };
 
+    hearsay_spec::Hint hint;
     char line[256];
     while (std::fgets(line, sizeof line, stdin)) {
         std::string body;
@@ -174,9 +175,9 @@ int main(int argc, char **argv) {
                         if (llama_decode(ctx, llama_batch_get_one(&tok, 1)) != 0) break;
                     }
                 };
-                last_stats = {}; last_fallback = 0;
+                last_stats = {}; last_fallback = 0; hint.cursor = 0;
                 if (use_spec) {
-                    int rc = hearsay_spec::generate(ctx, smpl, vocab, pos, budget, toks, &pre.tokens, spec, last_stats, emit);
+                    int rc = hearsay_spec::generate(ctx, smpl, vocab, pos, budget, toks, &pre.tokens, spec, last_stats, emit, hint.tokens.empty() ? nullptr : &hint);
                     if (rc != hearsay_spec::SPEC_OK) {
                         // Same fallback as the app: back to the prefix, prompt again, plain decode.
                         last_fallback = 1; out.clear(); gen = 0;
@@ -191,6 +192,11 @@ int main(int argc, char **argv) {
             }
             std::printf("C %zu %.1f %d %.1f %zu\n", toks.size(), prefill, gen, dec, out.size());
             std::fwrite(out.data(), 1, out.size(), stdout);
+        } else if (line[0] == 'H') {
+            size_t n = std::strtoul(line + 2, nullptr, 10);
+            read_bytes(n, body);
+            hint.tokens = body.empty() ? std::vector<llama_token>() : tokenize(vocab, body, false);
+            std::printf("H %zu\n", hint.tokens.size());
         } else if (line[0] == 'X') {
             int d = 0, g = 2, up = 1, pad = 4;
             std::sscanf(line + 2, "%d %d %d %d", &d, &g, &up, &pad);
