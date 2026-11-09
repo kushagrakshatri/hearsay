@@ -58,7 +58,7 @@ class LlmCleaner private constructor(
         lastStatus = null
         lastReused = 0; lastPieces = 0
         // Live cleanup: reuse the stretches cleaned while the user was talking.
-        if (cleansLive && style != Style.VERBATIM && pieces != null && pieces.size > 1 &&
+        if (cleansLive && style != Style.VERBATIM && pieces != null && pieces.isNotEmpty() &&
             pieces.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ") == raw.trim()) {
             val units = Pieces.units(pieces)
             lastPieces = units.size
