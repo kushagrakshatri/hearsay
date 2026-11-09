@@ -402,6 +402,7 @@ class OfflineFlowIME : InputMethodService() {
         wave.visibility = View.INVISIBLE
         status.visibility = View.VISIBLE
         val audio = rec.stop()
+        val livePauses = if (live != null) rec.chunksSent else -1
         val liveNow = live?.takeIf { rec.chunksSent > 0 }
         live = null
         val tail = rec.tail
@@ -415,7 +416,7 @@ class OfflineFlowIME : InputMethodService() {
             else -> "Writing it down\u2026"
         })
         val t0 = SystemClock.elapsedRealtime()
-        val timing = dev.offlineflow.core.Timing().apply { audioMs = audio.size * 1000L / Recorder.SAMPLE_RATE }
+        val timing = dev.offlineflow.core.Timing().apply { this.livePauses = livePauses; audioMs = audio.size * 1000L / Recorder.SAMPLE_RATE }
         val cloudAsrModel = Prefs.cloudSpeechModel(this)
         setMic(MicButton.State.BUSY)
         scope.launch {

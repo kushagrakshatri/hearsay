@@ -5,6 +5,7 @@ import dev.offlineflow.audio.Recorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 
 /**
  * Speech recognition while the user is still talking. The recorder hands over each finished
@@ -18,6 +19,7 @@ class LiveSpeech(
     private val onText: (List<String>) -> Unit = {},
 ) {
     private val parts = ArrayList<Deferred<String?>>()
+    private val chunks = ArrayList<FloatArray>()
     private val texts = ArrayList<String>()
 
     /** The transcript in pieces (one per pause, then the tail), as [finish] joined them. */
@@ -37,7 +39,7 @@ class LiveSpeech(
                     runCatching { onText(soFar) }
                 }
         }
-        synchronized(parts) { parts += d }
+        synchronized(parts) { parts += d; chunks += chunk }
     }
 
     /**
@@ -46,8 +48,14 @@ class LiveSpeech(
      */
     suspend fun finish(tail: FloatArray, t: Timing?): String? {
         val waitFrom = Timing.now()
-        val done = synchronized(parts) { parts.toList() }.map { it.await() ?: return null }
-        t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs }
+        val (ds, cs) = synchronized(parts) { parts.toList() to chunks.toList() }
+        var redone = 0
+        // A piece that failed while talking gets one more try on its own before giving up on all of it.
+        val done = ds.mapIndexed { i, d ->
+            d.await() ?: withContext(Brain.asr) { runCatching { transcribe(cs[i]) }.getOrNull() }
+                ?.also { redone++ } ?: run { t?.liveFailed = true; return null }
+        }
+        t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs; liveRedone = redone }
         val last = if (tail.size >= Recorder.SAMPLE_RATE / 4) Brain.onAsr(t) { transcribe(tail) } else ""
         pieces = (done + last).map { it.trim() }.filter { it.isNotEmpty() }
         return pieces.joinToString(" ")

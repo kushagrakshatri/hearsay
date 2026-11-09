@@ -495,6 +495,7 @@ class BubbleService : AccessibilityService() {
         recorder = null; handsFree = false
         buzz()
         val audio = rec.stop()
+        val livePauses = if (live != null) rec.chunksSent else -1
         val liveNow = live?.takeIf { rec.chunksSent > 0 }
         live = null
         val tail = rec.tail
@@ -505,7 +506,7 @@ class BubbleService : AccessibilityService() {
         busy = true; mic.state = MicButton.State.BUSY
         say(if (Brain.engineLoaded(models.selected)) "Writing it down\u2026" else "Warming up\u2026", 0)
         val t0 = SystemClock.elapsedRealtime()
-        val timing = dev.offlineflow.core.Timing()
+        val timing = dev.offlineflow.core.Timing().apply { this.livePauses = livePauses }
         // Read the names on screen while the speech model works.
         val names = target()?.let { n -> scope.async(Dispatchers.Default) { runCatching { screenNames(n) }.getOrDefault(emptyList()) } }
         scope.launch {

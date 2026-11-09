@@ -17,6 +17,8 @@ class Timing {
     var liveAudioMs = 0L; var liveWait = 0L
     /** Live cleanup: stretches cleaned while the user talked, of how many. */
     var cleanReused = 0; var cleanPieces = 0
+    /** Pieces handed over at pauses while talking (-1: live speech off), retried at the end, or given up on. */
+    var livePauses = -1; var liveRedone = 0; var liveFailed = false
     fun livePieces(c: dev.offlineflow.cleanup.LlmCleaner) { cleanReused = c.lastReused; cleanPieces = c.lastPieces }
     var ranLlm = false
     var cloud = false
@@ -29,6 +31,11 @@ class Timing {
         if (liveWait >= MIN) add("finishing speech from before the last pause ${secs(liveWait)}")
         add("speech ${secs(asr)}" + (if (audioMs > 0) " for ${secs(audioMs)} of audio" else "") +
             if (liveAudioMs > 0) " (${secs(liveAudioMs)} done while you talked)" else "")
+        when {
+            liveFailed -> add("live speech failed, redid the whole recording")
+            livePauses == 0 -> add("no pause caught while talking")
+            liveRedone > 0 -> add("redid $liveRedone live pieces")
+        }
         if (llmWait >= MIN) add("waiting for cleanup model ${secs(llmWait)}")
         if (llmLoad >= MIN) add("loading cleanup model ${secs(llmLoad)}")
         if (prompt >= MIN) add("first-use prompt setup ${secs(prompt)}")
