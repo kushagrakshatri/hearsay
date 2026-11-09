@@ -57,14 +57,14 @@ class LlmCleaner private constructor(
     fun clean(raw: String, style: Style, names: List<String> = emptyList(), pieces: List<String>? = null): String {
         lastStatus = null
         lastReused = 0; lastPieces = 0
-        // Live cleanup (Emberon-2): reuse the stretches cleaned while the user was talking.
-        if (zeroShot && style != Style.VERBATIM && pieces != null && pieces.size > 1 &&
+        // Live cleanup: reuse the stretches cleaned while the user was talking.
+        if (cleansLive && style != Style.VERBATIM && pieces != null && pieces.size > 1 &&
             pieces.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ") == raw.trim()) {
             val units = Pieces.units(pieces)
             lastPieces = units.size
-            lastReused = units.count { synchronized(ahead) { it in ahead } }
-            val out = Pieces.join(units.map(::unit))
-            return Lists.format(if (style == Style.CASUAL) casualEnding(out) else out)
+            lastReused = units.count { synchronized(ahead) { key(style, it) in ahead } }
+            val out = Pieces.join(units.map { unit(it, style, names) })
+            return if (zeroShot) Lists.format(if (style == Style.CASUAL) casualEnding(out) else out) else out
         }
         val out = cleanWith(raw, style) { input, words ->
             val note = if (zeroShot) null else namesNote(hints(learned + names, input))
@@ -86,22 +86,33 @@ class LlmCleaner private constructor(
     var lastPieces = 0; private set
 
     /**
-     * Live cleanup, zero-shot models only: cleans the newest stretch of [pieces] (the transcript
-     * so far, one entry per pause) so [clean] can reuse it. Model thread only.
+     * Whether pieces can be cleaned while the user talks: Emberon-2 (fast, one fixed prompt) or a
+     * model on the graphics chip, which leaves the processor to live speech. Qwen on the
+     * processor cleans slower than people talk, so it waits for the whole text.
      */
-    fun cleanAhead(pieces: List<String>) {
-        if (!zeroShot) return
-        Pieces.units(pieces).lastOrNull()?.let(::unit)
+    val cleansLive: Boolean get() = zeroShot || llm.backend.endsWith("GPU")
+
+    /**
+     * Live cleanup: cleans the newest stretch of [pieces] (the transcript so far, one entry per
+     * pause) in [style] so [clean] can reuse it. Model thread only.
+     */
+    fun cleanAhead(pieces: List<String>, style: Style) {
+        if (!cleansLive || style == Style.VERBATIM) return
+        Pieces.units(pieces).lastOrNull()?.let { unit(it, style, emptyList()) }
     }
 
-    private fun unit(text: String): String {
-        synchronized(ahead) { ahead[text] }?.let { return it }
-        // Style only changes the final period for zero-shot models; that is applied to the whole text.
-        val out = cleanWith(text, Style.POLISHED) { input, words ->
-            llm.complete(prefixFor(Style.POLISHED), null, input, maxTokens = words * 2 + 32).let(::strip)
+    // Zero-shot models use one prompt for every style; the final period is applied to the whole text.
+    private fun key(style: Style, text: String) = "${if (zeroShot) Style.POLISHED else style}|$text"
+
+    private fun unit(text: String, style: Style, names: List<String>): String {
+        val k = key(style, text)
+        synchronized(ahead) { ahead[k] }?.let { return it }
+        val out = cleanWith(text, if (zeroShot) Style.POLISHED else style) { input, words ->
+            val note = if (zeroShot) null else namesNote(hints(learned + names, input))
+            llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
                 .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
         }
-        synchronized(ahead) { ahead[text] = out }
+        synchronized(ahead) { ahead[k] = out }
         return out
     }
 

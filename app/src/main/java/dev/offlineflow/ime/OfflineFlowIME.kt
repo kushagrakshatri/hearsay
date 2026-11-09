@@ -385,7 +385,7 @@ class OfflineFlowIME : InputMethodService() {
         val gate = SpeechGate.create(assets)
         buzz()
         wave.clear(); wave.visibility = View.VISIBLE
-        val liveNow = Brain.liveSpeech(this, models, scope).also { live = it }
+        val liveNow = Brain.liveSpeech(this, models, scope, style).also { live = it }
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
             mic.post { if (handsFree) finishDictation() }

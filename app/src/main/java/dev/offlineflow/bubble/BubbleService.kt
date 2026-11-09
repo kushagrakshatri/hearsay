@@ -455,7 +455,8 @@ class BubbleService : AccessibilityService() {
         buzz()
         val gate = spareGate ?: SpeechGate.create(assets)
         spareGate = null; prepGate()
-        val liveNow = Brain.liveSpeech(this, models, scope).also { live = it }
+        val liveStyle = target()?.let { Style.forApp(this, it.packageName?.toString(), it.inputType) } ?: Style.POLISHED
+        val liveNow = Brain.liveSpeech(this, models, scope, liveStyle).also { live = it }
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             mic.post { if (handsFree) finish() }
         }, onLevel = { level -> mic.post { mic.push(level) } },

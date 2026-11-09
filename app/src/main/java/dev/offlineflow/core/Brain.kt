@@ -153,18 +153,18 @@ object Brain {
     }
 
     /** Live transcription for a dictation about to start, or null when speech runs in the cloud. */
-    fun liveSpeech(ctx: Context, models: ModelManager, scope: kotlinx.coroutines.CoroutineScope): LiveSpeech? =
+    fun liveSpeech(ctx: Context, models: ModelManager, scope: kotlinx.coroutines.CoroutineScope, style: Style = Style.POLISHED): LiveSpeech? =
         if (CloudClient.speechOn(ctx) || !models.isReady(models.selected)) null
         else LiveSpeech(scope, { engine(models).transcribe(it) }) { soFar ->
-            scope.launch(llm) { cleanAhead(ctx, soFar) }
+            scope.launch(llm) { cleanAhead(ctx, soFar, style) }
         }
 
     /** Live cleanup: cleans the newest piece while the user keeps talking, if the model is already loaded. [llm] thread. */
-    private fun cleanAhead(ctx: Context, soFar: List<String>) {
-        val c = cleaner?.takeIf { it.zeroShot } ?: return
+    private fun cleanAhead(ctx: Context, soFar: List<String>, style: Style) {
+        val c = cleaner?.takeIf { it.cleansLive } ?: return
         if (CloudText.on(ctx)) return
         val d = Dictionary.load(ctx)
-        runCatching { c.cleanAhead(soFar.map { d.apply(it) }) }.onFailure { Log.e(TAG, "live cleanup failed", it) }
+        runCatching { c.cleanAhead(soFar.map { d.apply(it) }, style) }.onFailure { Log.e(TAG, "live cleanup failed", it) }
     }
 
     class Cleaned(val text: String, val usedLlm: Boolean, val cloudNote: String?)
