@@ -13,7 +13,6 @@ object Pieces {
             "instead\\b|second(?:ly)?\\b|third(?:ly)?\\b|fourth(?:ly)?\\b|fifth(?:ly)?\\b|next\\b|then\\b|finally\\b|lastly\\b|" +
             "and\\b|but\\b|or\\b|so\\b|because\\b|which\\b|that\\b|plus\\b|also\\b)",
     )
-    private val ENDS_SENTENCE = Regex("[.!?:;…)\"'\\u201d]\\s*$")
 
     /** True when [piece] corrects or carries on from the piece before it. */
     fun continues(piece: String): Boolean = CONTINUES.containsMatchIn(piece)
@@ -22,14 +21,14 @@ object Pieces {
     fun units(pieces: List<String>): List<String> {
         val out = ArrayList<String>()
         for (p in pieces.map { it.trim() }.filter { it.isNotEmpty() }) {
-            if (out.isNotEmpty() && continues(p)) out[out.size - 1] = out.last() + " " + p else out += p
+            if (out.isNotEmpty() && continues(p)) out[out.size - 1] = Joins.join(listOf(out.last(), p)) else out += p
         }
         return out
     }
 
-    /** Cleaned stretches back into one text; a stretch the model left unpunctuated gets a period. */
-    fun join(cleaned: List<String>): String {
-        val parts = cleaned.map { it.trim() }.filter { it.isNotEmpty() }
-        return parts.mapIndexed { i, s -> if (i < parts.size - 1 && !ENDS_SENTENCE.containsMatchIn(s)) "$s." else s }.joinToString(" ")
-    }
+    /**
+     * Cleaned stretches back into one text. Where the next stretch carries on the sentence
+     * ([Joins]), the period at the pause goes; otherwise a stretch the model left unpunctuated gets one.
+     */
+    fun join(cleaned: List<String>): String = Joins.join(cleaned, period = true)
 }

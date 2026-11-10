@@ -1,0 +1,122 @@
+[
+ {
+  "truth": [
+   "I left my keys at",
+   "the office again.",
+   "Could you grab them on",
+   "your way home?"
+  ],
+  "chunks": [
+   "I left my keys at",
+   "To the office again.",
+   "Could you grab them on?",
+   "Your way home?"
+  ],
+  "whole": "I left my keys at the office again. Could you grab them on? Your way home?"
+ },
+ {
+  "truth": [
+   "The doctor said the results look",
+   "better than last time.",
+   "I still have to",
+   "go back in June."
+  ],
+  "chunks": [
+   "The doctor said the results look.",
+   "Better than last time.",
+   "I still have to.",
+   "Go back in June."
+  ],
+  "whole": "The doctor said the results look better than last time. I still have to go back in June."
+ },
+ {
+  "truth": [
+   "We moved the launch to",
+   "Thursday because the servers",
+   "were not ready.",
+   "Nobody was happy about it."
+  ],
+  "chunks": [
+   "We move the launch to",
+   "Thursday because the servers",
+   "We're not ready.",
+   "Nobody was happy about it."
+  ],
+  "whole": "We moved the launch to Thursday because the servers were not ready. Nobody was happy about it."
+ },
+ {
+  "truth": [
+   "Send the invoice to",
+   "the client and copy",
+   "Daniel on the email.",
+   "He tracks the payments."
+  ],
+  "chunks": [
+   "Send the invoice to",
+   "The client and copy.",
+   "Dane only email.",
+   "He tracks the payments."
+  ],
+  "whole": "Send the invoice to the client and copy Daniel on the email. He tracks the payments."
+ },
+ {
+  "truth": [
+   "I'm going to the gym.",
+   "Of course I'll be back by six.",
+   "Then we can cook",
+   "dinner together."
+  ],
+  "chunks": [
+   "I'm going to the gym.",
+   "Of course I'll be back by six.",
+   "And we can cook.",
+   "Dinner together?"
+  ],
+  "whole": "I'm going to the gym. Of course I'll be back by six. Then we can cook dinner together."
+ },
+ {
+  "truth": [
+   "The kids loved the museum.",
+   "For lunch we had pizza with",
+   "the whole family.",
+   "It was a long day."
+  ],
+  "chunks": [
+   "The kids love the museum.",
+   "For lunch we had pizza with",
+   "The whole family.",
+   "It was a long day."
+  ],
+  "whole": "The kids love the museum. For lunch, we had pizza with the whole family. It was a long day."
+ },
+ {
+  "truth": [
+   "My manager wants the slides by",
+   "the end of the week.",
+   "I have not started",
+   "them yet."
+  ],
+  "chunks": [
+   "My manager wants the slides by.",
+   "The end of the week.",
+   "I have not started.",
+   "Them yet."
+  ],
+  "whole": "My manager wants the slides by the end of the week. I have not started them yet."
+ },
+ {
+  "truth": [
+   "I tried calling you twice.",
+   "Your phone went straight to",
+   "voicemail both times.",
+   "Is everything okay?"
+  ],
+  "chunks": [
+   "I tried calling you twice.",
+   "Your phone went straight to",
+   "Voicemail both times.",
+   "Is everything okay?"
+  ],
+  "whole": "I tried calling you twice. Your phone went straight to voicemail both times. Is everything okay?"
+ }
+]

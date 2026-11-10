@@ -1,0 +1,345 @@
+[
+ {
+  "truth": [
+   "That run never went live: the line has no done while you talked",
+   "for speech or cleanup, so it fell back to doing all 32.7 seconds",
+   "after you let go. I can't tell yet whether the phone was too slow."
+  ],
+  "chunks": [
+   "That run never went live. The line has no done while you talked.",
+   "For speech or cleanup, so it fell back to doing all thirty-two point seven seconds.",
+   "After you let go, I can't tell yet whether the phone was too slow."
+  ],
+  "whole": "That run never went live. The line has no done while you talked, forced speech or clean up, so it fell back to doing all thirty two point seven seconds after you let go. I can't tell yet whether the phone was too slow."
+ },
+ {
+  "truth": [
+   "I went to the store with",
+   "my sister yesterday.",
+   "We bought apples and",
+   "oranges for the party."
+  ],
+  "chunks": [
+   "I went to the store with",
+   "with my sister yesterday.",
+   "We bought apples and",
+   "Oranges for the party."
+  ],
+  "whole": "I went to the store with my sister yesterday. We bought apples and oranges for the party."
+ },
+ {
+  "truth": [
+   "Can you send me the report",
+   "before Friday?",
+   "I need to review it with",
+   "the team on Monday."
+  ],
+  "chunks": [
+   "Can you send me the report?",
+   "Before Friday?",
+   "I need to review it with",
+   "The team on Monday."
+  ],
+  "whole": "Can you send me the report before Friday? I need to review it with the team on Monday."
+ },
+ {
+  "truth": [
+   "The meeting moved to",
+   "three o'clock because the client",
+   "is running late.",
+   "Sarah will call you after lunch."
+  ],
+  "chunks": [
+   "The meeting moved to",
+   "Three o'clock because the client",
+   "is running late.",
+   "Sarah will call you after lunch."
+  ],
+  "whole": "The meeting moved to three o'clock because the client is running late. Sarah will call you after lunch."
+ },
+ {
+  "truth": [
+   "I think we should take the",
+   "train instead of driving.",
+   "It's cheaper and",
+   "we can work on the way."
+  ],
+  "chunks": [
+   "I think we should take the",
+   "Train instead of driving.",
+   "It's cheaper and",
+   "We can work on the way."
+  ],
+  "whole": "I think we should take the train instead of driving. It's cheaper and we can work on the way."
+ },
+ {
+  "truth": [
+   "Please remind me to",
+   "pick up the dry cleaning.",
+   "Also, tell Mark that",
+   "the package arrived this morning."
+  ],
+  "chunks": [
+   "Please remind me to",
+   "Pick up the dry cleaning.",
+   "Also, tell Mark that.",
+   "The package arrived this morning."
+  ],
+  "whole": "Please remind me to pick up the dry cleaning. Also, tell Mark that the package arrived this morning."
+ },
+ {
+  "truth": [
+   "We tried the new restaurant on",
+   "Saturday and it was great.",
+   "The pasta was better than",
+   "anything we had in Rome."
+  ],
+  "chunks": [
+   "We try the new restaurant on.",
+   "Saturday and it was great.",
+   "The pasta was better than",
+   "Anything we had in Rome."
+  ],
+  "whole": "We tried the new restaurant on Saturday and it was great. The pasta was better than anything we had in Rome."
+ },
+ {
+  "truth": [
+   "My flight lands at",
+   "seven so I'll be home",
+   "around nine.",
+   "Don't wait up for me."
+  ],
+  "chunks": [
+   "My flight lands at",
+   "Seven, so I'll be home.",
+   "Around nine.",
+   "Don't wait up for me."
+  ],
+  "whole": "My flight lands at 7, so I'll be home around 9. Don't wait up for me."
+ },
+ {
+  "truth": [
+   "The build failed again",
+   "because the tests timed out on",
+   "the emulator.",
+   "I'll rerun it tonight."
+  ],
+  "chunks": [
+   "The bill failed again.",
+   "And because the test timed out on.",
+   "The emulator",
+   "I'll rerun it tonight."
+  ],
+  "whole": "The build failed again because the test timed out on the emulator. I'll rerun it tonight."
+ },
+ {
+  "truth": [
+   "She said the apartment is",
+   "bigger than ours but",
+   "the rent is higher.",
+   "We should visit it this weekend."
+  ],
+  "chunks": [
+   "She said the apartment is",
+   "bigger than ours, but",
+   "The rent is higher.",
+   "We should visit it this weekend."
+  ],
+  "whole": "She said the apartment is bigger than ours, but the rent is higher. We should visit it this weekend."
+ },
+ {
+  "truth": [
+   "I finished the draft of",
+   "the proposal and sent it to",
+   "Priya for review.",
+   "Let me know if you want a copy."
+  ],
+  "chunks": [
+   "I finished the draft of",
+   "The proposal and sent it to",
+   "Pre-ifer review",
+   "Let me know if you want a copy."
+  ],
+  "whole": "I finished the draft of the proposal and sent it to Priya for review. Let me know if you want a copy."
+ },
+ {
+  "truth": [
+   "After dinner we watched a movie.",
+   "Then we went for a walk.",
+   "It was a quiet night",
+   "with nothing else planned."
+  ],
+  "chunks": [
+   "After dinner we watched a movie.",
+   "Then we went for a walk.",
+   "It was a quiet night.",
+   "With nothing else planned."
+  ],
+  "whole": "After dinner we watched a movie. Then we went for a walk. It was a quiet night, with nothing else planned."
+ },
+ {
+  "truth": [
+   "Thanks for the update.",
+   "I'll look into the bug and",
+   "get back to you by tomorrow.",
+   "Google said the fix is coming."
+  ],
+  "chunks": [
+   "Thanks for the update.",
+   "I'll look into the bug and",
+   "Get back to you by tomorrow.",
+   "Google said the fix is coming."
+  ],
+  "whole": "Thanks for the update. I'll look into the bug and get back to you by tomorrow. Google said the fix is coming."
+ },
+ {
+  "truth": [
+   "The new phone has a",
+   "better camera than the old one,",
+   "so the photos look",
+   "much sharper at night."
+  ],
+  "chunks": [
+   "The new phone has a",
+   "A better camera than the old one.",
+   "So the photos look",
+   "Much sharper at night."
+  ],
+  "whole": "The new phone has a better camera than the old one, so the photos look much sharper at night."
+ },
+ {
+  "truth": [
+   "We need to buy milk,",
+   "eggs, and bread before",
+   "the store closes.",
+   "Is it open on Sundays?"
+  ],
+  "chunks": [
+   "We need to buy milk.",
+   "Eggs and bread before",
+   "The store closes.",
+   "Is it open on Sundays?"
+  ],
+  "whole": "We need to buy milk, eggs, and bread before the store closes. Is it open on Sundays?"
+ },
+ {
+  "truth": [
+   "It was getting late.",
+   "After the show, we took a cab home.",
+   "The driver was",
+   "really friendly."
+  ],
+  "chunks": [
+   "It was getting late.",
+   "After the show we took a cab home.",
+   "The driver was",
+   "Really friendly."
+  ],
+  "whole": "It was getting late. After the show we took a cab home. The driver was really friendly."
+ },
+ {
+  "truth": [
+   "I need a new laptop.",
+   "For example, the battery dies in an hour.",
+   "Mark thinks I should",
+   "wait for the sale."
+  ],
+  "chunks": [
+   "I need a new laptop.",
+   "For example, the battery dies in an hour.",
+   "Mark thinks I should.",
+   "Wait for the sale."
+  ],
+  "whole": "I need a new laptop. For example, the battery dies in an hour. Mark thinks I should wait for the sale."
+ },
+ {
+  "truth": [
+   "We should leave soon.",
+   "To be honest, I'm tired.",
+   "Priya is driving",
+   "us home tonight."
+  ],
+  "chunks": [
+   "We should leave soon.",
+   "To be honest, I'm tired.",
+   "Priya is driving",
+   "Us home tonight."
+  ],
+  "whole": "We should leave soon. To be honest, I'm tired. Priya is driving us home tonight."
+ },
+ {
+  "truth": [
+   "The demo went well.",
+   "Which part did you like?",
+   "I liked the voice",
+   "editing the most."
+  ],
+  "chunks": [
+   "The demo went well.",
+   "Which part did you like?",
+   "I like the voice.",
+   "Editing the most."
+  ],
+  "whole": "The demo went well. Which part did you like? I liked the voice editing the most."
+ },
+ {
+  "truth": [
+   "I sent the file to",
+   "Google Drive this morning.",
+   "Let's review it",
+   "after lunch."
+  ],
+  "chunks": [
+   "I sent a file, too.",
+   "Google Drive this morning.",
+   "To review it. After",
+   "The launch."
+  ],
+  "whole": "I sent the file to Google Drive this morning. Let's review it after lunch."
+ },
+ {
+  "truth": [
+   "The rent went up because",
+   "of the new pool.",
+   "That's annoying.",
+   "Of course we'll pay it."
+  ],
+  "chunks": [
+   "The rent went up because",
+   "Of a new pool.",
+   "That's annoying.",
+   "Of course we'll pay it."
+  ],
+  "whole": "The rent went up because of a new pool. That's annoying. Of course, we'll pay it."
+ },
+ {
+  "truth": [
+   "I'd love to.",
+   "See you on Friday then.",
+   "I'm more tired than",
+   "usual this week."
+  ],
+  "chunks": [
+   "I'd love to.",
+   "See you on Friday then.",
+   "I'm more tired than.",
+   "Usual this week."
+  ],
+  "whole": "I'd love to. See you on Friday then. I'm more tired than usual this week."
+ },
+ {
+  "truth": [
+   "I can stay until",
+   "I finish the report.",
+   "Then I'll head out with",
+   "Kashish for dinner."
+  ],
+  "chunks": [
+   "I can stay until.",
+   "I finished the report.",
+   "Then I'll head out with.",
+   "Cushish for dinner."
+  ],
+  "whole": "I can stay until I finish the report. Then I'll head out with cushions for dinner."
+ }
+]

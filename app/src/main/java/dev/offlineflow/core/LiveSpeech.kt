@@ -2,6 +2,7 @@ package dev.offlineflow.core
 
 import android.util.Log
 import dev.offlineflow.audio.Recorder
+import dev.offlineflow.cleanup.Joins
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -22,7 +23,7 @@ class LiveSpeech(
     private val chunks = ArrayList<FloatArray>()
     private val texts = ArrayList<String>()
 
-    /** The transcript in pieces (one per pause, then the tail), as [finish] joined them. */
+    /** The transcript in pieces (one per pause, then the tail), as transcribed; [finish] joins them with [Joins]. */
     var pieces: List<String> = emptyList()
         private set
     @Volatile private var audioMs = 0L
@@ -58,7 +59,8 @@ class LiveSpeech(
         t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs; liveRedone = redone }
         val last = if (tail.size >= Recorder.SAMPLE_RATE / 4) Brain.onAsr(t) { transcribe(tail) } else ""
         pieces = (done + last).map { it.trim() }.filter { it.isNotEmpty() }
-        return pieces.joinToString(" ")
+        // Each piece was transcribed alone and ends like a sentence; mend the seams that don't end one.
+        return Joins.join(pieces)
     }
 
     private companion object { const val TAG = "HearsayLive" }

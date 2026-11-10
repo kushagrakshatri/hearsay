@@ -14,7 +14,7 @@ object Words {
             context.assets.open("words/common-en.txt").bufferedReader().useLines { lines ->
                 lines.map { it.trim() }.filter { it.isNotEmpty() }.toHashSet()
             }
-        }.getOrDefault(emptySet<String>()).also { set = it }
+        }.getOrDefault(emptySet<String>()).also { set = it; Joins.common = it }
     }
 
     /** True for a word an ordinary English speaker types every day, in any case. */
