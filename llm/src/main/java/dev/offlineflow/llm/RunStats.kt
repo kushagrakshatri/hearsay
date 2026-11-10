@@ -20,4 +20,16 @@ data class RunStats(
     val tokensPerSec: Double?,
     /** [tokens] and [tokensPerSec] are estimated from the text length (~4 characters a token). */
     val approx: Boolean = false,
+    /** Prompt tokens the call read before writing (just the new turn when [reusedPrompt]); null when unknown. */
+    val promptTokens: Int? = null,
+    /** Time spent reading them, in ms; null when unknown. */
+    val promptMs: Long? = null,
+    /** The call copied the prefilled prompt (true) or read it all again (false); null when the engine doesn't say. */
+    val reusedPrompt: Boolean? = null,
+    /** Why it read it all again, when [reusedPrompt] is false. */
+    val fullPromptWhy: FullPromptWhy? = null,
+    /** Copying the prefilled prompt is off for good (after repeated failures). */
+    val copyingOff: Boolean = false,
+    /** The first try failed and the call was redone on a fresh conversation. */
+    val retried: Boolean = false,
 )

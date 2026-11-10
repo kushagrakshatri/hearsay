@@ -37,7 +37,7 @@ class LlmCleaner private constructor(
     var lastStatus: String? = null
         private set
 
-    private val dictionary = known.take(MAX_DICTIONARY)
+    private var dictionary = known.take(MAX_DICTIONARY)
     private val knownSet = known.toHashSet()
     private val prefixIds = HashMap<Style, Int>()
 
@@ -64,6 +64,8 @@ class LlmCleaner private constructor(
             lastPieces = units.size
             lastReused = units.count { synchronized(ahead) { key(style, it) in ahead } }
             val out = Pieces.join(units.map { unit(it, style, names) })
+            // Every piece was cleaned while the user talked: show what the last of them did.
+            if (lastStatus == null) lastStatus = lastPieceRun?.let { CleanupStatus.line(modelName, it, piece = true) }
             return if (zeroShot) Lists.format(if (style == Style.CASUAL) casualEnding(out) else out) else out
         }
         val out = cleanWith(raw, style) { input, words ->
@@ -84,6 +86,9 @@ class LlmCleaner private constructor(
     /** Of the last [clean]'s stretches, how many were cleaned while the user talked, and how many there were. */
     var lastReused = 0; private set
     var lastPieces = 0; private set
+
+    /** What the engine did on the newest live piece (cleaned while talking or at the end); null before one ran. */
+    var lastPieceRun: dev.offlineflow.llm.RunStats? = null; private set
 
     /**
      * Whether pieces can be cleaned while the user talks: Emberon-2 (fast, one fixed prompt) or a
@@ -108,16 +113,36 @@ class LlmCleaner private constructor(
         val k = key(style, text)
         synchronized(ahead) { ahead[k] }?.let { return it }
         val out = cleanWith(text, if (zeroShot) Style.POLISHED else style) { input, words ->
-            val note = if (zeroShot) null else namesNote(hints(learned + names, input))
+            var note = if (zeroShot) null else namesNote(hints(learned + names, input))
+            // A newly learned word would force this piece, and every later one it matches, to read
+            // the whole prompt again: build it into the prompt instead, so later pieces copy it.
+            if (note != null && names.isEmpty() && absorbLearned()) note = null
             llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
-                .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
+                .also {
+                    lastPieceRun = llm.lastRun
+                    lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it, piece = true) }
+                }
         }
         synchronized(ahead) { ahead[k] = out }
         return out
     }
 
     /** Evaluates the style's prompt now so the first dictation doesn't pay for it. */
-    fun warm(style: Style) { if (style != Style.VERBATIM) prefixFor(style) }
+    fun warm(style: Style) { if (style != Style.VERBATIM) llm.warm(prefixFor(style)) }
+
+    /**
+     * Moves the words learned since the prompts were built into the prompts themselves (they're
+     * prepared again on next use). False when there's nothing to move or no room for it.
+     */
+    private fun absorbLearned(): Boolean {
+        if (learned.isEmpty() || dictionary.size + learned.size > MAX_DICTIONARY) return false
+        dictionary = dictionary + learned
+        knownSet += learned
+        learned = emptyList()
+        prefixIds.clear()
+        android.util.Log.i("hearsay-cleanup", "learned words built into the cleanup prompt; it's prepared again")
+        return true
+    }
 
     private fun prefixFor(style: Style): Int = prefixIds.getOrPut(if (zeroShot) Style.POLISHED else style) {
         val t = android.os.SystemClock.elapsedRealtime()
@@ -151,7 +176,7 @@ class LlmCleaner private constructor(
     }
 
     /** Evaluates the command-mode prompt ahead of use (e.g. when text gets selected). */
-    fun warmEdit() { if (!zeroShot) editPrefix() }
+    fun warmEdit() { if (!zeroShot) llm.warm(editPrefix()) }
 
     private fun editPrefix(): Int = editPrefixId ?: llm.prepare(EDIT_SYSTEM, EDIT_EXAMPLES).also { editPrefixId = it }
 

@@ -19,7 +19,12 @@ class Timing {
     var cleanReused = 0; var cleanPieces = 0
     /** Pieces handed over at pauses while talking (-1: live speech off), retried at the end, or given up on. */
     var livePauses = -1; var liveRedone = 0; var liveFailed = false
-    fun livePieces(c: dev.offlineflow.cleanup.LlmCleaner) { cleanReused = c.lastReused; cleanPieces = c.lastPieces }
+    /** Live cleanup: whether the newest piece reused the prefilled prompt, in plain words. */
+    var piecePrompt: String? = null
+    fun livePieces(c: dev.offlineflow.cleanup.LlmCleaner) {
+        cleanReused = c.lastReused; cleanPieces = c.lastPieces
+        piecePrompt = c.lastPieceRun?.takeIf { cleanPieces > 0 }?.let(dev.offlineflow.cleanup.CleanupStatus::prompt)
+    }
     var ranLlm = false
     var cloud = false
 
@@ -44,6 +49,7 @@ class Timing {
             ranLlm -> "cleanup ${secs(llm)}" + if (cleanReused > 0) " ($cleanReused of $cleanPieces pieces done while you talked)" else ""
             else -> "no cleanup model ran"
         })
+        if (ranLlm && !cloud) piecePrompt?.let { add("last piece $it") }
         val other = totalMs - (liveWait + asrWait + asrLoad + asr + llmWait + llmLoad + prompt + llm)
         if (other >= MIN) add("other ${secs(other)}")
     }.joinToString(" \u00b7 ")

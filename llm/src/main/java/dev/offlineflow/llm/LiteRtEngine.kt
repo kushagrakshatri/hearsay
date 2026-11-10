@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.ModelInfo
 import com.google.ai.edge.litertlm.SamplerConfig
@@ -20,10 +21,12 @@ import java.io.File
  * A .litertlm model running through Google's LiteRT-LM, on the GPU (OpenCL) when the phone
  * supports it, else on the CPU (XNNPACK).
  *
- * Each prepared prompt is a [Conversation] whose system prompt and few-shot examples are
- * prefilled once ([ConversationConfig.prefillPrefaceOnInit]); every call clones it, so only the
- * new turn is evaluated. The chat template comes from the model file, so prompts here are plain
- * text. If cloning isn't supported, each call opens a fresh conversation instead (slower).
+ * One prepared prompt at a time is kept as a [Conversation] whose system prompt and few-shot
+ * examples are prefilled ([ConversationConfig.prefillPrefaceOnInit]); each call clones it, so only
+ * the new turn is read. Switching prompts (another style, command mode) closes it and prefills the
+ * new one on first use or [warm]. A failed copy prepares the prompt again next time; copying stops
+ * for good only after a few failures in a row ([ClonePolicy]). A call that can't copy (a names
+ * note, copying off) opens a fresh conversation and reads the whole prompt (slower).
  */
 class LiteRtEngine private constructor(
     private val engine: Engine,
@@ -37,51 +40,104 @@ class LiteRtEngine private constructor(
     override val lastRun: RunStats? get() = last
     private var benchmark = true
 
-    private class Prompt(val system: String, val examples: List<String>, var base: Conversation?)
+    private class Prompt(val system: String, val examples: List<String>)
 
     private val prompts = ArrayList<Prompt>()
-    private var cloning = true
+
+    /** The one prefilled conversation, and the prompt it holds (-1: none). */
+    private var base: Conversation? = null
+    private var baseHandle = -1
+    private val policy = ClonePolicy()
 
     override val preparedCount: Int get() = prompts.size
 
     override fun prepare(system: String, examples: List<String>): Int {
-        val p = Prompt(system, examples, null)
-        if (cloning) {
-            try {
-                p.base = open(system, examples, prefill = true)
-            } catch (t: Throwable) {
-                Log.w(TAG, "can't keep a prefilled conversation; opening one per call", t)
-                stopCloning()
-            }
+        prompts += Prompt(system, examples)
+        val handle = prompts.size - 1
+        baseFor(handle) // prefill now, so the first call doesn't pay for it
+        return handle
+    }
+
+    override fun warm(handle: Int) { baseFor(handle) }
+
+    /**
+     * The prefilled conversation for [handle], replacing the one kept for another prompt; null
+     * when copying is off or the prompt couldn't be prefilled.
+     */
+    private fun baseFor(handle: Int): Conversation? {
+        if (!policy.on) return null
+        if (baseHandle == handle) base?.let { return it }
+        closeBase()
+        val p = prompts[handle]
+        return try {
+            open(p.system, p.examples, prefill = true).also { base = it; baseHandle = handle }
+        } catch (t: Throwable) {
+            Log.w(TAG, "can't prefill the prompt; this call reads it whole", t)
+            failed(FullPromptWhy.NO_BASE)
+            null
         }
-        prompts += p
-        return prompts.size - 1
     }
 
     override fun complete(handle: Int, note: String?, user: String, maxTokens: Int): String {
         val p = prompts[handle]
         // The note changes the system prompt, so it can't reuse the prefilled one. It's rare:
-        // only when a name on screen sounds like something in the transcript.
-        val cloned = if (note == null) p.base?.let { base ->
-            try { base.clone() } catch (t: Throwable) { Log.w(TAG, "clone failed", t); stopCloning(); null }
-        } else null
-        val conv: Conversation = cloned ?: run {
-            val system = if (note == null) p.system else p.system + "\n" + note
-            try {
-                open(system, p.examples, prefill = false)
+        // only when a name on screen or a newly learned word sounds like something in the transcript.
+        var why: FullPromptWhy? = if (note != null) FullPromptWhy.NAMES_NOTE else null
+        var copy: Conversation? = null
+        if (note == null) {
+            val b = baseFor(handle)
+            if (b == null) why = if (policy.on) FullPromptWhy.NO_BASE else policy.lastFailure ?: FullPromptWhy.NO_BASE
+            else try {
+                copy = b.clone()
             } catch (t: Throwable) {
-                // Some builds allow one conversation at a time: drop the cached ones and retry.
-                if (prompts.none { it.base != null }) throw t
-                stopCloning()
-                open(system, p.examples, prefill = false)
+                Log.w(TAG, "copying the prefilled prompt failed; preparing it again next call", t)
+                closeBase()
+                failed(FullPromptWhy.CLONE_ERROR)
+                why = FullPromptWhy.CLONE_ERROR
             }
         }
+        if (copy != null) {
+            try {
+                return send(copy, user, maxTokens, why = null, retried = false).also { policy.succeeded() }
+            } catch (t: Throwable) {
+                // Seen with MTP on a copy ("Failed to register input tensor buffer"), now and then:
+                // redo the call once on a fresh conversation before the caller falls back to rules.
+                Log.w(TAG, "writing on the copied prompt failed; retrying once with the whole prompt", t)
+                failed(FullPromptWhy.CLONE_ERROR)
+                return send(fresh(p, null), user, maxTokens, FullPromptWhy.CLONE_ERROR, retried = true)
+            }
+        }
+        return send(fresh(p, note), user, maxTokens, why ?: FullPromptWhy.NO_BASE, retried = false)
+    }
+
+    /** A new conversation that reads the whole prompt (plus [note]) on its first message. */
+    private fun fresh(p: Prompt, note: String?): Conversation {
+        val system = if (note == null) p.system else p.system + "\n" + note
+        return try {
+            open(system, p.examples, prefill = false)
+        } catch (t: Throwable) {
+            // Some builds allow one conversation at a time: drop the prefilled one and retry.
+            if (base == null) throw t
+            Log.w(TAG, "can't open a conversation beside the prefilled one; closing it and retrying", t)
+            closeBase()
+            failed(FullPromptWhy.OPEN_FAILED)
+            open(system, p.examples, prefill = false)
+        }
+    }
+
+    /** Sends [user] on [conv] (closing it after), recording what the call did. */
+    private fun send(conv: Conversation, user: String, maxTokens: Int, why: FullPromptWhy?, retried: Boolean): String {
         try {
             val t0 = System.nanoTime()
             val out = conv.sendMessage(Message.user(user), maxOutputToken = maxTokens).toString()
             val ms = (System.nanoTime() - t0) / 1_000_000
-            Log.i(TAG, "complete: ${out.length} chars in $ms ms ($backend, MTP ${if (mtp) "on" else "off"})")
-            last = stats(conv, out, ms)
+            val s = stats(conv, out, ms, why, retried)
+            last = s
+            Log.i(TAG, "complete: ${out.length} chars in $ms ms ($backend, MTP ${if (mtp) "on" else "off"}); " +
+                (if (why == null) "copied prompt" else "whole prompt (${why.words}" + (if (!policy.on) ", copying off" else "") + ")") +
+                (if (retried) ", retried" else "") +
+                ", read ${s.promptTokens ?: "?"} tokens in ${s.promptMs ?: "?"} ms" +
+                ", ${s.tokens} tokens at ${s.tokensPerSec?.let { "%.1f".format(it) } ?: "?"} tok/s" + (if (s.approx) " (estimated)" else ""))
             return out
         } finally {
             runCatching { conv.close() }
@@ -93,17 +149,30 @@ class LiteRtEngine private constructor(
      * estimate from the text (~4 characters a token) over the whole call, marked approximate.
      */
     @OptIn(ExperimentalApi::class)
-    private fun stats(conv: Conversation, out: String, ms: Long): RunStats {
+    private fun stats(conv: Conversation, out: String, ms: Long, why: FullPromptWhy?, retried: Boolean): RunStats {
         val engineName = if (backend.endsWith("GPU")) "LiteRT-LM graphics chip" else "LiteRT-LM processor"
         // Benchmark info is off unless the runtime collects it: after one failure, don't ask again.
-        val bench = if (!benchmark) null else runCatching { conv.getBenchmarkInfo() }.onFailure { benchmark = false }.getOrNull()
+        val bench = if (!benchmark) null else runCatching { conv.getBenchmarkInfo() }
+            .onFailure { benchmark = false; Log.w(TAG, "no benchmark info from LiteRT-LM; speeds are estimates", it) }.getOrNull()
+        val promptTokens = bench?.lastPrefillTokenCount?.takeIf { it > 0 }
+        val prefillTps = bench?.lastPrefillTokensPerSecond ?: 0.0
+        val promptMs = when {
+            promptTokens != null && prefillTps > 0.0 -> (promptTokens * 1000.0 / prefillTps).toLong()
+            bench != null && bench.timeToFirstTokenInSecond > 0.0 -> (bench.timeToFirstTokenInSecond * 1000).toLong()
+            else -> null
+        }
         val n = bench?.lastDecodeTokenCount ?: 0
         val tps = bench?.lastDecodeTokensPerSecond ?: 0.0
-        return if (n > 0 && tps > 0.0) RunStats(engineName, mtpStatus, ms, n, tps)
+        val r = if (n > 0 && tps > 0.0) RunStats(engineName, mtpStatus, ms, n, tps)
         else {
             val est = (out.length + 3) / 4
             RunStats(engineName, mtpStatus, ms, est, if (est > 0 && ms > 0) est * 1000.0 / ms else null, approx = true)
         }
+        return r.copy(
+            promptTokens = promptTokens, promptMs = promptMs,
+            reusedPrompt = why == null, fullPromptWhy = why,
+            copyingOff = !policy.on, retried = retried,
+        )
     }
 
     private fun open(system: String, examples: List<String>, prefill: Boolean): Conversation =
@@ -117,13 +186,21 @@ class LiteRtEngine private constructor(
             )
         )
 
-    private fun stopCloning() {
-        cloning = false
-        for (p in prompts) { runCatching { p.base?.close() }; p.base = null }
+    /** Records a copying failure; after a few in a row, copying is off for the engine's life. */
+    private fun failed(why: FullPromptWhy) {
+        if (policy.failed(why)) {
+            Log.w(TAG, "copying the prefilled prompt is off for good: ${policy.failuresInARow} failures in a row (last: ${why.words})")
+            closeBase()
+        }
+    }
+
+    private fun closeBase() {
+        base?.let { runCatching { it.close() } }
+        base = null; baseHandle = -1
     }
 
     override fun close() {
-        stopCloning()
+        closeBase()
         runCatching { engine.close() }
     }
 
@@ -138,6 +215,16 @@ class LiteRtEngine private constructor(
         } catch (t: Throwable) {
             Log.w(TAG, "couldn't read model info for ${model.name}", t); null
         }
+        /**
+         * Asks LiteRT-LM to measure each call (prompt tokens read, decode speed) for the "Last
+         * cleanup" readout. Process-wide; read when engines and conversations are made.
+         */
+        @OptIn(ExperimentalApi::class)
+        private fun enableBenchmark() {
+            runCatching { ExperimentalFlags.enableBenchmark = true }
+                .onFailure { Log.w(TAG, "couldn't turn on LiteRT-LM benchmark info", it) }
+        }
+
         /** Bumped with the LiteRT-LM version so a newer runtime gets to try the GPU again. */
         private const val RUNTIME = "0.19.0"
 
@@ -174,6 +261,7 @@ class LiteRtEngine private constructor(
                 for (mtp in if (wantMtp) listOf(true, false) else listOf(false)) {
                     var engine: Engine? = null
                     try {
+                        enableBenchmark()
                         engine = Engine(
                             EngineConfig(
                                 modelPath = model.absolutePath,

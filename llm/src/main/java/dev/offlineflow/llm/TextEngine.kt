@@ -21,6 +21,12 @@ interface TextEngine : AutoCloseable {
      */
     fun complete(handle: Int, note: String?, user: String, maxTokens: Int): String
 
+    /**
+     * Makes prepared prompt [handle] ready now, for engines that keep only some prompts ready
+     * (LiteRT-LM keeps one); a no-op elsewhere. Blocking; call off the main thread.
+     */
+    fun warm(handle: Int) {}
+
     /** What the last [complete] did (chip, speed-up, timing); null before the first call. */
     val lastRun: RunStats? get() = null
 }
