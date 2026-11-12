@@ -429,10 +429,10 @@ class OfflineFlowIME : InputMethodService() {
                         // Cloud failed: fall back to the on-device model when there is one.
                         if (!models.isReady(models.selected)) throw t
                         Log.w(TAG, "cloud transcription failed, using on-device", t)
-                        Brain.onAsr(timing) { engineForSelected().transcribe(audio) }
+                        Brain.onAsr(timing) { engineForSelected().transcribe(audio, Dictionary.load(this@OfflineFlowIME).spellings) }
                     }.also { if (timing.asr == 0L) timing.asr = SystemClock.elapsedRealtime() - t0 }
                 } else liveNow?.finish(tail, timing) ?: Brain.onAsr(timing) {
-                    engineForSelected().transcribe(audio)
+                    engineForSelected().transcribe(audio, Dictionary.load(this@OfflineFlowIME).spellings)
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "transcription failed", t)

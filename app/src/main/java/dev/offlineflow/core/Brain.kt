@@ -149,14 +149,17 @@ object Brain {
             }
         }
         live?.finish(tail, t)?.let { return it }
-        return onAsr(t) { engine(models).transcribe(audio) }
+        val hints = Dictionary.load(ctx).spellings
+        return onAsr(t) { engine(models).transcribe(audio, hints) }
     }
 
     /** Live transcription for a dictation about to start, or null when speech runs in the cloud. */
     fun liveSpeech(ctx: Context, models: ModelManager, scope: kotlinx.coroutines.CoroutineScope, style: Style = Style.POLISHED): LiveSpeech? =
         if (CloudClient.speechOn(ctx) || !models.isReady(models.selected)) null
-        else LiveSpeech(scope, { engine(models).transcribe(it) }) { soFar ->
-            scope.launch(llm) { cleanAhead(ctx, soFar, style) }
+        else Dictionary.load(ctx).spellings.let { hints ->
+            LiveSpeech(scope, { engine(models).transcribe(it, hints) }) { soFar ->
+                scope.launch(llm) { cleanAhead(ctx, soFar, style) }
+            }
         }
 
     /** Live cleanup: cleans the newest piece while the user keeps talking, if the model is already loaded. [llm] thread. */

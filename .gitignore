@@ -9,3 +9,4 @@ captures/
 *.apk
 *.bin
 app/libs/*.aar
+__pycache__/
