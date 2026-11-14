@@ -5,9 +5,10 @@ import java.io.File
 /** whisper.cpp running fully on-device through JNI. */
 class WhisperEngine private constructor(private var handle: Long) : SpeechEngine {
 
-    override fun transcribe(samples: FloatArray, prompt: String?): String {
+    /** [hints] are not used here yet; the cleanup step applies the dictionary to Whisper's text. */
+    override fun transcribe(samples: FloatArray, hints: List<String>): String {
         check(handle != 0L) { "WhisperEngine is closed" }
-        return nativeTranscribe(handle, samples, prompt).trim()
+        return nativeTranscribe(handle, samples, null).trim()
     }
 
     override fun close() {
