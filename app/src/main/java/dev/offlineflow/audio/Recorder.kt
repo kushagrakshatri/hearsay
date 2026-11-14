@@ -24,6 +24,8 @@ class Recorder(
      * keeps talking: at the first pause the VAD closes after at least [MIN_CHUNK_MS] of new speech.
      */
     private val onChunk: ((FloatArray) -> Unit)? = null,
+    /** Whether [onSpeechEnd] ends this recording (hands-free). Holding the mic keeps handing over pieces after a long pause. */
+    private val endsOnPause: () -> Boolean = { true },
 ) {
     private var record: AudioRecord? = null
     private var worker: Thread? = null
@@ -32,9 +34,17 @@ class Recorder(
     @Volatile private var endFired = false
     /** Speech stretches already handed to [onChunk]. */
     @Volatile private var emitted = 0
+    /** Sample offset the next piece starts from: where the last volume or forced cut fell (0 before any). */
+    @Volatile private var clipFrom = 0L
+    @Volatile private var sent = 0
+    private val cutter = PauseCutter()
+    private val kinds = IntArray(PauseCutter.Kind.entries.size)
 
     /** Chunks handed to [onChunk] that [tail] continues from; 0 means [tail] is everything. Valid after [stop]. */
-    val chunksSent: Int get() = emitted
+    val chunksSent: Int get() = sent
+
+    /** Pieces handed over by what cut them, indexed by [PauseCutter.Kind]. Valid after [stop]. */
+    val cutCounts: IntArray get() = kinds.copyOf()
 
     /** The speech after the last chunk handed to [onChunk] (all of it when none was). Valid after [stop]. */
     var tail = FloatArray(0)
@@ -72,6 +82,7 @@ class Recorder(
         onLevel(rms(c))
         val g = gate ?: return
         runCatching { g.accept(c) }
+        if (onChunk != null) cutter.add(c)
         val silentTooLong = if (g.heardSpeech) g.trailingSilence >= endSilenceMs * SAMPLE_RATE / 1000L
             else synchronized(chunks) { chunks.size } * 100 >= noSpeechMs
         if (!endFired && silentTooLong) {
@@ -79,13 +90,30 @@ class Recorder(
             onSpeechEnd()
         }
         val cb = onChunk ?: return
-        if (endFired || !g.heardSpeech || g.trailingSilence < CHUNK_SILENCE_MS * SAMPLE_RATE / 1000L) return
+        if (stopsChunking(endFired, endsOnPause()) || !g.heardSpeech) return
         val n = g.rangeCount
-        if (n <= emitted) return
-        val ranges = g.rangesFrom(emitted)
-        if (ranges.last().last - ranges.first().first < MIN_CHUNK_MS * SAMPLE_RATE / 1000L) return
+        val pending = if (n > emitted) g.rangesFrom(emitted) else emptyList()
+        // No pause the VAD closes yet: cut at a quiet stretch, or force one (PauseCutter).
+        val open = g.openStart
+        val unhanded = (pending.firstOrNull()?.first ?: open.takeIf { it >= 0 })?.let { maxOf(it, clipFrom) }
+        val cut = unhanded?.let { cutter.cutAt(it) }
+        if (cut != null) {
+            val (at, kind) = cut
+            val rs = if (open in 0 until at) pending + listOf(open until at) else pending
+            val piece = PauseCutter.slice(snapshot(), rs, clipFrom, at)
+            if (piece.isNotEmpty()) { emitted = n; clipFrom = at; hand(cb, piece, kind) }
+            return
+        }
+        if (g.trailingSilence < CHUNK_SILENCE_MS * SAMPLE_RATE / 1000L) return
+        if (pending.isEmpty()) return
+        if (pending.last().last - maxOf(pending.first().first, clipFrom) < MIN_CHUNK_MS * SAMPLE_RATE / 1000L) return
         emitted = n
-        runCatching { cb(SpeechGate.cut(snapshot(), ranges)) }
+        hand(cb, PauseCutter.slice(snapshot(), pending, clipFrom), PauseCutter.Kind.PAUSE)
+    }
+
+    private fun hand(cb: (FloatArray) -> Unit, piece: FloatArray, kind: PauseCutter.Kind) {
+        sent++; kinds[kind.ordinal]++
+        runCatching { cb(piece) }
     }
 
     private fun snapshot(): FloatArray {
@@ -131,11 +159,12 @@ class Recorder(
         val out = snapshot()
         synchronized(chunks) { chunks.clear() }
         val g = gate ?: return Silence.trim(out).also { tail = it }
-        val speech = runCatching { g.finish() }.getOrNull() ?: return Silence.trim(out).also { tail = it; emitted = 0 }
+        val speech = runCatching { g.finish() }.getOrNull() ?: return Silence.trim(out).also { tail = it; sent = 0 }
         g.close()
         heardSpeech = speech.isNotEmpty()
         val all = if (heardSpeech) SpeechGate.cut(out, speech) else FloatArray(0)
-        tail = if (emitted > 0) SpeechGate.cut(out, speech.drop(emitted)) else all
+        // Starts exactly where the last piece ended: after its VAD stretches, and at its cut.
+        tail = if (sent > 0) PauseCutter.slice(out, speech.drop(emitted), clipFrom) else all
         return all
     }
 
@@ -158,6 +187,9 @@ class Recorder(
         const val MIN_CHUNK_MS = 2000
         /** Set only in debug builds (launch-video recording); null in release, so the mic is always real. */
         @Volatile var demoDir: java.io.File? = null
+
+        /** The end-of-speech pause stops live pieces only when it ends the recording (hands-free). */
+        fun stopsChunking(endFired: Boolean, endsOnPause: Boolean) = endFired && endsOnPause
     }
 }
 

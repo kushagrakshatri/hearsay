@@ -249,8 +249,9 @@ class ModelManager(context: Context) {
         private const val KEY_MODEL = "model"
         private const val KEY_CLEANUP = "cleanup"
         private const val OFF = "OFF"
+        /** Pinned to a commit: the repo's main was re-uploaded on Nov 6, 2026 with different files, which broke the sizes and hashes below. */
         private const val PARAKEET_REPO =
-            "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main"
+            "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2"
 
         private fun hf(name: String, bytes: Long, sha: String) = Asset(name, "$PARAKEET_REPO/$name", bytes, sha)
 

@@ -23,11 +23,24 @@ class SpeechGate private constructor(private val vad: Vad) : AutoCloseable {
     /** Samples of silence since speech was last heard, or 0 before any speech. */
     val trailingSilence: Long get() = if (lastSpeechAt < 0) 0 else samplesSeen - lastSpeechAt
 
+    /**
+     * Roughly where the stretch the VAD is still in started (sample offset), or -1 when it isn't
+     * in one. The Kotlin Vad doesn't expose it; this mirrors sherpa's start (newest window − 2
+     * windows − min speech) at the read where speech was first detected.
+     */
+    var openStart = -1L
+        private set
+
     fun accept(chunk: FloatArray) {
         vad.acceptWaveform(chunk)
         samplesSeen += chunk.size
-        if (vad.isSpeechDetected()) lastSpeechAt = samplesSeen
+        if (vad.isSpeechDetected()) {
+            lastSpeechAt = samplesSeen
+            if (openStart < 0) openStart = maxOf(0L, samplesSeen / WINDOW * WINDOW - 2 * WINDOW - MIN_SPEECH_SAMPLES)
+        } else openStart = -1
         drain()
+        // A stretch closed and a new one opened within this read: the open one starts after it.
+        if (openStart >= 0 && ranges.isNotEmpty()) openStart = maxOf(openStart, ranges.last().last + 1)
     }
 
     /** Speech stretches finished so far. */
@@ -56,6 +69,8 @@ class SpeechGate private constructor(private val vad: Vad) : AutoCloseable {
 
     companion object {
         private const val TAG = "SpeechGate"
+        private const val WINDOW = 512L
+        private const val MIN_SPEECH_SAMPLES = 2400L // minSpeechDuration 0.15 s
 
         /** Returns null if the VAD can't load; callers fall back to energy trimming. */
         fun create(assets: AssetManager): SpeechGate? = runCatching {

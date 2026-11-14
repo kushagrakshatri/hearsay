@@ -460,7 +460,8 @@ class BubbleService : AccessibilityService() {
         recorder = Recorder(gate, endSilenceMs = Prefs.pauseMs(this), onSpeechEnd = {
             mic.post { if (handsFree) finish() }
         }, onLevel = { level -> mic.post { mic.push(level) } },
-            onChunk = liveNow?.let { l -> { chunk: FloatArray -> l.add(chunk) } }).also { it.start() }
+            onChunk = liveNow?.let { l -> { chunk: FloatArray -> l.add(chunk) } },
+            endsOnPause = { handsFree }).also { it.start() }
     }
 
     /** Glides to the nearer side of the screen after a drag, then saves the spot. */
@@ -507,7 +508,7 @@ class BubbleService : AccessibilityService() {
         busy = true; mic.state = MicButton.State.BUSY
         say(if (Brain.engineLoaded(models.selected)) "Writing it down\u2026" else "Warming up\u2026", 0)
         val t0 = SystemClock.elapsedRealtime()
-        val timing = dev.offlineflow.core.Timing().apply { this.livePauses = livePauses }
+        val timing = dev.offlineflow.core.Timing().apply { this.livePauses = livePauses; liveCuts = rec.cutCounts }
         // Read the names on screen while the speech model works.
         val names = target()?.let { n -> scope.async(Dispatchers.Default) { runCatching { screenNames(n) }.getOrDefault(emptyList()) } }
         scope.launch {

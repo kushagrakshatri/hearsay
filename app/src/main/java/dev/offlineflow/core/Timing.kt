@@ -19,6 +19,8 @@ class Timing {
     var cleanReused = 0; var cleanPieces = 0
     /** Pieces handed over at pauses while talking (-1: live speech off), retried at the end, or given up on. */
     var livePauses = -1; var liveRedone = 0; var liveFailed = false
+    /** What cut those pieces, indexed by PauseCutter.Kind (VAD pause, volume dip, forced). */
+    var liveCuts = IntArray(0)
     /** Live cleanup: whether the newest piece reused the prefilled prompt, in plain words. */
     var piecePrompt: String? = null
     fun livePieces(c: dev.offlineflow.cleanup.LlmCleaner) {
@@ -41,6 +43,7 @@ class Timing {
             livePauses == 0 -> add("no pause caught while talking")
             liveRedone > 0 -> add("redid $liveRedone live pieces")
         }
+        if (livePauses > 0 && !liveFailed) dev.offlineflow.audio.PauseCutter.describe(liveCuts).takeIf { it.isNotEmpty() }?.let { add("pieces: $it") }
         if (llmWait >= MIN) add("waiting for cleanup model ${secs(llmWait)}")
         if (llmLoad >= MIN) add("loading cleanup model ${secs(llmLoad)}")
         if (prompt >= MIN) add("first-use prompt setup ${secs(prompt)}")

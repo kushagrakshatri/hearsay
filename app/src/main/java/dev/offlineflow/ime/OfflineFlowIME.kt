@@ -390,7 +390,8 @@ class OfflineFlowIME : InputMethodService() {
             // Mic thread → main. Only hands-free ends on a pause; holding keeps listening.
             mic.post { if (handsFree) finishDictation() }
         }, onLevel = { level -> wave.post { wave.push(level); mic.push(level) } },
-            onChunk = liveNow?.let { l -> { chunk: FloatArray -> l.add(chunk) } }).also { it.start() }
+            onChunk = liveNow?.let { l -> { chunk: FloatArray -> l.add(chunk) } },
+            endsOnPause = { handsFree }).also { it.start() }
     }
 
     private fun finishDictation() {
@@ -416,7 +417,7 @@ class OfflineFlowIME : InputMethodService() {
             else -> "Writing it down\u2026"
         })
         val t0 = SystemClock.elapsedRealtime()
-        val timing = dev.offlineflow.core.Timing().apply { this.livePauses = livePauses; audioMs = audio.size * 1000L / Recorder.SAMPLE_RATE }
+        val timing = dev.offlineflow.core.Timing().apply { this.livePauses = livePauses; liveCuts = rec.cutCounts; audioMs = audio.size * 1000L / Recorder.SAMPLE_RATE }
         val cloudAsrModel = Prefs.cloudSpeechModel(this)
         setMic(MicButton.State.BUSY)
         scope.launch {
