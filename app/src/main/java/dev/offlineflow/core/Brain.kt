@@ -29,18 +29,23 @@ object Brain {
 
     private var engine: SpeechEngine? = null
     private var engineModel: ModelManager.Model? = null
+    private var engineOnSherpa = false
     private var cleaner: LlmCleaner? = null
     private var cleanerModel: ModelManager.Model? = null
 
     fun engineLoaded(m: ModelManager.Model) = engine != null && engineModel == m
 
+    /** Which runtime the loaded speech engine runs on, for the "Last dictation" line (null: none / not applicable). */
+    val speechBackend: String? get() = engine?.backend
+
     /** The engine for the selected model, (re)loading it if the choice changed. [asr] thread only. */
     fun engine(models: ModelManager): SpeechEngine {
         val want = models.selected
-        engine?.let { if (engineModel == want) return it }
+        val onSherpa = models.speechOnSherpa
+        engine?.let { if (engineModel == want && engineOnSherpa == onSherpa) return it }
         engine?.close(); engine = null; engineModel = null
         val t = Timing.now()
-        return Engines.load(models, want).also { engine = it; engineModel = want; asrLoadMs = Timing.now() - t }
+        return Engines.load(models, want).also { engine = it; engineModel = want; engineOnSherpa = onSherpa; asrLoadMs = Timing.now() - t }
     }
 
     /** The selected cleanup LLM, or RulesCleaner when off / not downloaded. [llm] thread only. */
@@ -91,7 +96,7 @@ object Brain {
         return withContext(asr) {
             val began = Timing.now(); asrLoadMs = 0
             try { block() } finally {
-                t?.apply { asrWait = began - asked; asrLoad = asrLoadMs; asr = Timing.now() - began - asrLoadMs }
+                t?.apply { asrWait = began - asked; asrLoad = asrLoadMs; asr = Timing.now() - began - asrLoadMs; speechEngine = engine?.backend }
             }
         }
     }

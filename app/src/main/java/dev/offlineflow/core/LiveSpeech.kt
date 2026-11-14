@@ -56,7 +56,7 @@ class LiveSpeech(
             d.await() ?: withContext(Brain.asr) { runCatching { transcribe(cs[i]) }.getOrNull() }
                 ?.also { redone++ } ?: run { t?.liveFailed = true; return null }
         }
-        t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs; liveRedone = redone }
+        t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs; liveRedone = redone; speechEngine = Brain.speechBackend }
         val last = if (tail.size >= Recorder.SAMPLE_RATE / 4) Brain.onAsr(t) { transcribe(tail) } else ""
         pieces = (done + last).map { it.trim() }.filter { it.isNotEmpty() }
         // Each piece was transcribed alone and ends like a sentence; mend the seams that don't end one.

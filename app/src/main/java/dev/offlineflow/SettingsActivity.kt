@@ -99,6 +99,14 @@ class SettingsActivity : AppCompatActivity() {
                 }
             })
             addView(speechBar); addView(speechAction)
+            addView(ui.space(8))
+            // A/B for one release: Hearsay's own Parakeet engine (default) vs sherpa-onnx's recognizer.
+            addView(switch("Accurate (Parakeet): use the old sherpa-onnx engine", models.speechOnSherpa) {
+                models.speechOnSherpa = it
+                lifecycleScope.launch { dev.offlineflow.core.Brain.releaseAsr() }
+            })
+            addView(ui.hint("For comparing. Hearsay runs Parakeet on its own engine and falls back to sherpa-onnx by itself " +
+                "if that fails. Settings → Cleanup → Last dictation shows which one ran."))
         }
         val cleanupSheet = ui.column().apply {
             addView(ui.hint("Drops the ums, fixes punctuation and spells your words right. " +

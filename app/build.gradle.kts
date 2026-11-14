@@ -25,6 +25,22 @@ if (!sherpaAar.exists() || sha256(sherpaAar) != sherpaSha256) {
     check(sha256(sherpaAar) == sherpaSha256) { "sherpa-onnx AAR checksum mismatch" }
 }
 
+// The app's own Parakeet runner (src/main/cpp/parakeet_core.cc) links against the ONNX Runtime inside that same
+// AAR (1.28.2). Unzip jni/<abi>/libonnxruntime.so into build/ for CMake to link against; nothing extra is packaged
+// (the AAR's copy is the one in the APK). Keyed on the AAR's pinned SHA, so a new AAR re-extracts.
+val sherpaOrtDir = layout.buildDirectory.dir("sherpa-ort/$sherpaSha256").get().asFile
+for (abi in listOf("arm64-v8a", "x86_64")) {
+    val so = File(sherpaOrtDir, "$abi/libonnxruntime.so")
+    if (so.exists()) continue
+    so.parentFile.mkdirs()
+    java.util.zip.ZipFile(sherpaAar).use { zip ->
+        val e = checkNotNull(zip.getEntry("jni/$abi/libonnxruntime.so")) { "sherpa-onnx AAR has no jni/$abi/libonnxruntime.so" }
+        val tmp = File(so.path + ".tmp")
+        zip.getInputStream(e).use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        check(tmp.renameTo(so)) { "Could not extract $so" }
+    }
+}
+
 // CI run number makes every published build an in-place upgrade.
 val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
@@ -43,7 +59,7 @@ android {
         // Opt-in cloud mode (bring your own key). Build with -PnoCloud to compile it out (F-Droid).
         buildConfigField("boolean", "CLOUD", if (project.hasProperty("noCloud")) "false" else "true")
         externalNativeBuild {
-            cmake { arguments += listOf("-DANDROID_STL=c++_shared") }
+            cmake { arguments += listOf("-DANDROID_STL=c++_shared", "-DSHERPA_ORT_DIR=${sherpaOrtDir.absolutePath}") }
         }
     }
 
@@ -94,7 +110,11 @@ android {
 
     packaging {
         // Both native modules bundle the same NDK C++ runtime.
-        jniLibs { pickFirsts += "**/libc++_shared.so" }
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+            // AGP also offers the CMake-imported copy of sherpa's ONNX Runtime (byte-identical, from the same AAR): keep one.
+            pickFirsts += "**/libonnxruntime.so"
+        }
     }
 
     buildFeatures { buildConfig = true }

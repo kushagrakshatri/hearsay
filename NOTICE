@@ -12,5 +12,8 @@ user's choice, from their publishers and are used under their own licenses:
 - Qwen3.5 0.8B / 2B (Alibaba Cloud, Apache-2.0), Gemma 4 E2B (Google, Apache-2.0),
   NVIDIA Parakeet TDT 0.6B v2 (CC-BY-4.0), OpenAI Whisper base.en (MIT), Silero VAD (MIT, bundled).
 
-Third-party code: llama.cpp and whisper.cpp (MIT), sherpa-onnx (Apache-2.0), LiteRT-LM (Apache-2.0).
+Third-party code: llama.cpp and whisper.cpp (MIT), sherpa-onnx (Apache-2.0), LiteRT-LM (Apache-2.0),
+kaldi-native-fbank v1.22.4 (Apache-2.0, third_party/kaldi-native-fbank), KISS FFT (BSD-3-Clause,
+third_party/kissfft), and the ONNX Runtime 1.28.2 C/C++ API headers (MIT, Copyright Microsoft Corporation,
+third_party/onnxruntime-headers); ONNX Runtime itself ships inside the sherpa-onnx AAR (MIT).
 The common-words list comes from SCOWL (app/src/main/assets/words/SCOWL-LICENSE.txt).

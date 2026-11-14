@@ -27,6 +27,8 @@ class Timing {
         cleanReused = c.lastReused; cleanPieces = c.lastPieces
         piecePrompt = c.lastPieceRun?.takeIf { cleanPieces > 0 }?.let(dev.offlineflow.cleanup.CleanupStatus::prompt)
     }
+    /** Which runtime ran speech ("own engine", "sherpa (…)"), from the engine; null for Whisper or cloud speech. */
+    @Volatile var speechEngine: String? = null
     var ranLlm = false
     var cloud = false
 
@@ -37,7 +39,8 @@ class Timing {
         if (asrLoad >= MIN) add("loading speech model ${secs(asrLoad)}")
         if (liveWait >= MIN) add("finishing speech from before the last pause ${secs(liveWait)}")
         add("speech ${secs(asr)}" + (if (audioMs > 0) " for ${secs(audioMs)} of audio" else "") +
-            if (liveAudioMs > 0) " (${secs(liveAudioMs)} done while you talked)" else "")
+            (if (liveAudioMs > 0) " (${secs(liveAudioMs)} done while you talked)" else "") +
+            (speechEngine?.let { " on $it" } ?: ""))
         when {
             liveFailed -> add("live speech failed, redid the whole recording")
             livePauses == 0 -> add("no pause caught while talking")

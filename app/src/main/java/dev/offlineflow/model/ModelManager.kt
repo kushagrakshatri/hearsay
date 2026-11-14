@@ -33,13 +33,17 @@ class ModelManager(context: Context) {
     /** LLAMA: llama.cpp on the CPU (GGUF). LITERT: Google LiteRT-LM, GPU with CPU fallback (.litertlm). */
     enum class Engine { WHISPER, PARAKEET, LLAMA, LITERT }
 
-    data class Asset(val name: String, val url: String, val bytes: Long, val sha256: String)
+    /** [patchedBytes]: size of the same file after an on-phone patch (see [EncoderPatch]), also accepted as ready. */
+    data class Asset(val name: String, val url: String, val bytes: Long, val sha256: String, val patchedBytes: Long = -1) {
+        fun complete(f: File) = f.exists() && (f.length() == bytes || f.length() == patchedBytes)
+    }
 
     enum class Model(val label: String, val kind: Kind, val engine: Engine, val subdir: String, val assets: List<Asset>) {
         PARAKEET_V2(
             "Parakeet TDT 0.6B v2 (NVIDIA) · most accurate", Kind.SPEECH, Engine.PARAKEET, "parakeet-tdt-0.6b-v2-int8",
             listOf(
-                hf("encoder.int8.onnx", 652_184_296, "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab"),
+                // Downloaded as pinned upstream, then patched once on the phone to also output layer-11 states.
+                hf("encoder.int8.onnx", EncoderPatch.ORIGINAL_BYTES, EncoderPatch.ORIGINAL_SHA, EncoderPatch.PATCHED_BYTES),
                 hf("decoder.int8.onnx", 7_257_753, "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e"),
                 hf("joiner.int8.onnx", 1_739_080, "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2"),
                 hf("tokens.txt", 9_384, "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d"),
@@ -140,6 +144,11 @@ class ModelManager(context: Context) {
     val recommended: Model
         get() = if (totalRam >= 5_500_000_000L) Model.PARAKEET_V2 else Model.WHISPER_BASE_EN
 
+    /** Run Parakeet on sherpa-onnx's recognizer instead of Hearsay's own engine (Settings switch, kept for one release as an A/B). */
+    var speechOnSherpa: Boolean
+        get() = prefs.getBoolean(KEY_SHERPA, false)
+        set(value) { prefs.edit().putBoolean(KEY_SHERPA, value).apply() }
+
     var selected: Model
         get() = prefs.getString(KEY_MODEL, null)
             ?.let { name -> Model.entries.firstOrNull { it.name == name && it.kind == Kind.SPEECH } } ?: recommended
@@ -186,7 +195,7 @@ class ModelManager(context: Context) {
 
     fun dir(m: Model): File = if (m.subdir.isEmpty()) root else File(root, m.subdir)
     fun file(m: Model, asset: Asset = m.assets.first()) = File(dir(m), asset.name)
-    fun isReady(m: Model) = m.assets.all { file(m, it).let { f -> f.exists() && f.length() == it.bytes } }
+    fun isReady(m: Model) = m.assets.all { it.complete(file(m, it)) }
 
     /** Bytes this model takes on disk, including partial downloads. */
     fun bytesOnDisk(m: Model): Long = m.assets.sumOf { a ->
@@ -195,7 +204,10 @@ class ModelManager(context: Context) {
 
     /** Deletes this model's files (and partial downloads) to free space. */
     fun delete(m: Model) {
-        for (a in m.assets) { file(m, a).delete(); File(file(m, a).path + ".part").delete() }
+        for (a in m.assets) {
+            file(m, a).delete(); File(file(m, a).path + ".part").delete()
+            File(file(m, a).path + EncoderPatch.TMP_SUFFIX).delete(); File(file(m, a).path + EncoderPatch.FAILED_SUFFIX).delete()
+        }
     }
 
     /** Blocking; call off the main thread. Resumes partial downloads; verifies each file. */
@@ -205,7 +217,7 @@ class ModelManager(context: Context) {
         var before = 0L
         for (a in m.assets) {
             val dest = file(m, a)
-            if (!(dest.exists() && dest.length() == a.bytes)) {
+            if (!a.complete(dest)) {
                 fetch(a, dest) { got -> onProgress(((before + got) * 100 / total).toInt()) }
             }
             before += a.bytes
@@ -248,12 +260,14 @@ class ModelManager(context: Context) {
         private val RETIRED = listOf("LFM2.5-1.2B-Instruct-Q4_K_M.gguf", "MiniCPM5-1B-Q4_K_M.gguf")
         private const val KEY_MODEL = "model"
         private const val KEY_CLEANUP = "cleanup"
+        private const val KEY_SHERPA = "speech_sherpa"
         private const val OFF = "OFF"
         /** Pinned to a commit: the repo's main was re-uploaded on Nov 6, 2026 with different files, which broke the sizes and hashes below. */
         private const val PARAKEET_REPO =
             "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2"
 
-        private fun hf(name: String, bytes: Long, sha: String) = Asset(name, "$PARAKEET_REPO/$name", bytes, sha)
+        private fun hf(name: String, bytes: Long, sha: String, patchedBytes: Long = -1) =
+            Asset(name, "$PARAKEET_REPO/$name", bytes, sha, patchedBytes)
 
         fun sha256(f: File): String {
             val md = MessageDigest.getInstance("SHA-256")
