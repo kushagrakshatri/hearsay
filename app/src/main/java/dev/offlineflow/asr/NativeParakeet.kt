@@ -48,8 +48,8 @@ class NativeParakeet private constructor(private var handle: Long, private val t
     }
 
     companion object {
-        /** Loads libparakeet.so (and with it sherpa's libonnxruntime.so); throws UnsatisfiedLinkError when it can't. */
-        private val library: Unit by lazy { System.loadLibrary("parakeet") }
+        /** Loads libhearsay_parakeet.so (and with it sherpa's libonnxruntime.so); throws UnsatisfiedLinkError when it can't. */
+        private val library: Unit by lazy { System.loadLibrary("hearsay_parakeet") }
 
         fun load(dir: File, threads: Int): NativeParakeet {
             library

@@ -29,7 +29,7 @@ target_link_libraries(offlineflow whisper ${log-lib})
 # Keep this library's statically linked ggml private (the llm module ships its own copy).
 target_link_options(offlineflow PRIVATE "-Wl,--exclude-libs,ALL")
 
-# ---- Parakeet on ONNX Runtime ("own engine"): fbank + encoder + TDT greedy, see parakeet_core.cc.
+# ---- Parakeet on ONNX Runtime ("own engine", libhearsay_parakeet.so; whisper.cpp already has a target named parakeet): fbank + encoder + TDT greedy, see parakeet_core.cc.
 # Links against the libonnxruntime.so inside the pinned sherpa-onnx AAR (ORT 1.28.2), which app/build.gradle.kts
 # unzips to SHERPA_ORT_DIR for linking only; the APK carries that one copy (sherpa needs it anyway).
 set(TP ${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party)
@@ -55,8 +55,8 @@ target_include_directories(pk_knf PUBLIC ${TP}/kaldi-native-fbank)
 target_link_libraries(pk_knf PUBLIC pk_kissfft)
 set_target_properties(pk_knf PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_library(parakeet SHARED parakeet_jni.cpp parakeet_core.cc)
-target_include_directories(parakeet PRIVATE ${TP}/onnxruntime-headers/include)
-target_link_libraries(parakeet pk_knf onnxruntime ${log-lib})
+add_library(hearsay_parakeet SHARED parakeet_jni.cpp parakeet_core.cc)
+target_include_directories(hearsay_parakeet PRIVATE ${TP}/onnxruntime-headers/include)
+target_link_libraries(hearsay_parakeet pk_knf onnxruntime ${log-lib})
 # knf/kissfft stay private to this library (sherpa's own JNI carries its own copy of knf).
-target_link_options(parakeet PRIVATE "-Wl,--exclude-libs,ALL")
+target_link_options(hearsay_parakeet PRIVATE "-Wl,--exclude-libs,ALL")
