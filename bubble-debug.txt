@@ -1,0 +1,291 @@
+dev.hearsay.debug/dev.offlineflow.bubble.BubbleService
+com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME
+     Bound services:{Service[label=Hearsay floating mic, feedbackType[FEEDBACK_GENERIC], capabilities=1, eventTypes=[TYPE_VIEW_CLICKED, TYPE_VIEW_FOCUSED, TYPE_VIEW_TEXT_CHANGED, TYPE_WINDOW_STATE_CHANGED, TYPE_VIEW_TEXT_SELECTION_CHANGED, TYPE_WINDOWS_CHANGED], notificationTimeout=100, requestA11yBtn=false]}
+     Enabled services:{{dev.hearsay.debug/dev.offlineflow.bubble.BubbleService}}
+[com.google.android.apps.nexuslauncher][com.google.android.as][com.google.android.googlequicksearchbox][com.google.android.apps.messaging][com.google.android.apps.wellbeing][com.google.android.googlequicksearchbox][dev.hearsay.debug][com.google.android.tts][com.google.android.inputmethod.latin]}]
+A11yWindow[AccessibilityWindowInfo[title=Hearsay Debug, displayId=0, id=1097, taskId=14, type=TYPE_APPLICATION, layer=0, region=SkRegion((0,0,1080,2400)), bounds=Rect(0, 0 - 1080, 2400), focused=true, active=true, pictureInPicture=false, transitionTime=434759, hasParent=false, isAnchored=false, hasChildren=false]]
+WindowInfo[WindowInfo[title=Hearsay Debug, displayId=0, taskId=14, type=1, layer=1, token=android.os.BinderProxy@e647c7, region=SkRegion((0,0,1080,2400)), bounds=Rect(0, 0 - 1080, 2400), parent=null, focused=true, children=null, accessibility anchor=9223372034707292159, pictureInPicture=false, watchOutsideTouch=false, mTransformMatrix=Matrix{[1.0, 0.0, 0.0][0.0, 1.0, 0.0][0.0, 0.0, 1.0]}, mMagnificationSpec=<scale:1.0,offsetX:0.0,offsetY:0.0>, locales=[en_US]]]
+Window attributes:[{1089=AccessibilityWindowAttributes{mAccessibilityWindowTitle=HomemLocales=[en_US]}, 1090=AccessibilityWindowAttributes{mAccessibilityWindowTitle=Navigation barmLocales=[en_US]}, 1091=AccessibilityWindowAttributes{mAccessibilityWindowTitle=Navigation bar Edge PanelmLocales=[en_US]}, 1092=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 1093=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 1094=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 1095=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 1096=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}, 1097=AccessibilityWindowAttributes{mAccessibilityWindowTitle=Hearsay DebugmLocales=[en_US]}, 1098=AccessibilityWindowAttributes{mAccessibilityWindowTitle=nullmLocales=[en_US]}}]
+     Bound services:{Service[label=Hearsay floating mic, feedbackType[FEEDBACK_GENERIC], capabilities=1, eventTypes=[TYPE_VIEW_CLICKED, TYPE_VIEW_FOCUSED, TYPE_VIEW_TEXT_CHANGED, TYPE_WINDOW_STATE_CHANGED, TYPE_VIEW_TEXT_SELECTION_CHANGED, TYPE_WINDOWS_CHANGED], notificationTimeout=100, requestA11yBtn=false]}
+--------- beginning of system
+11-14 01:57:53.839   561   594 D AccessibilityManagerService: Ignoring non-encryption-aware service ComponentInfo{com.android.systemui.accessibility.accessibilitymenu/com.android.systemui.accessibility.accessibilitymenu.AccessibilityMenuService}
+11-14 01:57:53.842   561   594 D AccessibilityManagerService: Ignoring non-encryption-aware service ComponentInfo{com.android.systemui.accessibility.accessibilitymenu/com.android.systemui.accessibility.accessibilitymenu.AccessibilityMenuService}
+11-14 01:57:53.843   561   594 D AccessibilityManagerService: Ignoring non-encryption-aware service ComponentInfo{com.android.systemui.accessibility.accessibilitymenu/com.android.systemui.accessibility.accessibilitymenu.AccessibilityMenuService}
+11-14 01:58:17.021   561  2021 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:18.077   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:19.852   561  1525 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:20.908   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:22.180   561  1018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:23.249   561   579 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:27.367   561  1021 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:28.396   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:29.862   561  1244 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:30.883   561  1027 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:32.091   561   579 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:33.137   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:37.011   561  1530 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:38.047   561  1530 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:39.505   561  1027 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:40.585   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:42.115   561  2019 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:43.178   561  1765 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:47.566   561  1015 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:48.610   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:50.146   561  1244 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:51.195   561  1021 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:52.575   561  2018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:53.692   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:58:57.848   561   652 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:58:58.891   561  2029 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:00.438   561  2018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:01.457   561   579 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:02.472   561  1525 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:03.491   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:07.310   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:08.328   561  1524 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:09.585   561  1524 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:10.594   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:11.563   561   649 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:12.574   561  1530 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:16.319   561  2025 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:17.334   561  2025 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:18.583   561  1530 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:19.597   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:20.563   561   649 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:21.572   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:25.300   561  2023 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:26.325   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:29.745   561  1529 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:30.818   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:33.947   561  1015 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:34.980   561   652 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:38.102   561  2023 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:39.132   561  2029 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:43.645   561   577 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:44.731   561   649 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:45.718   561   652 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:46.754   561  1018 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:50.483   561  1018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:51.507   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:53.830   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:54.855   561  2025 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 01:59:55.824   561  1018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 01:59:56.853   561  1018 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:00.574   561  2025 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:01.590   561  2025 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:03.879   561   577 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:04.911   561   652 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:05.886   561   652 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:06.910   561   577 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:10.637   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:11.657   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:13.958   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:14.999   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:15.969   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:17.001   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:20.724   561  2025 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:21.746   561   649 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:24.042   561  2025 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:25.075   561   577 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:26.054   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:27.080   561   577 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:29.368   561  2025 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:30.438   561  1018 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:34.169   561  1018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:35.176   561  2025 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:45.141   561  1179 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:46.182   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:47.461   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:48.474   561  1179 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:49.443   561  1179 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:50.465   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:54.196   561  1179 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:55.212   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:56.472   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:57.484   561  1179 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:00:58.458   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:00:59.481   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:03.210   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:04.225   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:05.484   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:06.497   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:07.470   561  1529 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:08.498   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:12.227   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:13.240   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:14.503   561  1015 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:15.515   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:16.495   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:17.511   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:21.248   561  1529 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:22.259   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:23.508   561  2029 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:24.520   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:25.492   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:26.530   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:30.259   561  2023 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:31.287   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:32.539   561  1520 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:33.549   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:34.521   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:35.532   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:39.260   561  1525 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:40.288   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:41.547   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:42.562   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:43.534   561  1520 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:44.545   561  1520 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:48.281   561  1179 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:49.312   561  1520 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:52.451   561  1179 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:53.513   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:01:56.626   561  1520 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:01:57.689   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:00.835   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:01.877   561  1520 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:06.549   561  1015 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:07.581   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:08.560   561  1525 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:09.587   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:13.322   561  1533 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:14.342   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:16.657   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:17.692   561  2026 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:18.664   561  1529 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:19.690   561  1533 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:23.412   561  1520 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:24.427   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:26.726   561  2023 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:27.757   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:28.736   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:29.765   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:33.487   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:34.501   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:36.815   561  1533 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:37.839   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:38.811   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:39.836   561  1179 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:43.563   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:44.575   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:46.932   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:47.964   561  1179 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:48.937   561  1533 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:49.962   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:52.260   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:53.299   561  1533 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:02:57.027   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:02:58.037   561  1533 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:04.651   561  1179 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:05.709   561  2021 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:06.684   561  1997 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:07.712   561  1533 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:10.007   561  2018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:11.029   561  1015 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:12.005   561  2018 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:13.026   561  1520 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:16.288   561  2026 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:17.317   561  2018 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:18.292   561  1532 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:19.321   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:21.547   561  1533 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:22.561   561  2026 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:23.536   561  2026 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:24.550   561  1179 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:26.777   561  2021 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:27.793   561  1520 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:28.859   561  1015 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:29.873   561  1525 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:38.354   561  1525 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:41.394   561  1529 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:50.134   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:51.179   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:52.441   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:53.470   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:03:54.447   561  2026 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:03:55.481   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:00.227   561  1531 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:01.253   561  1531 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:04.111   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:05.168   561  1997 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:12.936   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:13.961   561  2018 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:16.308   561   578 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:17.354   561  2018 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:24.975   561  2023 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:26.023   561  2023 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:27.006   561   652 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:28.038   561   578 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:32.779   561  2026 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:33.803   561   652 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+--------- beginning of main
+11-14 02:04:37.148  6873  6873 I HearsayBubble: connected 96018296
+11-14 02:04:43.487  7039  7039 I HearsayBubble: connected 102251597
+11-14 02:04:52.202   561  1021 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:52.202  7039  7039 I HearsayBubble: unbind 102251597
+11-14 02:04:52.204  7039  7039 I HearsayBubble: destroy 102251597
+11-14 02:04:52.204  7039  7039 I HearsayBubble: java.lang.Throwable: where
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at dev.offlineflow.bubble.BubbleService.onDestroy(BubbleService.kt:656)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.handleStopService(ActivityThread.java:5177)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.-$$Nest$mhandleStopService(Unknown Source:0)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2477)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.os.Looper.loopOnce(Looper.java:232)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.os.Looper.loop(Looper.java:317)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at java.lang.reflect.Method.invoke(Native Method)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+11-14 02:04:52.204  7039  7039 I HearsayBubble: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)
+11-14 02:04:53.250   561  1021 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:53.256  7039  7039 I HearsayBubble: connected 67068348
+11-14 02:04:54.510   561  1021 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:54.511  7039  7039 I HearsayBubble: unbind 67068348
+11-14 02:04:54.511  7039  7039 I HearsayBubble: destroy 67068348
+11-14 02:04:54.511  7039  7039 I HearsayBubble: java.lang.Throwable: where
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at dev.offlineflow.bubble.BubbleService.onDestroy(BubbleService.kt:656)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.handleStopService(ActivityThread.java:5177)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.-$$Nest$mhandleStopService(Unknown Source:0)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2477)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.os.Looper.loopOnce(Looper.java:232)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.os.Looper.loop(Looper.java:317)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at java.lang.reflect.Method.invoke(Native Method)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+11-14 02:04:54.511  7039  7039 I HearsayBubble: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)
+11-14 02:04:55.535   561  1021 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:55.542  7039  7039 I HearsayBubble: connected 118971441
+11-14 02:04:56.512   561  1021 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:04:56.513  7039  7039 I HearsayBubble: unbind 118971441
+11-14 02:04:56.514  7039  7039 I HearsayBubble: destroy 118971441
+11-14 02:04:56.514  7039  7039 I HearsayBubble: java.lang.Throwable: where
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at dev.offlineflow.bubble.BubbleService.onDestroy(BubbleService.kt:656)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.handleStopService(ActivityThread.java:5177)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.-$$Nest$mhandleStopService(Unknown Source:0)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2477)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.os.Looper.loopOnce(Looper.java:232)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.os.Looper.loop(Looper.java:317)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at java.lang.reflect.Method.invoke(Native Method)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+11-14 02:04:56.514  7039  7039 I HearsayBubble: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)
+11-14 02:04:57.532   561  1021 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:04:57.538  7039  7039 I HearsayBubble: connected 13318894
+11-14 02:04:59.211   561   561 W AccessibilityManagerService:  wait for adding window timeout: 1100
+11-14 02:05:02.795   561  2026 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+11-14 02:05:02.795  7039  7039 I HearsayBubble: unbind 13318894
+11-14 02:05:02.796  7039  7039 I HearsayBubble: destroy 13318894
+11-14 02:05:02.796  7039  7039 I HearsayBubble: java.lang.Throwable: where
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at dev.offlineflow.bubble.BubbleService.onDestroy(BubbleService.kt:656)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.handleStopService(ActivityThread.java:5177)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.-$$Nest$mhandleStopService(Unknown Source:0)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2477)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.os.Looper.loopOnce(Looper.java:232)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.os.Looper.loop(Looper.java:317)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at android.app.ActivityThread.main(ActivityThread.java:8705)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at java.lang.reflect.Method.invoke(Native Method)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:580)
+11-14 02:05:02.796  7039  7039 I HearsayBubble: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:886)
+11-14 02:05:03.819   561  1532 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+11-14 02:05:03.823  7039  7039 I HearsayBubble: connected 61183708
