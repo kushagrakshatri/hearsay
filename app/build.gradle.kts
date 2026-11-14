@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import java.util.zip.ZipFile
 
 plugins {
     id("com.android.application")
@@ -33,7 +34,7 @@ for (abi in listOf("arm64-v8a", "x86_64")) {
     val so = File(sherpaOrtDir, "$abi/libonnxruntime.so")
     if (so.exists()) continue
     so.parentFile.mkdirs()
-    java.util.zip.ZipFile(sherpaAar).use { zip ->
+    ZipFile(sherpaAar).use { zip ->
         val e = checkNotNull(zip.getEntry("jni/$abi/libonnxruntime.so")) { "sherpa-onnx AAR has no jni/$abi/libonnxruntime.so" }
         val tmp = File(so.path + ".tmp")
         zip.getInputStream(e).use { input -> tmp.outputStream().use { input.copyTo(it) } }
