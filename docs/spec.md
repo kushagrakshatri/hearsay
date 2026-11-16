@@ -55,7 +55,7 @@ Mic (AudioRecord, 16 kHz mono)
 
 ## 5. Privacy
 - Audio held in memory only, discarded after each dictation. No transcripts saved unless the user turns on history.
-- No analytics or telemetry. Network used only for model downloads and opt-in cloud mode.
+- No analytics or telemetry in public builds (`-PnoTelemetry`). Testing builds send Sentry diagnostics (crashes, fallbacks, per-dictation timings and text) while Settings → Testing → Send test logs is on. Network otherwise used only for model downloads and opt-in cloud mode.
 - Ship an F-Droid build flavor with cloud mode compiled out.
 
 ## 6. Targets (to validate in M0)

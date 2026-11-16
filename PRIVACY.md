@@ -1,6 +1,6 @@
 # Hearsay privacy policy
 
-_Last updated: October 29, 2026_
+_Last updated: November 16, 2026_
 
 Hearsay is a voice dictation app built so your words stay on your phone.
 
@@ -24,11 +24,25 @@ The floating mic uses Android's accessibility service, and only to do these thin
 - **Model downloads.** On first run, Hearsay downloads the speech and cleanup models you pick from their public hosts (Hugging Face and GitHub). These are plain file downloads, checked against fixed SHA-256 hashes.
 - **Optional: ChatGPT or your own API key.** Off by default. If you sign in with ChatGPT or add your own OpenAI-compatible key, the transcript, plus any names picked up from the screen for that dictation, goes to that provider (audio never does, unless you also turn on cloud speech with your own key) for cleanup and voice edits. That provider's privacy policy then applies. Sign-in tokens and keys stay in Hearsay's private storage, and signing out revokes them. The F-Droid build has no cloud features at all.
 
-Hearsay has no servers, analytics, ads, crash reporting or tracking.
+## Testing builds: diagnostics sent to the developer
+
+Testing builds (the builds published on GitHub while Hearsay is being tested) can send diagnostics to the developer through Sentry (sentry.io). This is controlled by **Settings → Testing → Send test logs to developer (testing builds)**, which is on by default in those builds. While it is on, Hearsay sends:
+
+- **Crash reports**, including app freezes (ANRs) and crashes in the on-device speech and language models, with the device model, Android version and app version.
+- **Engine problems Hearsay recovered from**, such as a model that couldn't start on the graphics chip, a speech engine falling back to another, or a model download that failed its checksum.
+- **For each dictation:** its timings (the "Last dictation" and "Last cleanup" numbers), which models and engines ran, the writing style and the app you dictated into, and **the dictated text: the words as heard and the text Hearsay typed.** If you undo to the words as heard or edit the inserted text soon after, the changed text is sent too.
+
+Audio is never sent. No account, name, email or IP address is attached (Sentry's default personal-data collection is off). Turn the switch off and nothing more is sent.
+
+Public builds (Google Play and F-Droid) are built with telemetry compiled out: they contain no Sentry code and send none of this.
+
+## No tracking
+
+Apart from the testing-build diagnostics above, Hearsay has no servers, analytics, ads, crash reporting or tracking.
 
 ## Children
 
-Hearsay doesn't collect personal information from anyone, including children.
+Public builds don't collect personal information from anyone, including children. Testing builds send the diagnostics described above only while their switch is on.
 
 ## Contact
 

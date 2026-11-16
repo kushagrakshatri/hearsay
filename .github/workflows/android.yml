@@ -31,7 +31,12 @@ jobs:
           $SDKM "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
       - name: Build debug APK
+        env:
+          # Testing diagnostics (Sentry). Empty (no secret, or a fork's PR) = SDK never started, nothing sent.
+          HEARSAY_SENTRY_DSN: ${{ secrets.HEARSAY_SENTRY_DSN }}
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Check the public build compiles without telemetry (-PnoTelemetry)
+        run: ./gradlew :app:compileDebugKotlin -PnoTelemetry --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: hearsay-debug-apk
@@ -40,6 +45,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           HEARSAY_SIGNING_PASSWORD: ${{ secrets.HEARSAY_SIGNING_PASSWORD }}
+          HEARSAY_SENTRY_DSN: ${{ secrets.HEARSAY_SENTRY_DSN }}
         run: |
           if [ -z "$HEARSAY_SIGNING_PASSWORD" ]; then echo "No signing secret; skipping release build"; exit 0; fi
           export HEARSAY_KEYSTORE="$RUNNER_TEMP/hearsay-release.p12"

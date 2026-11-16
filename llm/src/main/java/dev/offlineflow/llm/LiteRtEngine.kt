@@ -80,6 +80,7 @@ class LiteRtEngine private constructor(
             }
         } catch (t: Throwable) {
             Log.w(TAG, "can't prefill the prompt; this call reads it whole", t)
+            Diagnostics.problem("litert: prefill failed", t, mapOf("backend" to backend))
             failed(FullPromptWhy.NO_BASE)
             null
         }
@@ -101,6 +102,7 @@ class LiteRtEngine private constructor(
                 copyMs = (System.nanoTime() - t0) / 1_000_000
             } catch (t: Throwable) {
                 Log.w(TAG, "copying the prefilled prompt failed; preparing it again next call", t)
+                Diagnostics.problem("litert: prompt copy failed", t, mapOf("backend" to backend))
                 closeBase()
                 failed(FullPromptWhy.CLONE_ERROR)
                 why = FullPromptWhy.CLONE_ERROR
@@ -113,6 +115,7 @@ class LiteRtEngine private constructor(
                 // Seen with MTP on a copy ("Failed to register input tensor buffer"), now and then:
                 // redo the call once on a fresh conversation before the caller falls back to rules.
                 Log.w(TAG, "writing on the copied prompt failed; retrying once with the whole prompt", t)
+                Diagnostics.problem("litert: write on copied prompt failed, retrying whole prompt", t, mapOf("backend" to backend))
                 failed(FullPromptWhy.CLONE_ERROR)
                 return send(fresh(p, null), user, maxTokens, FullPromptWhy.CLONE_ERROR, retried = true)
             }
@@ -129,6 +132,7 @@ class LiteRtEngine private constructor(
             // Some builds allow one conversation at a time: drop the prefilled one and retry.
             if (base == null) throw t
             Log.w(TAG, "can't open a conversation beside the prefilled one; closing it and retrying", t)
+            Diagnostics.problem("litert: second conversation refused", t, mapOf("backend" to backend))
             closeBase()
             failed(FullPromptWhy.OPEN_FAILED)
             open(system, p.examples, prefill = false)
@@ -226,6 +230,7 @@ class LiteRtEngine private constructor(
     private fun failed(why: FullPromptWhy) {
         if (policy.failed(why)) {
             Log.w(TAG, "copying the prefilled prompt is off for good: ${policy.failuresInARow} failures in a row (last: ${why.words})")
+            Diagnostics.step("litert: prompt copying off for good", mapOf("failures" to "${policy.failuresInARow}", "last" to why.words))
             closeBase()
         }
     }
@@ -283,7 +288,12 @@ class LiteRtEngine private constructor(
                 // A start that never finished: the process died in it (likely a driver crash).
                 // Twice in a row and this backend is skipped from now on.
                 val unfinished = runCatching { trying.readText().trim().toInt() }.getOrDefault(0)
-                if (unfinished >= 2) { bad.writeText("crashed while starting"); trying.delete(); continue }
+                if (unfinished >= 2) {
+                    bad.writeText("crashed while starting"); trying.delete()
+                    Diagnostics.problem("litert: $name crashed the process while starting twice; skipping it",
+                        IllegalStateException("$name crashed while starting twice"), mapOf("model" to model.name, "backend" to name))
+                    continue
+                }
                 trying.writeText((unfinished + 1).toString())
                 // MTP: on for GPUs except PowerVR (it slows decode there), on the CPU per the setting.
                 // An MTP start that fails is retried once without it before giving up on this backend.
@@ -311,6 +321,7 @@ class LiteRtEngine private constructor(
                         )
                         engine.initialize()
                         trying.delete()
+                        Diagnostics.step("litert: loaded", mapOf("model" to model.name, "backend" to name, "mtp" to "$mtp"))
                         Log.i(TAG, "${model.name} loaded on $name, MTP ${if (mtp) "on" else "off"}" +
                             (if (!mtp && why.isNotEmpty()) " ($why)" else if (!mtp && wantMtp) " (MTP start failed)" else ""))
                         val status = when {
@@ -322,9 +333,15 @@ class LiteRtEngine private constructor(
                         return LiteRtEngine(engine, "LiteRT-LM $name", mtp, status)
                     } catch (t: Throwable) {
                         runCatching { engine?.close() }
-                        if (mtp) { Log.w(TAG, "${model.name} failed to start on $name with MTP; retrying without", t); continue }
+                        if (mtp) {
+                            Log.w(TAG, "${model.name} failed to start on $name with MTP; retrying without", t)
+                            Diagnostics.problem("litert: MTP start failed, retrying without", t, mapOf("model" to model.name, "backend" to name))
+                            continue
+                        }
                         trying.delete()
                         Log.w(TAG, "${model.name} failed to start on $name", t)
+                        Diagnostics.problem(if (gpu) "litert: GPU start failed, trying CPU" else "litert: CPU start failed", t,
+                            mapOf("model" to model.name, "backend" to name))
                         if (gpu) bad.writeText(t.toString().take(500)) // no usable GPU here: go straight to CPU next time
                         if (first == null) first = t
                     }

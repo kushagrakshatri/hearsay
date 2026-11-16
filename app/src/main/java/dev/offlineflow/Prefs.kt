@@ -98,6 +98,16 @@ object Prefs {
         e.apply()
     }
 
+    /**
+     * Testing builds: send diagnostics (crashes, engine fallbacks, each dictation's timings and
+     * text) to the developer's Sentry. On by default when the build has a DSN; absent from public builds.
+     */
+    fun sendTestLogs(c: Context): Boolean = p(c).getBoolean("send_test_logs", true)
+    fun setSendTestLogs(c: Context, on: Boolean) {
+        p(c).edit().putBoolean("send_test_logs", on).apply()
+        dev.offlineflow.telemetry.Telemetry.setEnabled(on)
+    }
+
     fun setupDone(c: Context): Boolean = p(c).getBoolean("setup_done", false)
     fun setSetupDone(c: Context) = p(c).edit().putBoolean("setup_done", true).apply()
 

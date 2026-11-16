@@ -100,6 +100,9 @@ class BubbleService : AccessibilityService() {
     private var lastEditable: AccessibilityNodeInfo? = null
     // Undo to what you actually said: the raw words for the last cleaned insert.
     private var lastRaw: String? = null
+    // Testing diagnostics: the last dictation's id, and the one CorrectionWatch is watching (null: diagnostics off).
+    private var lastDictationId: String? = null
+    private var watchedId: String? = null
     // Set in onDestroy: a check still queued on the main thread must not put up a bubble nobody owns.
     private var destroyed = false
     private var undoable = false
@@ -153,6 +156,8 @@ class BubbleService : AccessibilityService() {
         val change = watch.edited(w, text, SystemClock.elapsedRealtime())
         watch.clear(); watchedText = null
         if (change == null) return
+        watchedId?.let { dev.offlineflow.telemetry.Telemetry.followUp(it, "edited", change.first, change.second) }
+        watchedId = null
         scope.launch {
             val added = withContext(Dispatchers.IO) { runCatching { Learning.learn(this@BubbleService, change.first, change.second) }.getOrDefault(emptyList()) }
             if (added.isEmpty()) return@launch
@@ -374,6 +379,7 @@ class BubbleService : AccessibilityService() {
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor)
         })
         lastInserted = piece; lastRaw = null; watch.clear()
+        lastDictationId?.let { dev.offlineflow.telemetry.Telemetry.followUp(it, "undo to raw", ins, piece) }
         say("Back to what you said")
     }
 
@@ -515,7 +521,9 @@ class BubbleService : AccessibilityService() {
             try {
                 Log.i(TAG, "transcribe ${audio.size} samples on ${System.identityHashCode(this@BubbleService)}")
                 val raw = try { Brain.transcribe(this@BubbleService, models, audio, timing, liveNow, tail) } catch (t: Throwable) {
-                    Log.e(TAG, "transcription failed", t); say("Couldn't write that down"); return@launch
+                    Log.e(TAG, "transcription failed", t)
+                    dev.offlineflow.telemetry.Telemetry.problem("transcription failed", t, mapOf("surface" to "floating mic"), dev.offlineflow.telemetry.Telemetry.Level.ERROR)
+                    say("Couldn't write that down"); return@launch
                 }
                 val node = target() ?: run { say("Tap a text box first"); return@launch }
                 node.refresh()
@@ -543,7 +551,14 @@ class BubbleService : AccessibilityService() {
                 val out = if (style == Style.VERBATIM) cleaned.text else Continuity.apply(cleaned.text, before)
                 put(node, text, sel, out, spaced = true)
                 val ms = SystemClock.elapsedRealtime() - t0
-                timing.line(ms).let { Log.i(TAG, "timing $it"); dev.offlineflow.Prefs.recordTiming(this@BubbleService, it) }
+                timing.line(ms).let { line ->
+                    Log.i(TAG, "timing $line"); dev.offlineflow.Prefs.recordTiming(this@BubbleService, line)
+                    val cloudSpeech = dev.offlineflow.cloud.CloudClient.from(this@BubbleService)
+                        ?.takeIf { dev.offlineflow.cloud.CloudClient.speechOn(this@BubbleService) } != null
+                    lastDictationId = dev.offlineflow.telemetry.Dictations.report(this@BubbleService, "floating mic", timing, ms, models,
+                        style, node.packageName?.toString(), raw, out, cloudSpeech = cloudSpeech, line = line)
+                    watchedId = lastDictationId
+                }
                 // Demo footage comes from a slow emulator; the edit marks the trimmed wait, so leave out its timing.
                 val done = if (Recorder.demoDir != null) "Done" else "Done \u00b7 " + if (ms < 1000) "$ms ms" else "%.1f s".format(ms / 1000f)
                 val rawText = raw.trim()
@@ -604,6 +619,7 @@ class BubbleService : AccessibilityService() {
             })
         } else paste(node, piece)
         lastInserted = piece
+        watchedId = null
         watch.begin(node, updated, before.length, piece, SystemClock.elapsedRealtime())
         watchedText = null
     }

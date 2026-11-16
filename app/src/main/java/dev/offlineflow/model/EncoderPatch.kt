@@ -59,9 +59,15 @@ object EncoderPatch {
         if (encoder.length() != ORIGINAL_BYTES || File(encoder.path + FAILED_SUFFIX).exists()) return
         if (!running.compareAndSet(false, true)) return
         Thread({
-            try { lastOutcome = apply(encoder) } catch (t: Throwable) { lastOutcome = "failed: ${t.message}" }
-            finally { running.set(false) }
+            var threw = false
+            try { lastOutcome = apply(encoder) } catch (t: Throwable) {
+                lastOutcome = "failed: ${t.message}"; threw = true
+                dev.offlineflow.telemetry.Telemetry.problem("encoder patch failed", t)
+            } finally { running.set(false) }
             android.util.Log.i("HearsayEncoderPatch", lastOutcome)
+            val outcome = lastOutcome
+            if (!threw && outcome.startsWith("failed")) dev.offlineflow.telemetry.Telemetry.problem("encoder patch failed", IllegalStateException(outcome))
+            else if (!threw) dev.offlineflow.telemetry.Telemetry.step("speech", "encoder patch: $outcome")
         }, "encoder-patch").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }.start()
     }
 

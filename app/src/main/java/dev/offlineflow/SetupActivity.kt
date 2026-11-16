@@ -263,6 +263,7 @@ class SetupActivity : AppCompatActivity() {
             window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             refreshModels()
             if (failure != null) {
+                dev.offlineflow.telemetry.Telemetry.problem("model download failed (setup)", failure, level = dev.offlineflow.telemetry.Telemetry.Level.ERROR)
                 android.widget.Toast.makeText(this@SetupActivity, "Download failed: ${failure.message}. Tap Download to resume.",
                     android.widget.Toast.LENGTH_LONG).show()
             } else advanceIfDone()

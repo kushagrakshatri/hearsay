@@ -41,6 +41,7 @@ class ParakeetEngine private constructor(
             }
         } catch (t: Throwable) {
             Log.e(TAG, "own engine failed, switching to sherpa", t)
+            dev.offlineflow.telemetry.Telemetry.problem("parakeet own engine failed, switching to sherpa", t)
             runCatching { n.close() }
             native = null
             label = "sherpa (own engine failed: ${short(t)})"
@@ -80,6 +81,7 @@ class ParakeetEngine private constructor(
                 ParakeetEngine(dir, threads, n, null, if (n.hasLayer11) "own engine" else "own engine, no layer-11 yet")
             } catch (t: Throwable) {
                 Log.e(TAG, "own engine didn't load, using sherpa", t)
+                dev.offlineflow.telemetry.Telemetry.problem("parakeet own engine didn't load, using sherpa", t)
                 ParakeetEngine(dir, threads, null, sherpa(dir, threads), "sherpa (own engine didn't load: ${short(t)})")
             }
             // One-time, in the background: add the layer-11 output to the pinned encoder (used from the next load).

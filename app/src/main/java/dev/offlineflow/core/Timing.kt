@@ -23,7 +23,15 @@ class Timing {
     var liveCuts = IntArray(0)
     /** Live cleanup: whether the newest piece reused the prefilled prompt, in plain words. */
     var piecePrompt: String? = null
+    /** For testing diagnostics: the cleanup model's numbers and where it ran (see telemetry.DictationReport). */
+    var cleanRun: dev.offlineflow.llm.RunStats? = null
+    var cleanPieceRun: dev.offlineflow.llm.RunStats? = null
+    var cleanModel: String? = null
+    var cleanBackend: String? = null
+    var cleanLine: String? = null
     fun livePieces(c: dev.offlineflow.cleanup.LlmCleaner) {
+        cleanRun = c.lastRun; cleanPieceRun = c.lastPieceRun?.takeIf { c.lastPieces > 0 }
+        cleanModel = c.modelName; cleanBackend = c.backend; cleanLine = c.lastStatus
         cleanReused = c.lastReused; cleanPieces = c.lastPieces
         piecePrompt = c.lastPieceRun?.takeIf { cleanPieces > 0 }?.let(dev.offlineflow.cleanup.CleanupStatus::prompt)
     }

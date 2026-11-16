@@ -37,6 +37,10 @@ class LlmCleaner private constructor(
     var lastStatus: String? = null
         private set
 
+    /** The engine's numbers behind [lastStatus] for a whole-text call; null when the last [clean] made none. */
+    var lastRun: dev.offlineflow.llm.RunStats? = null
+        private set
+
     private var dictionary = known.take(MAX_DICTIONARY)
     private val knownSet = known.toHashSet()
     private val prefixIds = HashMap<Style, Int>()
@@ -55,7 +59,7 @@ class LlmCleaner private constructor(
      * in the transcript ride in a short note after the cached prompt, for this call only.
      */
     fun clean(raw: String, style: Style, names: List<String> = emptyList(), pieces: List<String>? = null): String {
-        lastStatus = null
+        lastStatus = null; lastRun = null
         lastReused = 0; lastPieces = 0
         // Live cleanup: reuse the stretches cleaned while the user was talking.
         if (cleansLive && style != Style.VERBATIM && pieces != null && pieces.isNotEmpty() &&
@@ -72,7 +76,7 @@ class LlmCleaner private constructor(
             val note = if (zeroShot) null else namesNote(hints(learned + names, input))
             llm.complete(prefixFor(style), note, input, maxTokens = words * 2 + 32).let(::strip)
                 .let { if (zeroShot && style == Style.CASUAL) casualEnding(it) else it }
-                .also { lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
+                .also { lastRun = llm.lastRun; lastStatus = llm.lastRun?.let { CleanupStatus.line(modelName, it) } }
         }
         // Emberon-2 keeps "first …, second …" in one sentence; lay it out as a numbered list.
         return if (zeroShot) Lists.format(out) else out

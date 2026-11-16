@@ -84,6 +84,9 @@ class OfflineFlowIME : InputMethodService() {
     private var hasSelection = false
     private val watch = CorrectionWatch()
     private var fieldKey: String? = null
+    // Testing diagnostics: the last dictation's id, and the one CorrectionWatch is watching (null: diagnostics off).
+    private var lastDictationId: String? = null
+    private var watchedId: String? = null
     private lateinit var wave: LevelView
 
     override fun onCreate() {
@@ -430,6 +433,7 @@ class OfflineFlowIME : InputMethodService() {
                         // Cloud failed: fall back to the on-device model when there is one.
                         if (!models.isReady(models.selected)) throw t
                         Log.w(TAG, "cloud transcription failed, using on-device", t)
+                        dev.offlineflow.telemetry.Telemetry.problem("cloud transcription failed, using on-device", t)
                         Brain.onAsr(timing) { engineForSelected().transcribe(audio) }
                     }.also { if (timing.asr == 0L) timing.asr = SystemClock.elapsedRealtime() - t0 }
                 } else liveNow?.finish(tail, timing) ?: Brain.onAsr(timing) {
@@ -437,6 +441,7 @@ class OfflineFlowIME : InputMethodService() {
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "transcription failed", t)
+                dev.offlineflow.telemetry.Telemetry.problem("transcription failed", t, mapOf("surface" to "keyboard"), dev.offlineflow.telemetry.Telemetry.Level.ERROR)
                 say("Couldn't write that down. ${t.message ?: t.javaClass.simpleName}")
                 return@launch
             }
@@ -485,11 +490,13 @@ class OfflineFlowIME : InputMethodService() {
                 } catch (t: Throwable) {
                     // Offline, plan limit, signed out: fall back to the on-device model (or rules).
                     Log.w(TAG, "cloud cleanup failed, using on-device", t)
+                    dev.offlineflow.telemetry.Telemetry.problem("cloud cleanup failed, using on-device", t)
                     cloudNote = t.message
                     local()
                 } else local()
             } catch (t: Throwable) {
                 Log.e(TAG, "cleanup failed, using rules", t)
+                dev.offlineflow.telemetry.Telemetry.problem("cleanup failed, using rules", t, mapOf("surface" to "keyboard"), dev.offlineflow.telemetry.Telemetry.Level.ERROR)
                 fixWords(rulesFor(heard, s))
             }
             val cleanMs = SystemClock.elapsedRealtime() - t1
@@ -506,7 +513,13 @@ class OfflineFlowIME : InputMethodService() {
             else say("Done \u00b7 ${secs(ms)}" + if (useLlm || s == Style.VERBATIM) "" else " \u00b7 basic cleanup", R.drawable.ic_check)
             cloudNote = null
             Log.i(TAG, "latency=${ms}ms asr=${asrMs}ms cleanup=${cleanMs}ms audio=${audio.size}samples")
-            if (cleaned.isNotEmpty()) Prefs.recordTiming(ctx, timing.line(ms))
+            if (cleaned.isNotEmpty()) {
+                val line = timing.line(ms)
+                Prefs.recordTiming(ctx, line)
+                lastDictationId = dev.offlineflow.telemetry.Dictations.report(ctx, "keyboard", timing, ms, models, s, editorPkg,
+                    raw, lastInserted ?: cleaned, cloudSpeech = cloud != null, line = line)
+                watchedId = lastDictationId
+            }
           } finally {
             if (recorder == null) setMic(MicButton.State.IDLE)
             updateUndo()
@@ -537,7 +550,7 @@ class OfflineFlowIME : InputMethodService() {
                 local()
             } else local()
         } catch (t: Throwable) {
-            Log.e(TAG, "command failed", t); null
+            Log.e(TAG, "command failed", t); dev.offlineflow.telemetry.Telemetry.problem("voice edit failed", t, level = dev.offlineflow.telemetry.Telemetry.Level.ERROR); null
         }
         if (edited == null) { say("Couldn't do \u201c$instruction\u201d. Try saying it another way."); return }
         val ic = currentInputConnection ?: return
@@ -566,6 +579,7 @@ class OfflineFlowIME : InputMethodService() {
     private fun startWatch(piece: String) {
         val key = fieldKey ?: return
         val (text, cursor) = fieldText() ?: return
+        watchedId = null
         watch.begin(key, text, cursor - piece.length, piece, SystemClock.elapsedRealtime())
     }
 
@@ -575,6 +589,8 @@ class OfflineFlowIME : InputMethodService() {
         val now = fieldText()?.first ?: return
         val change = watch.edited(key, now, SystemClock.elapsedRealtime()) ?: return
         watch.clear()
+        watchedId?.let { dev.offlineflow.telemetry.Telemetry.followUp(it, "edited", change.first, change.second) }
+        watchedId = null
         scope.launch {
             val added = withContext(Dispatchers.IO) { runCatching { Learning.learn(this@OfflineFlowIME, change.first, change.second) }.getOrDefault(emptyList()) }
             if (added.isNotEmpty()) say(Learning.message(added), R.drawable.ic_book)
@@ -628,6 +644,7 @@ class OfflineFlowIME : InputMethodService() {
             ic.deleteSurroundingText(ins.length, 0)
             ic.commitText(raw, 1)
             lastInserted = raw
+            lastDictationId?.let { dev.offlineflow.telemetry.Telemetry.followUp(it, "undo to raw", ins, raw) }
         }
         updateUndo()
     }

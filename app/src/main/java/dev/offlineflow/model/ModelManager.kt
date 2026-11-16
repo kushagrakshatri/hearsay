@@ -249,6 +249,8 @@ class ModelManager(context: Context) {
             }
         }
         if (part.length() != a.bytes || sha256(part) != a.sha256) {
+            dev.offlineflow.telemetry.Telemetry.problem("model download failed verification", IllegalStateException("${a.name} size/SHA mismatch"),
+                mapOf("file" to a.name, "bytes" to "${part.length()}", "expected_bytes" to "${a.bytes}"))
             part.delete()
             error("${a.name} failed verification, please download again")
         }

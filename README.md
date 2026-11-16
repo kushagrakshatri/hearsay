@@ -6,7 +6,7 @@ Hold the floating mic in any app, say what you mean (ums, restarts, "no wait, Th
 
 ## Why Hearsay
 
-- **Private by design.** Speech recognition and cleanup both run on-device. No analytics, no telemetry, nothing stored on a server.
+- **Private by design.** Speech recognition and cleanup both run on-device. No analytics, nothing stored on a server. (Testing builds can send diagnostics to the developer while a Settings switch is on; public builds compile that out. See PRIVACY.md.)
 - **Works offline.** Planes, basements, bad signal: no network round trip, so no network lag either.
 - **Free and open source.** Apache-2.0. Read the code, build it yourself.
 - **Learns your words.** Fix a name once and Hearsay adds it to your dictionary by itself.
@@ -46,14 +46,14 @@ Android may grey out the accessibility switch for apps installed outside a store
 ```bash
 git clone --recursive https://github.com/kushagrakshatri/hearsay.git
 cd hearsay
-./gradlew :app:assembleDebug            # add -PnoCloud to compile out all cloud features
+./gradlew :app:assembleDebug            # add -PnoCloud to compile out all cloud features, -PnoTelemetry for testing diagnostics (Sentry)
 ```
 
 Needs JDK 17, Android SDK 35, NDK 27.2.12479018 and CMake 3.22.1.
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md). In short: audio stays in memory, on your phone, and is gone after each dictation. The only network traffic is model downloads, plus ChatGPT or your own key if you turn that on.
+See [PRIVACY.md](PRIVACY.md). In short: audio stays in memory, on your phone, and is gone after each dictation. The only network traffic is model downloads, plus ChatGPT or your own key if you turn that on, plus, in testing builds only, diagnostics (crashes, timings and dictated text) while Settings → Testing → Send test logs is on.
 
 ## Layout
 

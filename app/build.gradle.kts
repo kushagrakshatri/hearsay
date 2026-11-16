@@ -42,6 +42,13 @@ for (abi in listOf("arm64-v8a", "x86_64")) {
     }
 }
 
+// Testing diagnostics (Sentry). The DSN comes from the HEARSAY_SENTRY_DSN environment variable (a CI secret); empty
+// means the SDK is never started and nothing is sent. -PnoTelemetry compiles it all out, Sentry library included
+// (public Play / F-Droid builds), the way -PnoCloud does for cloud features.
+val telemetry = !project.hasProperty("noTelemetry")
+val sentryDsn = if (telemetry) System.getenv("HEARSAY_SENTRY_DSN").orEmpty().trim() else ""
+check(sentryDsn.none { it == '"' || it == '\\' }) { "HEARSAY_SENTRY_DSN has a quote or backslash" }
+
 // CI run number makes every published build an in-place upgrade.
 val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
@@ -59,6 +66,8 @@ android {
         versionName = "0.1.0-build.$buildNumber"
         // Opt-in cloud mode (bring your own key). Build with -PnoCloud to compile it out (F-Droid).
         buildConfigField("boolean", "CLOUD", if (project.hasProperty("noCloud")) "false" else "true")
+        buildConfigField("boolean", "TELEMETRY", telemetry.toString())
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         externalNativeBuild {
             cmake { arguments += listOf("-DANDROID_STL=c++_shared", "-DSHERPA_ORT_DIR=${sherpaOrtDir.absolutePath}") }
         }
@@ -120,6 +129,9 @@ android {
 
     buildFeatures { buildConfig = true }
 
+    // Telemetry's Sentry backend, or its no-op twin for -PnoTelemetry builds.
+    sourceSets.getByName("main").java.srcDir(if (telemetry) "src/telemetry/java" else "src/notelemetry/java")
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -142,5 +154,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation(files(sherpaAar))
     implementation(project(":llm"))
+    if (telemetry) {
+        // Core (crashes, ANRs, events) + NDK (native crashes in llama.cpp, whisper.cpp, Parakeet, ONNX Runtime, LiteRT-LM).
+        // Not the "sentry-android" bundle: that also pulls in session replay, which Hearsay doesn't use.
+        implementation("io.sentry:sentry-android-core:8.64.0")
+        implementation("io.sentry:sentry-android-ndk:8.64.0")
+    }
     testImplementation("junit:junit:4.13.2")
 }

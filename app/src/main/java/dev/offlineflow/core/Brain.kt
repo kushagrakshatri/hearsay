@@ -14,6 +14,7 @@ import dev.offlineflow.cleanup.Style
 import dev.offlineflow.cloud.CloudClient
 import dev.offlineflow.cloud.CloudText
 import dev.offlineflow.model.ModelManager
+import dev.offlineflow.telemetry.Telemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,7 +46,10 @@ object Brain {
         engine?.let { if (engineModel == want && engineOnSherpa == onSherpa) return it }
         engine?.close(); engine = null; engineModel = null
         val t = Timing.now()
-        return Engines.load(models, want).also { engine = it; engineModel = want; engineOnSherpa = onSherpa; asrLoadMs = Timing.now() - t }
+        return Engines.load(models, want).also {
+            engine = it; engineModel = want; engineOnSherpa = onSherpa; asrLoadMs = Timing.now() - t
+            Telemetry.step("speech", "speech model loaded", mapOf("model" to want.name, "engine" to (it.backend ?: "whisper"), "ms" to "$asrLoadMs"))
+        }
     }
 
     /** The selected cleanup LLM, or RulesCleaner when off / not downloaded. [llm] thread only. */
@@ -74,14 +78,18 @@ object Brain {
             // LiteRT-LM couldn't start on GPU or CPU here: use a downloaded GGUF model on llama.cpp.
             val fallback = models.fallbackCleanup()?.takeIf { want.engine == ModelManager.Engine.LITERT }
             Log.e(TAG, "${want.name} failed to load" + (fallback?.let { ", using ${it.name}" } ?: ""), t)
+            Telemetry.problem("cleanup model load failed", t, mapOf("model" to want.name, "fallback" to (fallback?.name ?: "rules")))
             try {
                 fallback?.let(::load)
             } catch (t2: Throwable) {
-                Log.e(TAG, "${fallback?.name} failed to load too", t2); null
+                Log.e(TAG, "${fallback?.name} failed to load too", t2)
+                Telemetry.problem("fallback cleanup model load failed", t2, mapOf("model" to "${fallback?.name}"), Telemetry.Level.ERROR)
+                null
             } ?: run { failedModel = want; return RulesCleaner }
         }
         llmLoadMs = Timing.now() - loadStart
         Log.i(TAG, "cleanup model ${want.name} on ${loaded.backend} in ${llmLoadMs} ms")
+        Telemetry.step("cleanup", "cleanup model loaded", mapOf("model" to want.name, "backend" to loaded.backend, "ms" to "$llmLoadMs"))
         cleaner = loaded; cleanerModel = want
         return loaded
     }
@@ -151,6 +159,7 @@ object Brain {
             } catch (t: Throwable) {
                 if (!models.isReady(models.selected)) throw t
                 Log.w(TAG, "cloud transcription failed, using on-device", t)
+                Telemetry.problem("cloud transcription failed, using on-device", t)
             }
         }
         live?.finish(tail, t)?.let { return it }
@@ -169,7 +178,10 @@ object Brain {
         val c = cleaner?.takeIf { it.cleansLive } ?: return
         if (CloudText.on(ctx)) return
         val d = Dictionary.load(ctx)
-        runCatching { c.cleanAhead(soFar.map { d.apply(it) }, style) }.onFailure { Log.e(TAG, "live cleanup failed", it) }
+        runCatching { c.cleanAhead(soFar.map { d.apply(it) }, style) }.onFailure {
+            Log.e(TAG, "live cleanup failed", it)
+            Telemetry.problem("live cleanup piece failed", it, mapOf("backend" to c.backend))
+        }
     }
 
     class Cleaned(val text: String, val usedLlm: Boolean, val cloudNote: String?)
@@ -206,11 +218,13 @@ object Brain {
                 }.also { t?.apply { cloud = true; llm = Timing.now() - began } }
             } catch (t: Throwable) {
                 Log.w(TAG, "cloud cleanup failed, using on-device", t)
+                Telemetry.problem("cloud cleanup failed, using on-device", t)
                 note = t.message
                 local()
             } else local()
         } catch (t: Throwable) {
             Log.e(TAG, "cleanup failed, using rules", t)
+            Telemetry.problem("cleanup failed, using rules", t, mapOf("model" to "${models.selectedCleanup?.name}"), Telemetry.Level.ERROR)
             fix(rules(heard, style))
         }
         return Cleaned(text, usedLlm, note)
@@ -237,7 +251,7 @@ object Brain {
         editor?.close(); editor = null; editorModel = null
         return runCatching {
             LlmCleaner.load(want, models.file(want), dictionary, models.prefixCacheDir, models.engineCacheDir, models.engineStateDir)
-        }.onFailure { Log.e(TAG, "edit model ${want.name} failed to load", it) }.getOrNull()
+        }.onFailure { Log.e(TAG, "edit model ${want.name} failed to load", it); Telemetry.problem("edit model load failed", it, mapOf("model" to want.name)) }.getOrNull()
             ?.also { editor = it; editorModel = want }
     }
 
@@ -264,7 +278,7 @@ object Brain {
                 Log.w(TAG, "cloud command failed, using on-device", t); local()
             } else local()
         } catch (t: Throwable) {
-            Log.e(TAG, "command failed", t); null
+            Log.e(TAG, "command failed", t); Telemetry.problem("voice edit failed", t, level = Telemetry.Level.ERROR); null
         }
     }
 

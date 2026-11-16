@@ -262,6 +262,16 @@ class SettingsActivity : AppCompatActivity() {
             if (BuildConfig.CLOUD) more += ui.listRow(R.drawable.ic_key, "Your own API key", keySum) { sheet("Your own API key", advancedCloud()) }
             addView(ui.group(*more.toTypedArray()))
 
+            // Testing builds only (a developer DSN compiled in); public builds compile this out (-PnoTelemetry).
+            if (dev.offlineflow.telemetry.Telemetry.available) {
+                addView(ui.overline("Testing"))
+                addView(ui.card(
+                    switch("Send test logs to developer (testing builds)", Prefs.sendTestLogs(context)) { Prefs.setSendTestLogs(context, it) },
+                    ui.hint("Sends crash reports, engine fallbacks and, for each dictation, its timings, what you said and " +
+                        "what Hearsay typed, so the developer can fix mistakes. Public builds don't include this."),
+                ))
+            }
+
             addView(ui.space(24))
             addView(ui.row().apply {
                 gravity = Gravity.CENTER
@@ -435,7 +445,10 @@ class SettingsActivity : AppCompatActivity() {
             }
             downloading -= m
             refresh()
-            result.onFailure { toast("Download failed: ${it.message}") }
+            result.onFailure {
+                dev.offlineflow.telemetry.Telemetry.problem("model download failed", it, mapOf("model" to m.name), dev.offlineflow.telemetry.Telemetry.Level.ERROR)
+                toast("Download failed: ${it.message}")
+            }
         }
     }
 

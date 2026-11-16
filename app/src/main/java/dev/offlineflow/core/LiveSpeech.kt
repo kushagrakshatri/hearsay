@@ -3,6 +3,7 @@ package dev.offlineflow.core
 import android.util.Log
 import dev.offlineflow.audio.Recorder
 import dev.offlineflow.cleanup.Joins
+import dev.offlineflow.telemetry.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -34,7 +35,10 @@ class LiveSpeech(
     fun add(chunk: FloatArray) {
         audioMs += chunk.size * 1000L / Recorder.SAMPLE_RATE
         val d = scope.async(Brain.asr) {
-            runCatching { transcribe(chunk) }.onFailure { Log.e(TAG, "live chunk failed", it) }.getOrNull()
+            runCatching { transcribe(chunk) }.onFailure {
+                Log.e(TAG, "live chunk failed", it)
+                Telemetry.problem("live speech piece failed", it, mapOf("engine" to "${Brain.speechBackend}"))
+            }.getOrNull()
                 ?.also { text ->
                     val soFar = synchronized(texts) { texts += text.trim(); texts.filter { it.isNotEmpty() } }
                     runCatching { onText(soFar) }
@@ -54,7 +58,13 @@ class LiveSpeech(
         // A piece that failed while talking gets one more try on its own before giving up on all of it.
         val done = ds.mapIndexed { i, d ->
             d.await() ?: withContext(Brain.asr) { runCatching { transcribe(cs[i]) }.getOrNull() }
-                ?.also { redone++ } ?: run { t?.liveFailed = true; return null }
+                ?.also { redone++; Telemetry.step("speech", "live piece redone", mapOf("piece" to "$i")) }
+                ?: run {
+                    t?.liveFailed = true
+                    Telemetry.problem("live speech failed, redoing whole recording", IllegalStateException("live piece $i failed twice"),
+                        mapOf("engine" to "${Brain.speechBackend}"))
+                    return null
+                }
         }
         t?.apply { liveWait = Timing.now() - waitFrom; liveAudioMs = audioMs; liveRedone = redone; speechEngine = Brain.speechBackend }
         val last = if (tail.size >= Recorder.SAMPLE_RATE / 4) Brain.onAsr(t) { transcribe(tail) } else ""
