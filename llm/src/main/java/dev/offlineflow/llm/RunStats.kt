@@ -32,4 +32,20 @@ data class RunStats(
     val copyingOff: Boolean = false,
     /** The first try failed and the call was redone on a fresh conversation. */
     val retried: Boolean = false,
+    /** Time to copy the prefilled prompt for this call (outside [ms]); null when it wasn't copied or measured. */
+    val copyMs: Long? = null,
+    /** Runs of the model's fixed-size prefill graph that reading [promptTokens] took; null when unknown. */
+    val promptPasses: Int? = null,
+    /**
+     * What one such run took when the prefilled prompt was first read ([firstReadMs] over its
+     * passes): the price of a run with no copying or switching around it. Null when unknown.
+     */
+    val passMs: Long? = null,
+    /** Time spent writing the [tokens] (decode), from the runtime's own clock; null when unknown. */
+    val decodeMs: Long? = null,
+    /** Part of [ms] outside reading and writing: queueing, switching to the copy, bookkeeping. Null when unknown. */
+    val aroundMs: Long? = null,
+    /** The prefilled prompt's own first read: tokens and time (no copy then). Null when unknown. */
+    val firstReadTokens: Int? = null,
+    val firstReadMs: Long? = null,
 )

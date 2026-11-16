@@ -57,6 +57,33 @@ class CleanupStatusTest {
         assertEquals("re-read prompt (432 tokens) in 900 ms, redone after a copy error", CleanupStatus.prompt(s))
     }
 
+    @Test fun lastPieceSplitsTheRead() {
+        val s = RunStats("LiteRT-LM graphics chip", "MTP on", 2914, 24, 22.0).copy(
+            promptTokens = 31, promptMs = 967, reusedPrompt = true, copyMs = 2, promptPasses = 1, passMs = 240,
+            decodeMs = 1091, aroundMs = 856, firstReadTokens = 403, firstReadMs = 960,
+        )
+        assertEquals(
+            "reused prompt (copied in 2 ms), 31 tokens read in 967 ms = setup ~727 ms + 1 pass ~240 ms; " +
+                "wrote 24 tokens in 1.1 s; 856 ms outside reading and writing",
+            CleanupStatus.prompt(s),
+        )
+        assertEquals(
+            "Gemma 4 E2B \u00b7 LiteRT-LM graphics chip \u00b7 MTP on \u00b7 2914 ms \u00b7 22 tokens/s \u00b7 last piece: " +
+                CleanupStatus.prompt(s) + " \u00b7 prompt first read: 403 tokens in 960 ms (4 passes)",
+            CleanupStatus.line("Gemma 4 E2B", s, piece = true),
+        )
+    }
+
+    @Test fun passesWithoutAYardstick() {
+        val s = gpu.copy(promptTokens = 432, promptMs = 1763, reusedPrompt = false, fullPromptWhy = FullPromptWhy.NAMES_NOTE, promptPasses = 4)
+        assertEquals("re-read prompt (432 tokens) in 1.8 s (4 passes), names note", CleanupStatus.prompt(s))
+    }
+
+    @Test fun setupNeverNegative() {
+        val s = gpu.copy(promptTokens = 31, promptMs = 200, reusedPrompt = true, promptPasses = 1, passMs = 240)
+        assertEquals("reused prompt, 31 tokens read in 200 ms = setup ~0 ms + 1 pass ~240 ms", CleanupStatus.prompt(s))
+    }
+
     @Test fun llamaSaysNothingAboutThePrompt() {
         assertEquals(null, CleanupStatus.prompt(RunStats("llama.cpp processor", "Faster cleanup off", 300, 0, null)))
     }

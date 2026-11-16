@@ -49,6 +49,9 @@ class LiteRtEngine private constructor(
     private var baseHandle = -1
     private val policy = ClonePolicy()
 
+    /** The base's own first read of its prompt (tokens, ms): the cost of reading with no copy around it. */
+    private var baseRead: Pair<Int, Long>? = null
+
     override val preparedCount: Int get() = prompts.size
 
     override fun prepare(system: String, examples: List<String>): Int {
@@ -70,7 +73,11 @@ class LiteRtEngine private constructor(
         closeBase()
         val p = prompts[handle]
         return try {
-            open(p.system, p.examples, prefill = true).also { base = it; baseHandle = handle }
+            val t0 = System.nanoTime()
+            open(p.system, p.examples, prefill = true).also {
+                base = it; baseHandle = handle
+                baseRead = firstRead(it, (System.nanoTime() - t0) / 1_000_000)
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "can't prefill the prompt; this call reads it whole", t)
             failed(FullPromptWhy.NO_BASE)
@@ -84,11 +91,14 @@ class LiteRtEngine private constructor(
         // only when a name on screen or a newly learned word sounds like something in the transcript.
         var why: FullPromptWhy? = if (note != null) FullPromptWhy.NAMES_NOTE else null
         var copy: Conversation? = null
+        var copyMs: Long? = null
         if (note == null) {
             val b = baseFor(handle)
             if (b == null) why = if (policy.on) FullPromptWhy.NO_BASE else policy.lastFailure ?: FullPromptWhy.NO_BASE
             else try {
+                val t0 = System.nanoTime()
                 copy = b.clone()
+                copyMs = (System.nanoTime() - t0) / 1_000_000
             } catch (t: Throwable) {
                 Log.w(TAG, "copying the prefilled prompt failed; preparing it again next call", t)
                 closeBase()
@@ -98,7 +108,7 @@ class LiteRtEngine private constructor(
         }
         if (copy != null) {
             try {
-                return send(copy, user, maxTokens, why = null, retried = false).also { policy.succeeded() }
+                return send(copy, user, maxTokens, why = null, retried = false, copyMs = copyMs).also { policy.succeeded() }
             } catch (t: Throwable) {
                 // Seen with MTP on a copy ("Failed to register input tensor buffer"), now and then:
                 // redo the call once on a fresh conversation before the caller falls back to rules.
@@ -126,18 +136,20 @@ class LiteRtEngine private constructor(
     }
 
     /** Sends [user] on [conv] (closing it after), recording what the call did. */
-    private fun send(conv: Conversation, user: String, maxTokens: Int, why: FullPromptWhy?, retried: Boolean): String {
+    private fun send(conv: Conversation, user: String, maxTokens: Int, why: FullPromptWhy?, retried: Boolean, copyMs: Long? = null): String {
         try {
             val t0 = System.nanoTime()
             val out = conv.sendMessage(Message.user(user), maxOutputToken = maxTokens).toString()
             val ms = (System.nanoTime() - t0) / 1_000_000
-            val s = stats(conv, out, ms, why, retried)
+            val s = stats(conv, out, ms, why, retried, copyMs)
             last = s
             Log.i(TAG, "complete: ${out.length} chars in $ms ms ($backend, MTP ${if (mtp) "on" else "off"}); " +
-                (if (why == null) "copied prompt" else "whole prompt (${why.words}" + (if (!policy.on) ", copying off" else "") + ")") +
+                (if (why == null) "copied prompt in ${copyMs ?: "?"} ms" else "whole prompt (${why.words}" + (if (!policy.on) ", copying off" else "") + ")") +
                 (if (retried) ", retried" else "") +
-                ", read ${s.promptTokens ?: "?"} tokens in ${s.promptMs ?: "?"} ms" +
-                ", ${s.tokens} tokens at ${s.tokensPerSec?.let { "%.1f".format(it) } ?: "?"} tok/s" + (if (s.approx) " (estimated)" else ""))
+                ", read ${s.promptTokens ?: "?"} tokens in ${s.promptMs ?: "?"} ms (${s.promptPasses ?: "?"} passes" +
+                (s.passMs?.let { ", a pass took $it ms on the first read of ${s.firstReadTokens} tokens in ${s.firstReadMs} ms" } ?: "") + ")" +
+                ", wrote ${s.tokens} tokens in ${s.decodeMs ?: "?"} ms at ${s.tokensPerSec?.let { "%.1f".format(it) } ?: "?"} tok/s" + (if (s.approx) " (estimated)" else "") +
+                ", ${s.aroundMs ?: "?"} ms outside reading and writing")
             return out
         } finally {
             runCatching { conv.close() }
@@ -149,8 +161,8 @@ class LiteRtEngine private constructor(
      * estimate from the text (~4 characters a token) over the whole call, marked approximate.
      */
     @OptIn(ExperimentalApi::class)
-    private fun stats(conv: Conversation, out: String, ms: Long, why: FullPromptWhy?, retried: Boolean): RunStats {
-        val engineName = if (backend.endsWith("GPU")) "LiteRT-LM graphics chip" else "LiteRT-LM processor"
+    private fun stats(conv: Conversation, out: String, ms: Long, why: FullPromptWhy?, retried: Boolean, copyMs: Long?): RunStats {
+        val engineName = if (gpu) "LiteRT-LM graphics chip" else "LiteRT-LM processor"
         // Benchmark info is off unless the runtime collects it: after one failure, don't ask again.
         val bench = if (!benchmark) null else runCatching { conv.getBenchmarkInfo() }
             .onFailure { benchmark = false; Log.w(TAG, "no benchmark info from LiteRT-LM; speeds are estimates", it) }.getOrNull()
@@ -168,11 +180,35 @@ class LiteRtEngine private constructor(
             val est = (out.length + 3) / 4
             RunStats(engineName, mtpStatus, ms, est, if (est > 0 && ms > 0) est * 1000.0 / ms else null, approx = true)
         }
+        val passes = promptTokens?.let { PrefillPasses.count(it, greedy = !gpu) }
+        val decodeMs = if (n > 0 && tps > 0.0) (n * 1000.0 / tps).toLong() else null
+        val first = baseRead?.takeIf { why == null }
         return r.copy(
             promptTokens = promptTokens, promptMs = promptMs,
             reusedPrompt = why == null, fullPromptWhy = why,
             copyingOff = !policy.on, retried = retried,
+            copyMs = copyMs, promptPasses = passes, decodeMs = decodeMs,
+            aroundMs = if (promptMs != null && decodeMs != null) (ms - promptMs - decodeMs).coerceAtLeast(0) else null,
+            passMs = first?.let { (tok, t) -> PrefillPasses.count(tok, greedy = !gpu).takeIf { it > 0 }?.let { t / it } },
+            firstReadTokens = first?.first, firstReadMs = first?.second,
         )
+    }
+
+    private val gpu: Boolean get() = backend.endsWith("GPU")
+
+    /**
+     * The prefilled conversation's own read of its prompt: tokens and time from benchmark info
+     * when the runtime reports them, else the token count over the wall time of opening it.
+     */
+    @OptIn(ExperimentalApi::class)
+    private fun firstRead(conv: Conversation, wallMs: Long): Pair<Int, Long>? {
+        val bench = if (benchmark) runCatching { conv.getBenchmarkInfo() }.getOrNull() else null
+        val tokens = bench?.lastPrefillTokenCount?.takeIf { it > 0 }
+            ?: runCatching { conv.getTokenCount() }.getOrNull()?.takeIf { it > 0 } ?: return null
+        val tps = bench?.lastPrefillTokensPerSecond ?: 0.0
+        val ms = if (bench?.lastPrefillTokenCount == tokens && tps > 0.0) (tokens * 1000.0 / tps).toLong() else wallMs
+        Log.i(TAG, "prompt prefilled: $tokens tokens in $ms ms (${PrefillPasses.count(tokens, greedy = !gpu)} passes; opening took $wallMs ms)")
+        return tokens to ms
     }
 
     private fun open(system: String, examples: List<String>, prefill: Boolean): Conversation =
@@ -196,7 +232,7 @@ class LiteRtEngine private constructor(
 
     private fun closeBase() {
         base?.let { runCatching { it.close() } }
-        base = null; baseHandle = -1
+        base = null; baseHandle = -1; baseRead = null
     }
 
     override fun close() {
